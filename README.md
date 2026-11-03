@@ -1,47 +1,38 @@
 # HanziPath — 汉字之路
 
-A responsive React + Vite starter for a Chinese-learning platform supporting both HSK 2.0 and HSK 3.0.
+A responsive React + Vite starter for a Chinese-learning platform supporting HSK 2.0 and HSK 3.0, with Russian, English, and Uzbek Latin interface languages.
 
-## Included in this starter
-- Russian / English interface switch
-- HSK 2.0 and HSK 3.0 selector
-- Vocabulary search and level filters
-- Sample vocabulary entries with pinyin, RU/EN meanings and example sentences
-- Mandarin pronunciation via browser speech synthesis (voice availability depends on device)
+## Included
+- Russian / English / Uzbek Latin interface language selector
+- Centralized translation keys for interface copy
+- Guest language preference saved locally; signed-in preference is prepared through the Supabase `user_preferences` table
+- HSK 2.0 and HSK 3.0 selector, vocabulary search, and level filters
+- Demo vocabulary with pinyin, Russian/English meanings, examples, and browser speech synthesis
+- Uzbek vocabulary and example translation fields with per-translation source and verification metadata
 - Daily checklist and starter dashboard
-- Supabase schema for vocabulary, grammar, exercises, spaced-repetition progress and daily activity
+- Supabase schema for vocabulary, grammar, exercises, spaced-repetition progress, and daily activity
 - Demo mode without Supabase credentials
 
-**Important:** The visible vocabulary is only sample data. This starter does not claim to contain a complete, verified HSK dictionary or a complete native audio library. Populate the database only from a documented, licensed/allowed source and verify translations before marking records `verified=true`.
+**Vocabulary note:** The visible vocabulary is sample data, not a complete or verified HSK dictionary. Uzbek word meanings are intentionally not generated or marked verified. No unverified external HSK dataset is included.
 
 ## Run locally
-1. Install Node.js 20 or newer.
-2. Extract the ZIP.
-3. In this folder run:
-   ```bash
-   npm install
-   npm run dev
-   ```
-4. Open the local URL printed by Vite.
+Requires Node.js 20 or newer.
+
+```bash
+npm install
+npm run dev
+npm run build
+```
 
 ## Connect Supabase
-1. Create a Supabase project.
-2. Open SQL Editor and run `supabase/migrations/001_initial_schema.sql`.
-3. Copy `.env.example` to `.env`.
-4. Fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-5. Restart the dev server.
+1. Configure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in your local environment.
+2. Apply `001_initial_schema.sql` to a new Supabase project if the initial schema is not already present.
+3. Apply `002_uzbek_localization.sql` to add nullable Uzbek translation/example fields, verification metadata, and the RLS-protected language preference table.
+4. Restart the dev server.
 
-Never put a Supabase service-role key in frontend code. Only use the anon/publishable key in this app; RLS policies protect private user progress.
+The migration is additive. It does not import vocabulary, alter HSK 2.0 records, or delete or rewrite user progress. Never put a Supabase service-role key in frontend code; use only the anon/publishable key.
 
-## Publish free (subject to provider limits)
-1. Create a GitHub repository and upload this project.
-2. In Vercel choose **Add New → Project**, import the GitHub repository.
-3. Vercel detects Vite automatically. Add the same two `VITE_SUPABASE_*` environment variables in Project Settings → Environment Variables.
-4. Deploy. Your public `*.vercel.app` URL will appear after a successful deployment.
+Profile language persistence requires a signed-in Supabase user. The current starter does not provide sign-in/sign-up flows; guests can always persist their choice in browser local storage.
 
-## Next development milestones
-1. Add Supabase sign-up/sign-in UI and persistent progress writes.
-2. Import verified vocabulary for both standards with source/version metadata.
-3. Add actual listening recordings or a licensed TTS provider.
-4. Build flashcard scheduling, grammar content, sentence-order exercises and timed mock exams.
-5. Add admin-only import tooling and tests for vocabulary counts/duplicates.
+## Publish
+Import the existing repository into your hosting provider and configure the same two `VITE_SUPABASE_*` variables in its environment settings.
