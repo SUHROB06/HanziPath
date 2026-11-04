@@ -165,7 +165,7 @@ export async function searchVocabulary(
     // applying the documented result cap, so no page-boundary omission is silent.
     for (let offset = 0; offset < selectedIds.length; offset += PAGE_SIZE) {
       const ids = selectedIds.slice(offset, offset + PAGE_SIZE)
-      const { data, error } = await supabase.from('vocabulary_items')
+      const { data, error } = await client.from('vocabulary_items')
         .select('*, vocabulary_readings(*), translations(*)')
         .eq('translations.verification_status', 'verified')
         .in('id', ids)
