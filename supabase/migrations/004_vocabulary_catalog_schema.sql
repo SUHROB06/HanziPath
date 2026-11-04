@@ -42,11 +42,20 @@ create table if not exists public.vocabulary_items (
   simplified text not null check (length(btrim(simplified)) > 0),
   traditional text,
   source_id uuid not null references public.data_sources(id) on delete restrict,
+  verification_status text not null default 'unverified'
+  check (verification_status in ('unverified', 'verified', 'rejected')),
+reviewed_by text,
+reviewed_at timestamptz,
+review_notes text,
   source_entry_key text,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (id, source_id)
+  unique (id, source_id),
+check (
+  verification_status not in ('verified', 'rejected')
+  or (nullif(btrim(reviewed_by), '') is not null and reviewed_at is not null)
+)
 );
 
 create table if not exists public.vocabulary_readings (
@@ -74,6 +83,11 @@ create table if not exists public.standard_memberships (
   standard_version_id uuid not null,
   vocabulary_item_id uuid not null references public.vocabulary_items(id) on delete cascade,
   source_id uuid not null references public.data_sources(id) on delete restrict,
+  verification_status text not null default 'unverified'
+  check (verification_status in ('unverified', 'verified', 'rejected')),
+reviewed_by text,
+reviewed_at timestamptz,
+review_notes text,
   level_category text not null,
   level_order integer not null check (level_order between 1 and 7),
   source_entry_key text,
@@ -81,7 +95,11 @@ create table if not exists public.standard_memberships (
   created_at timestamptz not null default now(),
   unique (standard_version_id, vocabulary_item_id),
   foreign key (standard_version_id, source_id)
-    references public.standard_versions(id, source_id) on delete cascade
+    references public.standard_versions(id, source_id) on delete cascade,
+  check (
+  verification_status not in ('verified', 'rejected')
+  or (nullif(btrim(reviewed_by), '') is not null and reviewed_at is not null)
+)
 );
 
 create table if not exists public.examples (
@@ -249,7 +267,7 @@ create policy "Published vocabulary items are readable"
     select 1 from public.data_sources as s
     where s.id = vocabulary_items.source_id
       and s.rights_status = 'approved' and s.is_publishable
-  ));
+ ) and verification_status = 'verified');
 
 drop policy if exists "Published readings are readable" on public.vocabulary_readings;
 create policy "Published readings are readable"
@@ -274,6 +292,8 @@ drop policy if exists "Published memberships are readable" on public.standard_me
 create policy "Published memberships are readable"
   on public.standard_memberships for select to anon, authenticated
   using (
+  verification_status = 'verified'
+and
     exists (
       select 1 from public.data_sources as s
       where s.id = standard_memberships.source_id
