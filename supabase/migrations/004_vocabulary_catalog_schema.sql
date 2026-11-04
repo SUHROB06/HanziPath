@@ -87,7 +87,7 @@ create table if not exists public.standard_memberships (
 create table if not exists public.examples (
   id uuid primary key default gen_random_uuid(),
   vocabulary_item_id uuid not null references public.vocabulary_items(id) on delete cascade,
-  reading_id uuid references public.vocabulary_readings(id) on delete set null,
+  reading_id uuid,
   sentence_hanzi text not null check (length(btrim(sentence_hanzi)) > 0),
   sentence_pinyin text,
   source_id uuid not null references public.data_sources(id) on delete restrict,
@@ -102,13 +102,15 @@ create table if not exists public.examples (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (id, vocabulary_item_id),
+  foreign key (reading_id, vocabulary_item_id)
+    references public.vocabulary_readings(id, vocabulary_item_id) on delete set null (reading_id),
   check (verification_status <> 'verified' or (reviewed_at is not null and (reviewer_id is not null or reviewer_name is not null)))
 );
 
 create table if not exists public.translations (
   id uuid primary key default gen_random_uuid(),
   vocabulary_item_id uuid not null references public.vocabulary_items(id) on delete cascade,
-  reading_id uuid references public.vocabulary_readings(id) on delete set null,
+  reading_id uuid,
   example_id uuid,
   locale text not null check (locale in ('en', 'ru', 'uz')),
   content_kind text not null check (content_kind in ('meaning', 'example_translation')),
@@ -125,7 +127,7 @@ create table if not exists public.translations (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   foreign key (reading_id, vocabulary_item_id)
-    references public.vocabulary_readings(id, vocabulary_item_id) on delete cascade,
+    references public.vocabulary_readings(id, vocabulary_item_id) on delete set null (reading_id),
   foreign key (example_id, vocabulary_item_id)
     references public.examples(id, vocabulary_item_id) on delete cascade,
   check (
