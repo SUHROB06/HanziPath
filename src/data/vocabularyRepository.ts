@@ -20,14 +20,13 @@ const EMPTY_CATALOG_ERROR: RepositoryError = {
   message: 'Vocabulary catalog is unavailable because Supabase is not configured.',
 }
 
-// Keep pages below PostgREST's common default maximum and verify every page against
-// the exact count, so a lower configured server limit cannot silently skip rows.
+// Keyset pages are deliberately small and bounded below PostgREST's common default maximum.
 const PAGE_SIZE = 100
 const DEFAULT_SEARCH_LIMIT = 50
 const MAX_SEARCH_LIMIT = 100
 const INCOMPLETE_PAGE_ERROR: RepositoryError = {
   code: 'INCOMPLETE_PAGINATED_RESULT',
-  message: 'The vocabulary query returned an incomplete page; results may not be safely represented.',
+  message: 'The vocabulary query returned an incomplete or changing page; results may not be safely represented.',
 }
 
 function asRepositoryError(error: unknown): RepositoryError {
@@ -54,33 +53,58 @@ function unique<T extends { id: string }>(rows: T[]): T[] {
   return [...new Map(rows.map(row => [row.id, row])).values()]
 }
 
-/** Fetch all rows in stable pages. Exact-count mismatches return an error, never partial data. */
-async function fetchAllPages<T>(
-  queryPage: (from: number, to: number) => any,
+/**
+ * Fetch rows in ascending unique-ID keyset pages. Each response includes an exact
+ * count for the current cursor's remaining rows; count/page mismatches fail closed.
+ * Inserts or deletes with IDs at/before the cursor cannot shift later pages. Changes
+ * after the cursor during a scan are detected by the remaining-count check and return
+ * an error instead of potentially inaccurate partial results. The query must select
+ * a unique `id`, order ascending by that ID, and apply `gt('id', cursor)` when present.
+ */
+async function fetchAllPages<T extends { id: string }>(
+  queryPage: (cursor: string | null, limit: number) => any,
 ): Promise<RepositoryResult<T[]>> {
   const rows: T[] = []
-  let total: number | null = null
+  let cursor: string | null = null
+  let expectedRemaining: number | null = null
 
   try {
-    for (let offset = 0; total === null || offset < total; offset += PAGE_SIZE) {
-      const { data, error, count } = await queryPage(offset, offset + PAGE_SIZE - 1)
+    while (true) {
+      const { data, error, count } = await queryPage(cursor, PAGE_SIZE)
       if (error) return failed([], error)
-      if (total === null) {
-        if (typeof count !== 'number') {
-          return failed([], { code: 'MISSING_EXACT_COUNT', message: 'The database did not return an exact row count.' })
-        }
-        total = count
+      if (typeof count !== 'number') {
+        return failed([], { code: 'MISSING_EXACT_COUNT', message: 'The database did not return an exact row count.' })
       }
+      if (expectedRemaining === null) expectedRemaining = count
+      else if (count !== expectedRemaining) return failed([], INCOMPLETE_PAGE_ERROR)
 
       const page = (data ?? []) as T[]
-      const expectedRows = Math.min(PAGE_SIZE, total - offset)
-      if (page.length !== expectedRows) return failed([], INCOMPLETE_PAGE_ERROR)
+      const expectedPageSize = Math.min(PAGE_SIZE, expectedRemaining)
+      if (page.length !== expectedPageSize) return failed([], INCOMPLETE_PAGE_ERROR)
+      if (page.length === 0) break
+
+      const pageIds = new Set(page.map(row => row.id))
+      if (pageIds.size !== page.length || (cursor !== null && page[0].id <= cursor)) {
+        return failed([], INCOMPLETE_PAGE_ERROR)
+      }
       rows.push(...page)
+      cursor = page[page.length - 1].id
+      expectedRemaining -= page.length
+      if (expectedRemaining === 0) break
     }
     return { data: rows, error: null }
   } catch (error) {
     return failed([], error)
   }
+}
+
+/**
+ * Apply a cursor and page size to a PostgREST query whose ordering is ascending unique ID.
+ * All repository callers use UUID primary keys for this stable keyset.
+ */
+function keysetPage(query: any, cursor: string | null, limit: number): any {
+  const afterCursor = cursor === null ? query : query.gt('id', cursor)
+  return afterCursor.order('id', { ascending: true }).limit(limit)
 }
 
 /**
@@ -105,18 +129,16 @@ export async function searchVocabulary(
       : DEFAULT_SEARCH_LIMIT
 
     const [itemMatches, readingMatches, translationMatches] = await Promise.all([
-      fetchAllPages<VocabularyItem>((from, to) => supabase.from('vocabulary_items')
+      fetchAllPages<VocabularyItem>((cursor, limit) => keysetPage(supabase.from('vocabulary_items')
         .select('*', { count: 'exact' })
-        .or(`simplified.ilike.${pattern},traditional.ilike.${pattern}`)
-        .order('id', { ascending: true }).range(from, to)),
-      fetchAllPages<VocabularyReading>((from, to) => supabase.from('vocabulary_readings')
-        .select('*', { count: 'exact' }).ilike('pinyin', pattern)
-        .order('id', { ascending: true }).range(from, to)),
-      fetchAllPages<Translation>((from, to) => {
+        .or(`simplified.ilike.${pattern},traditional.ilike.${pattern}`), cursor, limit)),
+      fetchAllPages<VocabularyReading>((cursor, limit) => keysetPage(supabase.from('vocabulary_readings')
+        .select('*', { count: 'exact' }).ilike('pinyin', pattern), cursor, limit)),
+      fetchAllPages<Translation>((cursor, limit) => {
         let query = supabase.from('translations').select('*', { count: 'exact' })
           .eq('verification_status', 'verified').ilike('text', pattern)
         if (options.locale) query = query.eq('locale', options.locale)
-        return query.order('id', { ascending: true }).range(from, to)
+        return keysetPage(query, cursor, limit)
       }),
     ])
 
@@ -280,10 +302,9 @@ export async function getVocabularyCounts(
     }
     if (!standardVersionId) return { data: counts, error: null }
 
-    const memberships = await fetchAllPages<{ id: string; level_category: StandardLevel }>((from, to) =>
-      supabase.from('standard_memberships').select('id, level_category', { count: 'exact' })
-        .eq('standard_version_id', standardVersionId)
-        .order('id', { ascending: true }).range(from, to),
+    const memberships = await fetchAllPages<{ id: string; level_category: StandardLevel }>((cursor, limit) =>
+      keysetPage(supabase.from('standard_memberships').select('id, level_category', { count: 'exact' })
+        .eq('standard_version_id', standardVersionId), cursor, limit),
     )
     if (memberships.error) return failed(emptyCounts, memberships.error)
     counts.totalMemberships = memberships.data.length
