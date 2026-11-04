@@ -52,7 +52,7 @@ function escapeLike(value: string): string {
 function normalizePinyin(value: string): string {
   return value.toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300\u0301\u0304\u030C]/g, '')
+    .replace(/\p{M}/gu, '')
     .replace(/[1-5\s]/g, '')
 }
 

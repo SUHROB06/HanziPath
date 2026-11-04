@@ -22,6 +22,13 @@ type Word = {
 }
 type Notice = { text: string; kind: 'success' | 'error' | 'info' }
 
+function normalizePinyin(value: string): string {
+  return value.toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[1-5\s]/g, '')
+}
+
 // The demo set is retained as-is. Uzbek vocabulary glosses are intentionally not fabricated.
 const words: Word[] = [
   {hanzi:'你好',pinyin:'nǐ hǎo',ru:'привет',en:'hello',level20:1,level30:1,example:'你好！',examplePinyin:'nǐ hǎo!',exampleRu:'Привет!',exampleEn:'Hello!'},
@@ -102,8 +109,10 @@ export default function App() {
 
   const filtered = useMemo(() => words.filter(w => {
     const searchable = [w.hanzi, w.pinyin, w.ru, w.en, w.uzVerified ? w.uz : ''].filter(Boolean).join(' ')
+    const normalizedQuery = normalizePinyin(query)
     return (level === 'all' || String(system === '2.0' ? w.level20 : w.level30) === level) &&
-      searchable.toLocaleLowerCase().includes(query.toLocaleLowerCase())
+      (searchable.toLocaleLowerCase().includes(query.toLocaleLowerCase()) ||
+        (normalizedQuery !== '' && normalizePinyin(w.pinyin).includes(normalizedQuery)))
   }), [level, query, system])
 
   const speak = (text: string) => {
