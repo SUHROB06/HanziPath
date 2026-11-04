@@ -118,6 +118,7 @@ export async function searchVocabulary(
   options: { limit?: number; locale?: 'en' | 'ru' | 'uz' } = {},
 ): Promise<RepositoryResult<VocabularySearchResult[]>> {
   if (!supabase) return failed([], EMPTY_CATALOG_ERROR)
+  const client = supabase
   const term = searchText.trim()
   if (!term) return { data: [], error: null }
 
@@ -129,13 +130,13 @@ export async function searchVocabulary(
       : DEFAULT_SEARCH_LIMIT
 
     const [itemMatches, readingMatches, translationMatches] = await Promise.all([
-      fetchAllPages<VocabularyItem>((cursor, limit) => keysetPage(supabase.from('vocabulary_items')
+      fetchAllPages<VocabularyItem>((cursor, limit) => keysetPage(client.from('vocabulary_items')
         .select('*', { count: 'exact' })
         .or(`simplified.ilike.${pattern},traditional.ilike.${pattern}`), cursor, limit)),
-      fetchAllPages<VocabularyReading>((cursor, limit) => keysetPage(supabase.from('vocabulary_readings')
+      fetchAllPages<VocabularyReading>((cursor, limit) => keysetPage(client.from('vocabulary_readings')
         .select('*', { count: 'exact' }).ilike('pinyin', pattern), cursor, limit)),
       fetchAllPages<Translation>((cursor, limit) => {
-        let query = supabase.from('translations').select('*', { count: 'exact' })
+        let query = client.from('translations').select('*', { count: 'exact' })
           .eq('verification_status', 'verified').ilike('text', pattern)
         if (options.locale) query = query.eq('locale', options.locale)
         return keysetPage(query, cursor, limit)
@@ -291,9 +292,10 @@ export async function getVocabularyCounts(
 ): Promise<RepositoryResult<VocabularyCounts>> {
   const emptyCounts: VocabularyCounts = { totalItems: 0, totalMemberships: null, byLevel: {} }
   if (!supabase) return failed(emptyCounts, EMPTY_CATALOG_ERROR)
+  const client = supabase
 
   try {
-    const itemCountResponse = await supabase.from('vocabulary_items').select('id', { count: 'exact', head: true })
+    const itemCountResponse = await client.from('vocabulary_items').select('id', { count: 'exact', head: true })
     if (itemCountResponse.error) return failed(emptyCounts, itemCountResponse.error)
     const counts: VocabularyCounts = {
       totalItems: itemCountResponse.count ?? 0,
@@ -303,7 +305,7 @@ export async function getVocabularyCounts(
     if (!standardVersionId) return { data: counts, error: null }
 
     const memberships = await fetchAllPages<{ id: string; level_category: StandardLevel }>((cursor, limit) =>
-      keysetPage(supabase.from('standard_memberships').select('id, level_category', { count: 'exact' })
+      keysetPage(client.from('standard_memberships').select('id, level_category', { count: 'exact' })
         .eq('standard_version_id', standardVersionId), cursor, limit),
     )
     if (memberships.error) return failed(emptyCounts, memberships.error)
