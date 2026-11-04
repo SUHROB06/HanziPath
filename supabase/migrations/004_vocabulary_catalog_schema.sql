@@ -255,6 +255,8 @@ drop policy if exists "Published readings are readable" on public.vocabulary_rea
 create policy "Published readings are readable"
   on public.vocabulary_readings for select to anon, authenticated
   using (
+      verification_status = 'verified'
+    and
     exists (
       select 1 from public.data_sources as s
       where s.id = vocabulary_readings.source_id
@@ -295,7 +297,7 @@ drop policy if exists "Published translations are readable" on public.translatio
 create policy "Published translations are readable"
   on public.translations for select to anon, authenticated
   using (
-    verification_status <> 'rejected'
+    verification_status = 'verified'
     and exists (
       select 1 from public.data_sources as s
       where s.id = translations.source_id
@@ -313,6 +315,7 @@ create policy "Published translations are readable"
         join public.data_sources as reading_source on reading_source.id = r.source_id
         where r.id = translations.reading_id
           and r.vocabulary_item_id = translations.vocabulary_item_id
+          and r.verification_status = 'verified'
           and reading_source.rights_status = 'approved' and reading_source.is_publishable
       )
     )
@@ -322,7 +325,7 @@ create policy "Published translations are readable"
         join public.data_sources as example_source on example_source.id = e.source_id
         where e.id = translations.example_id
           and e.vocabulary_item_id = translations.vocabulary_item_id
-          and e.verification_status <> 'rejected'
+          and e.verification_status = 'verified'
           and example_source.rights_status = 'approved' and example_source.is_publishable
       )
     )
@@ -332,7 +335,7 @@ drop policy if exists "Published examples are readable" on public.examples;
 create policy "Published examples are readable"
   on public.examples for select to anon, authenticated
   using (
-    verification_status <> 'rejected'
+    verification_status = 'verified'
     and exists (
       select 1 from public.data_sources as s
       where s.id = examples.source_id
@@ -350,6 +353,7 @@ create policy "Published examples are readable"
         join public.data_sources as reading_source on reading_source.id = r.source_id
         where r.id = examples.reading_id
           and r.vocabulary_item_id = examples.vocabulary_item_id
+          and r.verification_status = 'verified'
           and reading_source.rights_status = 'approved' and reading_source.is_publishable
       )
     )
