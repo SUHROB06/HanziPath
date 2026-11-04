@@ -49,6 +49,13 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_(),.]/g, character => `\\${character}`)
 }
 
+function normalizePinyin(value: string): string {
+  return value.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300\u0301\u0304\u030C]/g, '')
+    .replace(/[1-5\s]/g, '')
+}
+
 function unique<T extends { id: string }>(rows: T[]): T[] {
   return [...new Map(rows.map(row => [row.id, row])).values()]
 }
@@ -124,6 +131,7 @@ export async function searchVocabulary(
 
   try {
     const pattern = `%${escapeLike(term)}%`
+    const normalizedTerm = normalizePinyin(term)
     const requestedLimit = options.limit ?? DEFAULT_SEARCH_LIMIT
     const resultLimit = Number.isFinite(requestedLimit)
       ? Math.max(1, Math.min(Math.floor(requestedLimit), MAX_SEARCH_LIMIT))
@@ -134,7 +142,7 @@ export async function searchVocabulary(
         .select('*', { count: 'exact' })
         .or(`simplified.ilike.${pattern},traditional.ilike.${pattern}`), cursor, limit)),
       fetchAllPages<VocabularyReading>((cursor, limit) => keysetPage(client.from('vocabulary_readings')
-        .select('*', { count: 'exact' }).ilike('pinyin', pattern), cursor, limit)),
+        .select('*', { count: 'exact' }), cursor, limit)),
       fetchAllPages<Translation>((cursor, limit) => {
         let query = client.from('translations').select('*', { count: 'exact' })
           .eq('verification_status', 'verified').ilike('text', pattern)
@@ -146,10 +154,13 @@ export async function searchVocabulary(
     const queryError = itemMatches.error ?? readingMatches.error ?? translationMatches.error
     if (queryError) return failed([], queryError)
 
+    const matchingReadings = normalizedTerm
+      ? readingMatches.data.filter(reading => normalizePinyin(reading.pinyin).includes(normalizedTerm))
+      : []
     const matchedTranslations = translationMatches.data
     const candidates = new Set<string>([
       ...itemMatches.data.map(item => item.id),
-      ...readingMatches.data.map(reading => reading.vocabulary_item_id),
+      ...matchingReadings.map(reading => reading.vocabulary_item_id),
       ...matchedTranslations
         .filter(translation => translation.verification_status === 'verified')
         .map(translation => translation.vocabulary_item_id),
