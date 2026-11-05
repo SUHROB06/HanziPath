@@ -75,7 +75,10 @@ create table if not exists public.vocabulary_readings (
   updated_at timestamptz not null default now(),
   unique (vocabulary_item_id, pinyin, source_id),
   unique (id, vocabulary_item_id),
-  check (verification_status <> 'verified' or (reviewed_by is not null and reviewed_at is not null))
+  check (
+  verification_status not in ('verified', 'rejected')
+  or (nullif(btrim(reviewed_by), '') is not null and reviewed_at is not null)
+)
 );
 
 create table if not exists public.standard_memberships (
@@ -122,7 +125,13 @@ create table if not exists public.examples (
   unique (id, vocabulary_item_id),
   foreign key (reading_id, vocabulary_item_id)
     references public.vocabulary_readings(id, vocabulary_item_id) on delete set null (reading_id),
-  check (verification_status <> 'verified' or (reviewed_at is not null and (reviewer_id is not null or reviewer_name is not null)))
+  check (
+  verification_status not in ('verified', 'rejected')
+  or (
+    reviewed_at is not null
+    and (reviewer_id is not null or nullif(btrim(reviewer_name), '') is not null)
+  )
+)
 );
 
 create table if not exists public.translations (
@@ -152,7 +161,13 @@ create table if not exists public.translations (
     (content_kind = 'meaning' and example_id is null)
     or (content_kind = 'example_translation' and example_id is not null)
   ),
-  check (verification_status <> 'verified' or (reviewed_at is not null and (reviewer_id is not null or reviewer_name is not null)))
+check (
+  verification_status not in ('verified', 'rejected')
+  or (
+    reviewed_at is not null
+    and (reviewer_id is not null or nullif(btrim(reviewer_name), '') is not null)
+  )
+)
 );
 
 -- Enforce that a catalog membership is explicitly valid for its own standard.
