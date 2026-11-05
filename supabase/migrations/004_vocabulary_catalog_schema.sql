@@ -191,6 +191,79 @@ create table if not exists public.translations (
   )
 );
 
+-- Validate that example translations use exactly the same reading
+-- as their referenced examples, including when reading_id is NULL.
+
+create or replace function public.validate_catalog_example_reading()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  example_reading_id uuid;
+  example_vocabulary_item_id uuid;
+begin
+  if tg_table_name = 'translations' then
+    if new.example_id is null then
+      return new;
+    end if;
+
+    select e.reading_id, e.vocabulary_item_id
+    into example_reading_id, example_vocabulary_item_id
+    from public.examples as e
+    where e.id = new.example_id;
+
+    if not found then
+      raise exception 'Referenced example does not exist';
+    end if;
+
+    if new.vocabulary_item_id is distinct from example_vocabulary_item_id
+       or new.reading_id is distinct from example_reading_id then
+      raise exception
+        'Translation vocabulary item and reading must match the referenced example';
+    end if;
+
+    return new;
+
+  elsif tg_table_name = 'examples' then
+    if exists (
+      select 1
+      from public.translations as t
+      where t.example_id = new.id
+        and (
+          t.vocabulary_item_id is distinct from new.vocabulary_item_id
+          or t.reading_id is distinct from new.reading_id
+        )
+    ) then
+      raise exception
+        'Existing translations must match the updated example vocabulary item and reading';
+    end if;
+
+    return new;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists translation_example_reading_check
+  on public.translations;
+
+create constraint trigger translation_example_reading_check
+after insert or update on public.translations
+deferrable initially deferred
+for each row
+execute function public.validate_catalog_example_reading();
+
+drop trigger if exists example_translation_reading_check
+  on public.examples;
+
+create constraint trigger example_translation_reading_check
+after update on public.examples
+deferrable initially deferred
+for each row
+execute function public.validate_catalog_example_reading();
+
 -- Preserve reviewer identity when an auth user is deleted.
 -- The FK then sets reviewer_id to NULL, while reviewer_name keeps
 -- an archival label containing the original UUID.
