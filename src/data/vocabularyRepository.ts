@@ -33,9 +33,14 @@ const INCOMPLETE_PAGE_ERROR: RepositoryError = {
 function asRepositoryError(error: unknown): RepositoryError {
   if (error && typeof error === 'object') {
     const candidate = error as { code?: unknown; message?: unknown }
+
     return {
-      code: typeof candidate.code === 'string' ? candidate.code : 'VOCABULARY_QUERY_FAILED',
-      message: typeof candidate.message === 'string' ? candidate.message : 'The vocabulary request failed.',
+      code: typeof candidate.code === 'string'
+        ? candidate.code
+        : 'VOCABULARY_QUERY_FAILED',
+      message: typeof candidate.message === 'string'
+        ? candidate.message
+        : 'The vocabulary request failed.',
     }
   }
 
@@ -64,12 +69,17 @@ function unique<T extends { id: string }>(rows: T[]): T[] {
   return [...new Map(rows.map(row => [row.id, row])).values()]
 }
 
+/**
+ * Fetches every page using keyset pagination.
+ * PostgREST exact count is the total count on every page,
+ * not the number of rows remaining.
+ */
 async function fetchAllPages<T extends { id: string }>(
   queryPage: (cursor: string | null, limit: number) => any,
 ): Promise<RepositoryResult<T[]>> {
   const rows: T[] = []
   let cursor: string | null = null
-  let expectedRemaining: number | null = null
+  let expectedTotal: number | null = null
 
   try {
     while (true) {
@@ -84,14 +94,17 @@ async function fetchAllPages<T extends { id: string }>(
         })
       }
 
-      if (expectedRemaining === null) {
-        expectedRemaining = count
-      } else if (count !== expectedRemaining) {
+      if (expectedTotal === null) {
+        expectedTotal = count
+      } else if (count !== expectedTotal) {
         return failed([], INCOMPLETE_PAGE_ERROR)
       }
 
       const page = (data ?? []) as T[]
-      const expectedPageSize = Math.min(PAGE_SIZE, expectedRemaining)
+      const expectedPageSize = Math.min(
+        PAGE_SIZE,
+        Math.max(0, expectedTotal - rows.length),
+      )
 
       if (page.length !== expectedPageSize) {
         return failed([], INCOMPLETE_PAGE_ERROR)
@@ -110,9 +123,8 @@ async function fetchAllPages<T extends { id: string }>(
 
       rows.push(...page)
       cursor = page[page.length - 1].id
-      expectedRemaining -= page.length
 
-      if (expectedRemaining === 0) break
+      if (rows.length >= expectedTotal) break
     }
 
     return { data: rows, error: null }
@@ -121,8 +133,14 @@ async function fetchAllPages<T extends { id: string }>(
   }
 }
 
-function keysetPage(query: any, cursor: string | null, limit: number): any {
-  const afterCursor = cursor === null ? query : query.gt('id', cursor)
+function keysetPage(
+  query: any,
+  cursor: string | null,
+  limit: number,
+): any {
+  const afterCursor = cursor === null
+    ? query
+    : query.gt('id', cursor)
 
   return afterCursor
     .order('id', { ascending: true })
@@ -130,11 +148,15 @@ function keysetPage(query: any, cursor: string | null, limit: number): any {
 }
 
 /**
- * Searches simplified/traditional characters, pinyin, and verified translations.
+ * Searches simplified/traditional characters, pinyin,
+ * and verified translations.
  */
 export async function searchVocabulary(
   searchText: string,
-  options: { limit?: number; locale?: 'en' | 'ru' | 'uz' } = {},
+  options: {
+    limit?: number
+    locale?: 'en' | 'ru' | 'uz'
+  } = {},
 ): Promise<RepositoryResult<VocabularySearchResult[]>> {
   if (!supabase) return failed([], EMPTY_CATALOG_ERROR)
 
@@ -153,40 +175,42 @@ export async function searchVocabulary(
       ? Math.max(1, Math.min(Math.floor(requestedLimit), MAX_SEARCH_LIMIT))
       : DEFAULT_SEARCH_LIMIT
 
-    const [itemMatches, readingMatches, translationMatches] = await Promise.all([
-      fetchAllPages<VocabularyItem>((cursor, limit) =>
-        keysetPage(
-          client.from('vocabulary_items')
+    const [itemMatches, readingMatches, translationMatches] =
+      await Promise.all([
+        fetchAllPages<VocabularyItem>((cursor, limit) =>
+          keysetPage(
+            client.from('vocabulary_items')
+              .select('*', { count: 'exact' })
+              .or(`simplified.ilike.${pattern},traditional.ilike.${pattern}`),
+            cursor,
+            limit,
+          ),
+        ),
+
+        fetchAllPages<VocabularyReading>((cursor, limit) =>
+          keysetPage(
+            client.from('vocabulary_readings')
+              .select('*', { count: 'exact' })
+              .eq('verification_status', 'verified'),
+            cursor,
+            limit,
+          ),
+        ),
+
+        fetchAllPages<Translation>((cursor, limit) => {
+          let query = client.from('translations')
             .select('*', { count: 'exact' })
-            .or(`simplified.ilike.${pattern},traditional.ilike.${pattern}`),
-          cursor,
-          limit,
-        ),
-      ),
+            .eq('verification_status', 'verified')
+            .eq('content_kind', 'meaning')
+            .ilike('text', pattern)
 
-      fetchAllPages<VocabularyReading>((cursor, limit) =>
-        keysetPage(
-          client.from('vocabulary_readings')
-            .select('*', { count: 'exact' }),
-          cursor,
-          limit,
-        ),
-      ),
+          if (options.locale) {
+            query = query.eq('locale', options.locale)
+          }
 
-      fetchAllPages<Translation>((cursor, limit) => {
-        let query = client.from('translations')
-          .select('*', { count: 'exact' })
-          .eq('verification_status', 'verified')
-          .eq('content_kind', 'meaning')
-          .ilike('text', pattern)
-
-        if (options.locale) {
-          query = query.eq('locale', options.locale)
-        }
-
-        return keysetPage(query, cursor, limit)
-      }),
-    ])
+          return keysetPage(query, cursor, limit)
+        }),
+      ])
 
     const queryError =
       itemMatches.error ??
@@ -288,8 +312,123 @@ export async function searchVocabulary(
 }
 
 /**
- * Retrieves a catalog item and its associated readings, examples, and translations.
- * Verification statuses are retained so callers can decide what to display.
+ * Returns the first catalog page for browsing.
+ * Only rows visible under Supabase RLS can be returned.
+ */
+export async function getVocabularyCatalog(
+  options: {
+    standardVersionId?: string
+    level?: StandardLevel
+    limit?: number
+  } = {},
+): Promise<RepositoryResult<Array<VocabularyDetails & {
+  level_category?: StandardLevel
+}>>> {
+  if (!supabase) return failed([], EMPTY_CATALOG_ERROR)
+
+  const client = supabase
+  const requestedLimit = options.limit ?? PAGE_SIZE
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.max(1, Math.min(Math.floor(requestedLimit), 500))
+    : PAGE_SIZE
+
+  try {
+    let itemIds: string[] = []
+    const levelByItem = new Map<string, StandardLevel>()
+
+    if (options.standardVersionId) {
+      let membershipQuery = client.from('standard_memberships')
+        .select('vocabulary_item_id, level_category')
+        .eq('standard_version_id', options.standardVersionId)
+        .order('level_order', { ascending: true })
+
+      if (options.level) {
+        membershipQuery = membershipQuery.eq(
+          'level_category',
+          options.level,
+        )
+      }
+
+      const { data, error } = await membershipQuery.limit(limit)
+
+      if (error) return failed([], error)
+
+      for (const membership of data ?? []) {
+        const itemId = membership.vocabulary_item_id as string
+        itemIds.push(itemId)
+        levelByItem.set(
+          itemId,
+          membership.level_category as StandardLevel,
+        )
+      }
+    } else {
+      const { data, error } = await client.from('vocabulary_items')
+        .select('id')
+        .order('simplified', { ascending: true })
+        .limit(limit)
+
+      if (error) return failed([], error)
+
+      itemIds = (data ?? []).map(row => row.id as string)
+    }
+
+    itemIds = [...new Set(itemIds)]
+
+    if (itemIds.length === 0) {
+      return { data: [], error: null }
+    }
+
+    const details: Array<VocabularyDetails & {
+      level_category?: StandardLevel
+    }> = []
+
+    for (let offset = 0; offset < itemIds.length; offset += PAGE_SIZE) {
+      const ids = itemIds.slice(offset, offset + PAGE_SIZE)
+
+      const { data, error } = await client.from('vocabulary_items')
+        .select('*, vocabulary_readings(*), examples(*), translations(*)')
+        .in('id', ids)
+
+      if (error) return failed([], error)
+
+      const rows = (data ?? []) as Array<VocabularyItem & {
+        vocabulary_readings?: VocabularyReading[] | null
+        examples?: Example[] | null
+        translations?: Translation[] | null
+      }>
+
+      const rowsById = new Map(rows.map(row => [row.id, row]))
+
+      for (const id of ids) {
+        const row = rowsById.get(id)
+
+        if (!row) continue
+
+        details.push({
+          ...row,
+          vocabulary_readings: (row.vocabulary_readings ?? []).filter(
+            reading => reading.verification_status === 'verified',
+          ),
+          examples: (row.examples ?? []).filter(
+            example => example.verification_status === 'verified',
+          ),
+          translations: (row.translations ?? []).filter(
+            translation => translation.verification_status === 'verified',
+          ),
+          level_category: levelByItem.get(id),
+        })
+      }
+    }
+
+    return { data: details, error: null }
+  } catch (error) {
+    return failed([], error)
+  }
+}
+
+/**
+ * Retrieves a catalog item and its associated readings,
+ * examples, and translations.
  */
 export async function getVocabularyDetails(
   vocabularyItemId: string,
@@ -333,7 +472,8 @@ export async function getVocabularyDetails(
 }
 
 /**
- * Filters items through explicit membership in a selected standard version and level.
+ * Filters items through explicit membership
+ * in a selected standard version and level.
  */
 export async function filterVocabularyByStandardAndLevel(
   standardVersionId: string,
@@ -380,8 +520,7 @@ export async function filterVocabularyByStandardAndLevel(
 }
 
 /**
- * Returns standard versions known to the catalog.
- * Publication eligibility must be checked before displaying them publicly.
+ * Returns standard versions visible under Supabase RLS.
  */
 export async function getStandardVersions(
   standardCode?: StandardCode,
