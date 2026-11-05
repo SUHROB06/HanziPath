@@ -114,7 +114,7 @@ const ru: Record<TranslationKey, string> = {
   'dashboard.review': 'Повторение',
   'dashboard.reviewText': 'Регулярно повторяй слова, чтобы надолго сохранить их в памяти.',
   'dashboard.openFlashcards': 'Открыть карточки',
-  'dashboard.coming': 'Этот раздел появится н�� следующем этапе развития сайта.',
+  'dashboard.coming': 'Этот раздел появится на следующем этапе развития сайта.',
   'vocab.kicker': 'СЛОВАРЬ',
   'vocab.title': 'Словарь',
   'vocab.demo': 'Демонстрационные данные',
