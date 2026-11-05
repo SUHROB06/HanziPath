@@ -172,8 +172,9 @@ create table if not exists public.translations (
     on delete set null (reading_id),
   foreign key (example_id, vocabulary_item_id)
     references public.examples(id, vocabulary_item_id) on delete cascade,
-  foreign key (example_id, vocabulary_item_id, reading_id)
+    foreign key (example_id, vocabulary_item_id, reading_id)
     references public.examples(id, vocabulary_item_id, reading_id)
+    on update cascade
     on delete cascade,
   check (
     (content_kind = 'meaning' and example_id is null)
