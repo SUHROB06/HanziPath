@@ -228,7 +228,12 @@ export default function App() {
           throw new Error(standardsResult.error.message)
         }
 
-        const standard = standardsResult.data[0]
+        const standard = [...standardsResult.data].sort((a, b) => {
+          const dateA = a.effective_at ?? a.published_at ?? ''
+          const dateB = b.effective_at ?? b.published_at ?? ''
+
+          return dateB.localeCompare(dateA) || b.version_key.localeCompare(a.version_key)
+        })[0]
 
         // Pending or unpublished sources are intentionally invisible under RLS.
         if (!standard) {

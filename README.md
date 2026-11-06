@@ -28,9 +28,19 @@ npm run build
 1. Configure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in your local environment.
 2. Apply `001_initial_schema.sql` to a new Supabase project if the initial schema is not already present.
 3. Apply `002_uzbek_localization.sql` to add nullable Uzbek translation/example fields, verification metadata, and the RLS-protected language preference table.
-4. Restart the dev server.
+4. Apply `003_uzbek_translation_metadata.sql` to document the source and verification requirements for Uzbek text.
+5. Apply `supabase/migrations/004_vocabulary_catalog_schema.sql` only after reviewing the target database and confirming the migration has not already been applied.
+6. Restart the dev server.
 
 The migration is additive. It does not import vocabulary, alter HSK 2.0 records, or delete or rewrite user progress. Never put a Supabase service-role key in frontend code; use only the anon/publishable key.
+
+Migration `004` creates a separate, empty, provenance-aware vocabulary catalog. It does not populate the catalog or change the legacy vocabulary tables. Public catalog reads require both an approved, publishable data source and verified content. The demo dictionary remains visible until approved catalog data exists.
+
+## Vocabulary data status
+
+The current demo words are samples, not complete HSK data. No external HSK dataset has been imported. See [`VOCABULARY_DATA_SOURCES.md`](VOCABULARY_DATA_SOURCES.md) for the candidate-source audit, license notices, coverage gaps, and the conditions for preparing an import.
+
+The UI labels HSK 3.0 as the 2025 exam syllabus. When several catalog versions exist, it selects the most recently effective or published standard version.
 
 Profile language persistence requires a signed-in Supabase user. The current starter does not provide sign-in/sign-up flows; guests can always persist their choice in browser local storage.
 
