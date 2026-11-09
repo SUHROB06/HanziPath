@@ -157,6 +157,60 @@ const originalLessonWords: Word[] = lessonVocabulary.map((entry, index) => ({
   exampleEn: '',
 }))
 
+const classroomDialogue = [
+  {
+    key: 'learner',
+    hanzi: '老师，可以再说一遍吗？',
+    pinyin: 'Lǎoshī, kěyǐ zài shuō yí biàn ma?',
+    meaning: {
+      ru: 'Учитель, можно повторить ещё раз?',
+      en: 'Teacher, could you say that again?',
+      uz: 'Ustoz, yana bir marta ayta olasizmi?',
+    },
+  },
+  {
+    key: 'teacher',
+    hanzi: '当然可以。我们一起练习吧。',
+    pinyin: 'Dāngrán kěyǐ. Wǒmen yìqǐ liànxí ba.',
+    meaning: {
+      ru: 'Конечно. Давай потренируемся вместе.',
+      en: 'Of course. Let’s practice together.',
+      uz: 'Albatta. Keling, birga mashq qilamiz.',
+    },
+  },
+] as const
+
+const closingReading = {
+  hanzi: '今天的课很有意思。回家以后，我要再读一次，也要多练习。',
+  meaning: {
+    ru: 'Сегодняшний урок интересный. Дома я прочитаю его ещё раз и буду больше практиковаться.',
+    en: 'Today’s lesson is interesting. At home I’ll read it again and practice some more.',
+    uz: 'Bugungi dars qiziqarli. Uyda uni yana bir marta o‘qiyman va ko‘proq mashq qilaman.',
+  },
+  options: {
+    ru: [
+      'Я ещё раз прочитаю урок дома и буду практиковаться.',
+      'Я пойду в библиотеку и выберу новую книгу.',
+      'Я закончил урок и больше не буду заниматься.',
+    ],
+    en: [
+      'I’ll read the lesson again at home and practice more.',
+      'I’ll go to the library to choose a new book.',
+      'I finished the lesson and will stop studying.',
+    ],
+    uz: [
+      'Darsni uyda yana o‘qib, ko‘proq mashq qilaman.',
+      'Kutubxonaga borib, yangi kitob tanlayman.',
+      'Darsni tugatdim va endi o‘qimayman.',
+    ],
+  },
+} as const
+
+const lessonFlowKeys = [
+  'course.flow.topic', 'course.flow.words', 'course.flow.dialogue',
+  'course.flow.grammar', 'course.flow.listening', 'course.flow.reading', 'course.flow.review',
+] as const
+
 type ExamSection = 'listening' | 'reading' | 'writing' | 'translation' | 'speaking'
 type ExamQuestion = {
   section: ExamSection
@@ -669,6 +723,7 @@ export default function App() {
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>(() => readStored(COMPLETED_LESSONS_KEY, []))
   const [level, setLevel] = useState('all')
+  const [vocabularyCollection, setVocabularyCollection] = useState<'course' | 'hsk'>('course')
   const [query, setQuery] = useState('')
   const [dictionaryPage, setDictionaryPage] = useState(0)
   const [menu, setMenu] = useState(false)
@@ -685,6 +740,7 @@ export default function App() {
   const [listeningIndex, setListeningIndex] = useState(0)
   const [listeningChoice, setListeningChoice] = useState<string | null>(null)
   const [lessonListeningChoice, setLessonListeningChoice] = useState<string | null>(null)
+  const [closingChoice, setClosingChoice] = useState<number | null>(null)
   const [examSystem, setExamSystem] = useState<CourseSystem>('2.0')
   const [examLevel, setExamLevel] = useState<CourseLevel>(1)
   const [examQuestionsState, setExamQuestionsState] = useState<ExamQuestion[]>([])
@@ -943,15 +999,31 @@ export default function App() {
   }
 
   const availableWords = databaseWords ?? (reviewWords?.length ? reviewWords : words)
-  const currentWords = useMemo(() => availableWords.filter(word => {
-    const membership = system === '2.0' ? word.level20 : word.level30
-    return membership !== null && membership !== undefined && membership !== ''
-  }), [availableWords, system])
+  const currentWords = useMemo(() => vocabularyCollection === 'course'
+    ? originalLessonWords.filter(word => word.courseSystems?.includes(system))
+    : availableWords.filter(word => {
+      const membership = system === '2.0' ? word.level20 : word.level30
+      return membership !== null && membership !== undefined && membership !== ''
+    }), [availableWords, system, vocabularyCollection])
   const lessonEntries = [...(reviewWords?.length ? reviewWords : availableWords), ...originalLessonWords]
   const lessonAssignments = useMemo(() => lessonWordAssignments(lessonEntries), [lessonEntries])
   const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const activeLesson = lessonTemplates.find(lesson => lesson.id === activeLessonId && lesson.system === courseSystem && lesson.level === courseLevel) ?? courseLessons[0]
   const activeLessonWords = activeLesson ? lessonAssignments[activeLesson.id] ?? [] : []
+  const dialogueLines = activeLesson ? [
+    {
+      key: 'lesson-example',
+      speaker: t('course.speaker.teacher'),
+      hanzi: activeLesson.grammar.example,
+      pinyin: activeLesson.grammar.pinyin,
+      meaning: activeLesson.grammar.meaning,
+    },
+    ...classroomDialogue.map(line => ({
+      ...line,
+      speaker: t(line.key === 'teacher' ? 'course.speaker.teacher' : 'course.speaker.learner'),
+      meaning: line.meaning[lang],
+    })),
+  ] : []
   const courseFallbackWords = wordsForCourseLevel(lessonEntries, courseSystem, courseLevel)
   const studyWords = activeLessonWords.length ? activeLessonWords : courseFallbackWords
   const knownInCurrentWords = knownWords.filter(id => currentWords.some(word => wordId(word) === id)).length
@@ -980,7 +1052,9 @@ export default function App() {
       ].filter(Boolean).join(' ')
 
       const normalizedQuery = normalizePinyin(query)
-      const activeLevel = system === '2.0' ? word.level20 : word.level30
+      const activeLevel = vocabularyCollection === 'course'
+        ? word.courseStage
+        : system === '2.0' ? word.level20 : word.level30
 
       return (
         (level === 'all' || String(activeLevel).replace('7-9', '7') === level) &&
@@ -993,9 +1067,9 @@ export default function App() {
         )
       )
     })
-  }, [currentWords, level, query, system])
+  }, [currentWords, level, query, system, vocabularyCollection])
 
-  useEffect(() => setDictionaryPage(0), [system, level, query])
+  useEffect(() => setDictionaryPage(0), [system, level, query, vocabularyCollection])
 
   const pageSize = 60
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
@@ -1019,6 +1093,13 @@ export default function App() {
   const levelNames = system === '2.0'
     ? ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6']
     : ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6', 'HSK 7–9']
+
+  const levelFilterOptions = vocabularyCollection === 'course'
+    ? Array.from({ length: system === '2.0' ? 6 : 9 }, (_, index) => ({
+      value: String(index + 1),
+      label: `${t('vocab.courseStage')} ${index + 1} · ${currentWords.filter(word => word.courseStage === index + 1).length}`,
+    }))
+    : levels.map((count, index) => ({ value: String(index + 1), label: `${levelNames[index]} · ${count}` }))
 
   const activeSectionName = section < 7
     ? t(navKeys[section])
@@ -1260,6 +1341,7 @@ export default function App() {
               setCourseLevel(1)
               setActiveLessonId(null)
               setLessonListeningChoice(null)
+              setClosingChoice(null)
               setShowAnswer(false)
               setCardIndex(0)
             }}>HSK {standard}</button>)}
@@ -1273,6 +1355,7 @@ export default function App() {
                 setCourseLevel(course as CourseLevel)
                 setActiveLessonId(null)
                 setLessonListeningChoice(null)
+                setClosingChoice(null)
                 setListeningChoice(null)
                 setShowAnswer(false)
                 setCardIndex(0)
@@ -1288,14 +1371,27 @@ export default function App() {
           {courseSystem === '3.0' && courseLevel >= 7 && <p className="notice-text shared-band-note">{t('course.sharedBandNote')}</p>}
 
           {activeLessonId && activeLesson && <div className="lesson-detail">
-            <button className="outline lesson-back" onClick={() => { setActiveLessonId(null); setLessonListeningChoice(null) }}>‹ {t('course.back')}</button>
+            <button className="outline lesson-back" onClick={() => { setActiveLessonId(null); setLessonListeningChoice(null); setClosingChoice(null) }}>‹ {t('course.back')}</button>
             <div className="lesson-detail-heading">
               <div><span className="kicker">HSK {courseSystem} · {courseLevel}{courseSystem === '3.0' && courseLevel >= 7 ? ` · ${t('course.stage')}` : ''} · {t('course.lesson')} {activeLesson.chapter}{activeLesson.part > 1 ? `.${activeLesson.part}` : ''}</span><h2>{activeLesson.title}</h2></div>
               <span className="demo-tag">{activeLesson.minutes} {t('common.minutes')}</span>
             </div>
 
+            <nav className="lesson-route" aria-label={t('course.lessonFlow')}>
+              {lessonFlowKeys.map((key, index) => <span key={key}><i>{String(index + 1).padStart(2, '0')}</i>{t(key)}</span>)}
+            </nav>
+
+            <section className="course-block lesson-opening">
+              <span className="kicker">01 · {t('course.topicIntro')}</span>
+              <h3>{activeLesson.title}</h3>
+              <p>{t('course.topicWarmup')}</p>
+              <div className="lesson-theme-words">
+                {activeLessonWords.slice(0, 4).map(word => <span key={wordId(word)}>{word.hanzi}</span>)}
+              </div>
+            </section>
+
             <section className="course-block">
-              <div className="course-block-head"><div><span className="kicker">{t('course.newWords')}</span><h3>{newWordsCountLabel(activeLessonWords.length, lang)}</h3></div>
+              <div className="course-block-head"><div><span className="kicker">02 · {t('course.newWords')}</span><h3>{newWordsCountLabel(activeLessonWords.length, lang)}</h3></div>
                 {activeLessonWords.length > 0 && <button className="primary" onClick={() => { setCardIndex(0); setShowAnswer(false); setSection(3) }}>{t('course.cards')}<ChevronRight size={16}/></button>}
               </div>
               {activeLessonWords.length ? <div className="lesson-words">
@@ -1309,8 +1405,23 @@ export default function App() {
               {Boolean(reviewWords?.length) && <p className="source-credit">{t('course.translationNote')}</p>}
             </section>
 
+            <section className="course-block lesson-dialogue">
+              <div className="course-block-head"><div><span className="kicker">03 · {t('course.readingDialogue')}</span><h3>{t('course.readingCue')}</h3></div></div>
+              <ol className="dialogue-script">
+                {dialogueLines.map((line, index) => <li key={line.key}>
+                  <span className="dialogue-speaker">{line.speaker}</span>
+                  <div className="dialogue-line-copy">
+                    <b className="dialogue-hanzi">{line.hanzi}</b>
+                    <span className="dialogue-pinyin">{line.pinyin}</span>
+                    <small>{line.meaning}</small>
+                  </div>
+                  <button className="sound" onClick={() => speak(line.hanzi)} aria-label={`${t('vocab.listen')}: ${line.hanzi}`}><Volume2 size={17}/></button>
+                </li>)}
+              </ol>
+            </section>
+
             <section className="course-block grammar-focus">
-              <div className="course-block-head"><div><span className="kicker">{t('course.grammar')}</span><h3>{activeLesson.grammar.title}</h3></div>
+              <div className="course-block-head"><div><span className="kicker">04 · {t('course.grammar')}</span><h3>{activeLesson.grammar.title}</h3></div>
                 <button className="sound" aria-label={t('vocab.listen')} onClick={() => speak(activeLesson.grammar.example)}><Volume2 size={18}/></button>
               </div>
               <p>{activeLesson.grammar.explanation}</p>
@@ -1319,7 +1430,7 @@ export default function App() {
             </section>
 
             <section className="course-block lesson-listening">
-              <div className="course-block-head"><div><span className="kicker">{t('course.listen')}</span><h3>{t('course.listenPrompt')}</h3></div>
+              <div className="course-block-head"><div><span className="kicker">05 · {t('course.listen')}</span><h3>{t('course.listenPrompt')}</h3></div>
                 <button className="primary" onClick={() => speak(activeLesson.grammar.example)}><Volume2 size={17}/>{t('exam.play')}</button>
               </div>
               <div className="answer-options">
@@ -1337,6 +1448,41 @@ export default function App() {
               </div>
               {lessonListeningChoice && <p className={`feedback ${lessonListeningChoice === activeLesson.grammar.meaning ? 'success' : 'error'}`}>{lessonListeningChoice === activeLesson.grammar.meaning ? t('listening.correct') : t('listening.incorrect')}</p>}
               {lessonListeningChoice && <button className="outline" onClick={() => setLessonListeningChoice(null)}>{t('listening.next')}</button>}
+            </section>
+
+            <section className="course-block lesson-unassisted-reading">
+              <div className="course-block-head"><div><span className="kicker">06 · {t('course.finalReading')}</span><h3>{t('course.readWithoutPinyin')}</h3></div>
+                <button className="sound" onClick={() => speak(closingReading.hanzi)} aria-label={`${t('vocab.listen')}: ${closingReading.hanzi}`}><Volume2 size={18}/></button>
+              </div>
+              <p className="unassisted-text" lang="zh-CN">{closingReading.hanzi}</p>
+              <p className="reading-question">{t('course.readingQuestion')}</p>
+              <div className="answer-options">
+                {closingReading.options[lang].map((option, index) => <button key={option} className={`answer-option ${closingChoice !== null && index === 0 ? 'correct' : ''} ${closingChoice === index && index !== 0 ? 'incorrect' : ''}`} disabled={closingChoice !== null} onClick={() => {
+                  setClosingChoice(index)
+                  if (index === 0) recordActivity()
+                }}><span>{option}</span></button>)}
+              </div>
+              {closingChoice !== null && <p className={`feedback ${closingChoice === 0 ? 'success' : 'error'}`}>{closingChoice === 0 ? t('listening.correct') : t('listening.incorrect')}</p>}
+            </section>
+
+            <section className="course-block lesson-review">
+              <div className="course-block-head"><div><span className="kicker">07 · {t('course.finalReview')}</span><h3>{t('course.reviewPrompt')}</h3></div></div>
+              <div className="lesson-recap-grid">
+                <div className="lesson-recap-item">
+                  <b>{t('course.reviewWords')} · {activeLessonWords.length}</b>
+                  <ul>{activeLessonWords.map(word => <li key={wordId(word)}><strong>{word.hanzi}</strong><span>{word.pinyin} · {localeMeaning(word, lang) || t('vocab.translationUnavailable')}</span></li>)}</ul>
+                </div>
+                <div className="lesson-recap-item">
+                  <b>{t('course.reviewGrammar')}</b>
+                  <p>{activeLesson.grammar.title}</p>
+                  <code>{activeLesson.grammar.pattern}</code>
+                </div>
+                <div className="lesson-recap-item">
+                  <b>{t('course.reviewText')}</b>
+                  <p className="recap-hanzi" lang="zh-CN">{closingReading.hanzi}</p>
+                  <span>{closingReading.meaning[lang]}</span>
+                </div>
+              </div>
             </section>
 
             <div className="lesson-finish-row">
@@ -1358,6 +1504,7 @@ export default function App() {
               <button className="course-open" onClick={() => {
                 setActiveLessonId(lesson.id)
                 setLessonListeningChoice(null)
+                setClosingChoice(null)
                 setListeningChoice(null)
                 setCardIndex(0)
                 setListeningIndex(0)
@@ -1377,33 +1524,40 @@ export default function App() {
               <h2>{t('vocab.title')}</h2>
             </div>
             <span className="demo-tag">
-              {databaseWords ? t('common.database') : reviewWords?.length ? t('vocab.openDataset') : t('vocab.demo')}
+              {vocabularyCollection === 'course' ? t('vocab.courseCollection') : databaseWords ? t('common.database') : reviewWords?.length ? t('vocab.openDataset') : t('vocab.demo')}
             </span>
           </div>
 
+          <div className="standard-switch vocabulary-switch" role="group" aria-label={t('vocab.collection')}>
+            <button className={`outline ${vocabularyCollection === 'course' ? 'selected' : ''}`} aria-pressed={vocabularyCollection === 'course'} onClick={() => { setVocabularyCollection('course'); setLevel('all') }}>{t('vocab.courseCollection')}</button>
+            <button className={`outline ${vocabularyCollection === 'hsk' ? 'selected' : ''}`} aria-pressed={vocabularyCollection === 'hsk'} onClick={() => { setVocabularyCollection('hsk'); setLevel('all') }}>{t('vocab.hskCollection')}</button>
+          </div>
+
           <p className="notice-text">
-            {databaseWords
-              ? t('vocab.catalogReady')
-              : reviewWords?.length
-                ? t('vocab.reviewNotice')
-                : reviewWords === null
-                  ? t('vocab.loading')
-                  : t('vocab.demoNotice')}
+            {vocabularyCollection === 'course'
+              ? t('vocab.courseNotice')
+              : databaseWords
+                ? t('vocab.catalogReady')
+                : reviewWords?.length
+                  ? t('vocab.reviewNotice')
+                  : reviewWords === null
+                    ? t('vocab.loading')
+                    : t('vocab.demoNotice')}
           </p>
 
-          {Boolean(reviewWords?.length) && !databaseWords && <>
+          {(vocabularyCollection === 'course' || (Boolean(reviewWords?.length) && !databaseWords)) && <>
             <div className="dictionary-summary">
-              <div><strong>{currentWords.length.toLocaleString(lang)}</strong><span>{system === '2.0' ? t('vocab.wordsInHsk20') : t('vocab.wordsInHsk30')}</span></div>
+              <div><strong>{currentWords.length.toLocaleString(lang)}</strong><span>{vocabularyCollection === 'course' ? t('vocab.wordsInCourse') : system === '2.0' ? t('vocab.wordsInHsk20') : t('vocab.wordsInHsk30')}</span></div>
               <div><strong>{filtered.length.toLocaleString(lang)}</strong><span>{t('vocab.matchingWords')}</span></div>
               <div><strong>{pageSize}</strong><span>{t('vocab.resultsPerPage')}</span></div>
             </div>
-            <p className="source-credit">
+            {Boolean(reviewWords?.length) && !databaseWords && vocabularyCollection === 'hsk' && <p className="source-credit">
               {t('vocab.attribution')}{' '}
               <a href="https://hearmandarin.com/datasets/" target="_blank" rel="noreferrer">HearMandarin</a>{' · '}
               <a href="https://huggingface.co/datasets/Maqsudjonpolatov/hsk-chinese-uzbek-russian" target="_blank" rel="noreferrer">Zitou</a>{' · '}
               <a href="https://hanzibook.com/ru/hsk-3-0" target="_blank" rel="noreferrer">HanziBook</a>{' · '}
               <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>
-            </p>
+            </p>}
           </>}
 
           {catalogError && (
@@ -1436,11 +1590,7 @@ export default function App() {
             <label className="sr-only" htmlFor="level-filter">{t('vocab.level')}</label>
             <select id="level-filter" value={level} onChange={e => setLevel(e.target.value)}>
               <option value="all">{t('vocab.allLevels')}</option>
-              {levels.map((count, i) => (
-                <option value={String(i + 1)} key={count}>
-                  {levelNames[i]} · {count}
-                </option>
-              ))}
+              {levelFilterOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}
             </select>
           </div>
 
@@ -1462,7 +1612,9 @@ export default function App() {
                 </div>
 
                 <span className="level-pill">
-                  HSK {String(system === '2.0' ? word.level20 : word.level30).replace('7-9', '7–9')}
+                  {vocabularyCollection === 'course'
+                    ? `${t('vocab.courseStageShort')} ${word.courseStage}`
+                    : `HSK ${String(system === '2.0' ? word.level20 : word.level30).replace('7-9', '7–9')}`}
                 </span>
 
                 <button
@@ -1475,9 +1627,9 @@ export default function App() {
                 </button>
 
                 <div className="word-meanings">
-                  <div><b>RU</b><span>{word.ru || t('vocab.translationUnavailable')}</span>{Boolean(reviewWords?.length) && <small>{translationStatusLabel(word.ruStatus)}</small>}</div>
+                  <div><b>RU</b><span>{word.ru || t('vocab.translationUnavailable')}</span>{word.ruStatus && <small>{translationStatusLabel(word.ruStatus)}</small>}</div>
                   <div><b>EN</b><span>{word.en || t('vocab.translationUnavailable')}</span></div>
-                  <div><b>UZ</b><span>{word.uz || t('vocab.translationUnavailable')}</span>{Boolean(reviewWords?.length) && <small>{translationStatusLabel(word.uzStatus)}</small>}</div>
+                  <div><b>UZ</b><span>{word.uz || t('vocab.translationUnavailable')}</span>{word.uzStatus && <small>{translationStatusLabel(word.uzStatus)}</small>}</div>
                 </div>
 
                 {word.example && (
