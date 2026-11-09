@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tsbuildinfo
+*.log
+.env
+.env.*
+!.env.example
+supabase/private-import/
+public/vocabulary-review.json
+# Local candidate assembly helper may contain draft mappings; keep it private.
+scripts/assemble_vocabulary_candidates.py
