@@ -58,6 +58,10 @@ The gap-filling meanings were drafted from English glosses for this project. The
 
 The exact upstream files used here are published with explicit license grants: HearMandarin and Zitou declare CC BY 4.0, while HanziBook declares CC BY-SA 4.0. The combined adapted vocabulary file is therefore marked CC BY-SA 4.0 and carries those attributions in the app. These grants cover reuse of the publishers' files under their terms. They are not an endorsement by CTI and do not resolve every question about the official syllabus itself.
 
+## Original lesson vocabulary
+
+`src/data/lessonVocabulary.ts` contains 464 HanziPath-authored entries for the lesson activities. This set was written for the course and is not imported from the candidate datasets or presented as an official HSK vocabulary list. Stages 1–6 are used in the HSK 2.0 and HSK 3.0 course flows; stages 7–9 are used only in the HSK 3.0 course flow. Stage labels are a teaching sequence and do not claim independently verified HSK membership. RU/EN/UZ glosses are editorial drafts and must be reviewed by fluent speakers before being treated as trusted translations.
+
 ### Official-resource check (2026-11-09)
 
 - CTI's [Download Center](https://admin.chinesetest.cn/godownload.do) lists the 2015 HSK vocabulary list. The official [HSK 3.0 syllabus page](https://www.chinesetest.cn/syllabus) describes vocabulary as part of the syllabus, and CTI's [standards query system](https://admin.chinesetest.cn/standardsAction.do?means=standardInfo) provides a vocabulary search.

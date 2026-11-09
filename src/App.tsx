@@ -17,6 +17,7 @@ import {
   type LessonTemplate,
 } from './data/curriculum'
 import { hsk30LessonTemplates } from './data/hsk30Curriculum'
+import { lessonVocabulary } from './data/lessonVocabulary'
 import {
   getStandardVersions,
   getVocabularyCatalog,
@@ -37,6 +38,8 @@ type Word = {
   ruStatus?: string
   uzStatus?: string
   membershipStatus?: string
+  courseStage?: CourseLevel
+  courseSystems?: CourseSystem[]
   level20: number | string | null
   level30: number | string | null
   example: string
@@ -135,6 +138,24 @@ const ACTIVITY_DAYS_KEY = 'hanzipath.activityDays'
 const COMPLETED_LESSONS_KEY = 'hanzipath.completedLessons'
 
 const lessonTemplates = [...hsk20LessonTemplates, ...hsk30LessonTemplates]
+const originalLessonWords: Word[] = lessonVocabulary.map((entry, index) => ({
+  sourceEntryKey: `hanzipath-course-${entry.stage}-${index + 1}`,
+  hanzi: entry.hanzi,
+  pinyin: entry.pinyin,
+  ru: entry.ru,
+  en: entry.en,
+  uz: entry.uz,
+  ruStatus: 'ai_draft_unverified',
+  uzStatus: 'ai_draft_unverified',
+  courseStage: entry.stage,
+  courseSystems: entry.systems,
+  level20: null,
+  level30: null,
+  example: '',
+  examplePinyin: '',
+  exampleRu: '',
+  exampleEn: '',
+}))
 
 type ExamSection = 'listening' | 'reading' | 'writing' | 'translation' | 'speaking'
 type ExamQuestion = {
@@ -209,9 +230,10 @@ function localeMeaning(word: Word, locale: Locale): string {
 function wordsForCourseLevel(entries: Word[], system: CourseSystem, level: CourseLevel): Word[] {
   const membership = (word: Word) => system === '2.0' ? word.level20 : word.level30
   const category = system === '3.0' && level >= 7 ? '7-9' : String(level)
-  const pool = entries.filter(word => String(membership(word) ?? '') === category)
+  const pool = entries.filter(word => !word.courseStage && String(membership(word) ?? '') === category)
+  const authoredPool = entries.filter(word => word.courseStage === level && word.courseSystems?.includes(system))
 
-  if (system !== '3.0' || level < 7) return pool
+  if (system !== '3.0' || level < 7) return [...pool, ...authoredPool]
 
   const ordered = [...pool].sort((a, b) => {
     const left = `${a.hanzi}|${a.pinyin}`
@@ -221,7 +243,7 @@ function wordsForCourseLevel(entries: Word[], system: CourseSystem, level: Cours
 
   // CTI publishes one combined 7–9 membership band. These three slices are
   // an in-house course sequence and do not change official membership.
-  return ordered.filter((_, index) => index % 3 === level - 7)
+  return [...ordered.filter((_, index) => index % 3 === level - 7), ...authoredPool]
 }
 
 function lessonWordAssignments(entries: Word[]): Record<string, Word[]> {
@@ -925,7 +947,7 @@ export default function App() {
     const membership = system === '2.0' ? word.level20 : word.level30
     return membership !== null && membership !== undefined && membership !== ''
   }), [availableWords, system])
-  const lessonEntries = reviewWords?.length ? reviewWords : availableWords
+  const lessonEntries = [...(reviewWords?.length ? reviewWords : availableWords), ...originalLessonWords]
   const lessonAssignments = useMemo(() => lessonWordAssignments(lessonEntries), [lessonEntries])
   const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const activeLesson = lessonTemplates.find(lesson => lesson.id === activeLessonId && lesson.system === courseSystem && lesson.level === courseLevel) ?? courseLessons[0]
@@ -1283,6 +1305,7 @@ export default function App() {
                   {word.ruStatus || word.uzStatus ? <small className="lesson-word-status">{[...new Set([word.ruStatus, word.uzStatus].map(status => translationStatusLabel(status)).filter(Boolean))].join(' · ')}</small> : null}
                 </article>)}
               </div> : <p className="notice-text">{t('course.noWords')}</p>}
+              {activeLessonWords.some(word => word.courseStage !== undefined) && <p className="source-credit">{t('course.originalVocabularyNote')}</p>}
               {Boolean(reviewWords?.length) && <p className="source-credit">{t('course.translationNote')}</p>}
             </section>
 
