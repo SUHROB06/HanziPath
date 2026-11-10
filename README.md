@@ -7,7 +7,7 @@ A responsive React + Vite starter for a Chinese-learning platform supporting HSK
 - Centralized translation keys for interface copy
 - Guest language preference saved locally; signed-in preference is prepared through the Supabase `user_preferences` table
 - HSK 2.0 and HSK 3.0 selector, vocabulary search, and level filters
-- Sample vocabulary in the public dictionary while the full candidate catalog remains private for review
+- Full 11,147-entry HSK candidate dictionary in the `feature/vocabulary-database` review build
 - 464 original HanziPath lesson words across nine course stages, used in lesson word sets, cards, and listening practice
 - Search by characters, pinyin, or meaning; filter by standard and level; browse 60 entries per page
 - 132 original HSK 2.0 lessons across levels 1–6
@@ -21,7 +21,7 @@ A responsive React + Vite starter for a Chinese-learning platform supporting HSK
 - Supabase schema for vocabulary, grammar, exercises, spaced-repetition progress, and daily activity
 - Demo mode without Supabase credentials
 
-**Vocabulary note:** The public dictionary contains 8 sample entries; it is not a complete HSK dictionary. The lessons use 464 original HanziPath words across nine course stages. These course stages are an in-house learning sequence, not verified HSK memberships, and the RU/EN/UZ glosses are editorial drafts awaiting review. A local review build can separately load `public/vocabulary-review.json`, a private 11,147-entry candidate dataset. It is not a human-verified official dictionary: translations and HSK membership remain unverified. Candidate records exist only in the separate `HanziPath-Test` Supabase staging project; every source is pending, every record is unverified, and RLS blocks public reads. The review JSON is ignored by Git. Do not publish that dataset until rights review and human translation review are complete.
+**Vocabulary note:** The `feature/vocabulary-database` review build includes 11,147 HSK candidate entries with Russian, English, and Uzbek meanings. This is a review dataset, not a verified official dictionary: all translations and HSK memberships remain unverified, and the rights status of the underlying official HSK lists remains pending. It is present on this feature branch and its preview so the owner can inspect it; this does not approve the data for `main` or production. The separate `HanziPath-Test` Supabase staging project contains the same catalog behind RLS, with all sources pending and all records unverified. The lessons use 464 original HanziPath words across nine in-house course stages; their HSK memberships and RU/EN/UZ glosses are editorial drafts awaiting review.
 
 ## Run locally
 Requires Node.js 20 or newer.
@@ -47,7 +47,7 @@ Migration `004` creates a separate, provenance-aware vocabulary catalog. Migrati
 
 ## Vocabulary data status
 
-The local review UI loads candidate entries from `public/vocabulary-review.json`; they are not part of the public Git build or a public catalog. Candidate records are staged only in the separate `HanziPath-Test` Supabase project. The source remains pending rights review, and translations and HSK membership remain unverified. See [`VOCABULARY_DATA_SOURCES.md`](VOCABULARY_DATA_SOURCES.md) and [`data/vocabulary-candidates/README.md`](data/vocabulary-candidates/README.md) for source notices, coverage gaps, attribution, and release conditions.
+The feature-branch review UI loads candidate entries from `public/vocabulary-review.json`. The candidate bundle and its source snapshots are included on this branch with attribution and a review-status notice. Candidate records are also staged in the separate `HanziPath-Test` Supabase project. Source rights remain pending, and translations and HSK membership remain unverified. See [`VOCABULARY_DATA_SOURCES.md`](VOCABULARY_DATA_SOURCES.md) and [`data/vocabulary-candidates/README.md`](data/vocabulary-candidates/README.md) for source notices, coverage gaps, attribution, and release conditions.
 
 The full review dictionary has no example sentence for most entries. Course grammar examples are newly written and do not reproduce the supplied textbooks. Practice exams are original exercises that mirror the HSK 2.0 question and section counts and section time limits; they are not official papers. Listening uses browser speech synthesis, and reading task types are simplified. The HSK 4 picture-writing task is represented as a text prompt. CTI's [HSK structure table](https://www.chinesetest.cn/userfiles/file/HSKbyWord.pdf) lists section time separately from the five-minute personal-information period. The dataset uses the 2025 HSK 3.0 list snapshot; CTI currently announces a global HSK 3.0 launch date of December 13, 2026. When approved catalog versions exist, the app selects the most recently effective or published standard version.
 

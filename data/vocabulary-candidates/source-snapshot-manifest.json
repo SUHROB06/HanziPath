@@ -1,0 +1,31 @@
+{
+  "assembled_at": "2026-11-06",
+  "candidate_rows": 11147,
+  "candidate_file_sha256": "2478a3873615adb17899f784d71c3f279be579ea629afbe4eaffc2153de3047b",
+  "backlog_rows": 0,
+  "review_queue_rows": 3850,
+  "review_queue_sha256": "d0c9a012b1d163bf24566854a1d9545e3cb90f7fab12725f34fd979173d3ff6c",
+  "counts": {
+    "ru_ai_draft": 3590,
+    "ru_hanzibook_exact": 273,
+    "ru_headword_only": 218,
+    "ru_zitou_exact": 7066,
+    "uz_ai_draft": 3850,
+    "uz_headword_only": 231,
+    "uz_zitou_exact": 7066
+  },
+  "sources": {
+    "hearmandarin": {
+      "file": "data/vocabulary-candidates/source-snapshots/hearmandarin-hsk-2025-and-2015.json",
+      "sha256": "c8b590005c25def132c8401f4414c5b9cc9855a8fb00c9fad8cd22249895d0af"
+    },
+    "zitou": {
+      "file": "data/vocabulary-candidates/source-snapshots/zitou-hsk-uz-ru.csv",
+      "sha256": "a77b60ef392a0bb7e5a80732760a0ecc783c6af5769ff894ef55f805e71e214e"
+    },
+    "hanzibook": {
+      "file": "data/vocabulary-candidates/source-snapshots/hanzibook-hsk2025-ru.csv",
+      "sha256": "7023f0739d35f8382d6b144ce6307197d6ac39787b7828d7236dac311411b638"
+    }
+  }
+}

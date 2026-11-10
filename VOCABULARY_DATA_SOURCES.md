@@ -10,11 +10,11 @@ Reviewed 2026-11-09. Work is on `feature/vocabulary-database`; the staging impor
 - The generator reports 3,590 Russian and 3,850 Uzbek `ai_draft_unverified` fields. These include translations drafted from English glosses and explicit correction drafts for source mismatches. Every draft requires fluent-speaker review.
 - `translation-backlog.csv` currently contains only its header: no Russian or Uzbek fields are blank. Existing source values, headword-only matches and generated drafts are still unverified.
 - `data/vocabulary-candidates/translation-review-queue.csv` contains the 3,850 rows with at least one generated draft for a fluent reviewer.
-- The local review build now loads `public/vocabulary-review.json` (11,147 entries) with source notices, all three meaning fields, and pagination. It is a review dataset, not the approved Supabase catalog. Every Russian/Uzbek draft and every HSK membership remains unverified.
+- The feature-branch review build loads `public/vocabulary-review.json` (11,147 entries) with source notices, all three meaning fields, and pagination. It is a review dataset, not an approved public catalog. Every Russian/Uzbek draft and every HSK membership remains unverified.
 - Pinyin-exact source matches are preferred. A same-headword match with a different pinyin is retained only with a reading-review status and note.
 - A restricted staging import is now in `HanziPath-Test`: 11,147 vocabulary entries, 11,147 readings, 16,000 standard memberships, and 33,441 meaning translations (11,147 each in English, Russian, and Uzbek). All source rights are `pending`, all entries and translations are `unverified`, and every source is non-publishable. RLS keeps these records from public catalog reads.
 - The same staging project contains 402 original lesson records and 13 original mock-exam blueprints. They are non-publishable until project release terms are reviewed. Lessons include HSK 2.0 levels 1–6 and HSK 3.0 learning stages 1–9; stages 7–9 map to one official combined 7–9 band.
-- The candidate review JSON and generated import batches are kept out of Git by ignore rules. Work remains on the pushed `feature/vocabulary-database` branch. No `main` change, merge, or production deployment was made; the branch has Vercel preview deployments for review.
+- The candidate CSV, review queue, source snapshots, reproducible assembly script, and review JSON are included in `feature/vocabulary-database` with attribution and status notices. The catalog is already in the separate `HanziPath-Test` Supabase staging project. No `main` change, merge, or production deployment is made by this review package.
 
 The HSK 3.0 advanced band is recorded as `7-9`, as published. It is not split into invented 7, 8 and 9 lists.
 
@@ -79,7 +79,7 @@ No open reuse grant for the official HSK 2.0/3.0 lists was located on CTI's offi
 
 ### Candidate data quality check (2026-11-09)
 
-The ignored local candidate bundle was read without changing or importing it:
+The candidate bundle was checked and imported to staging earlier; its current quality metrics are:
 
 - 11,147 source rows: 5,000 HSK 2.0 memberships and 11,000 HSK 3.0 (2025 syllabus) memberships, with overlap.
 - 11,105 distinct simplified-headword/Pinyin pairs; 42 rows repeat that pair. In 41 groups the repeated rows carry different glosses and/or level assignments. One group (`粉丝`, `fěnsī`) is identical across the checked content fields and differs only by source key/sequence. Preserve the raw source rows and resolve this during import normalization rather than silently dropping records.
@@ -92,7 +92,7 @@ The current catalog schema uses source-entry keys to preserve separate source ro
 
 ### Safe release gate
 
-Keep every imported source at `rights_status = pending` and `is_publishable = false`; keep vocabulary and translation rows unverified. Do not deploy or publish the review JSON until the underlying HSK-list rights and the HearMandarin license interaction are clarified, the data is normalized against the catalog schema, and Russian/Uzbek translations receive human review. The inquiry draft is in `data/vocabulary-candidates/rights/CTI_RIGHTS_INQUIRY.md`; it has not been sent. No SQL writes or Supabase imports were performed during this audit.
+Keep every imported source at `rights_status = pending` and `is_publishable = false`; keep vocabulary and translation rows unverified. At the user's direction, this feature branch includes the candidate review package while source rights and translation accuracy remain unresolved. This is not approval for public catalog use, `main`, or production. Before any promotion, clarify the underlying HSK-list rights and the HearMandarin license interaction, review normalization against the catalog schema, and obtain human review of Russian/Uzbek translations. The inquiry draft is in `data/vocabulary-candidates/rights/CTI_RIGHTS_INQUIRY.md`; it has not been sent. No additional SQL writes were required because the complete dataset was already present in HanziPath-Test.
 
 ## Rebuild the local candidate
 
