@@ -10,6 +10,8 @@ A responsive React + Vite starter for a Chinese-learning platform supporting HSK
 - Full 11,147-entry HSK candidate dictionary in the `feature/vocabulary-database` review build
 - 464 original HanziPath lesson words across nine course stages, used in lesson word sets, cards, and listening practice
 - Search by characters, pinyin, or meaning; filter by standard and level; browse 60 entries per page
+- Detailed word cards with simplified/traditional forms, pinyin, three translations, review status, and examples when available
+- Favorites and learned-word marks saved in browser storage; filter the dictionary to favorites
 - 132 original HSK 2.0 lessons across levels 1–6
 - 270 original HSK 3.0 lessons across learning stages 1–9; stages 7–9 stay inside the official combined 7–9 vocabulary band
 - Every lesson has a level-specific new-word set, flashcards, a spoken example, listening choices, and an original grammar focus

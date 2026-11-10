@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   BookOpen, Headphones, Layers, Target, ChartNoAxesColumnIncreasing,
   Languages, Search, Volume2, ChevronRight, Flame, Menu, X,
-  GraduationCap, CheckCircle2, LockKeyhole, Settings,
+  GraduationCap, CheckCircle2, LockKeyhole, Settings, Star,
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './supabase'
 import {
@@ -36,6 +36,7 @@ type Word = {
   uz?: string | null
   uzVerified?: boolean
   ruStatus?: string
+  enStatus?: string
   uzStatus?: string
   membershipStatus?: string
   courseStage?: CourseLevel
@@ -133,6 +134,7 @@ function initialLocale(): Locale {
 }
 
 const KNOWN_WORDS_KEY = 'hanzipath.knownWords'
+const FAVORITE_WORDS_KEY = 'hanzipath.favoriteWords'
 const DAILY_TASKS_KEY = 'hanzipath.dailyTasks'
 const ACTIVITY_DAYS_KEY = 'hanzipath.activityDays'
 const COMPLETED_LESSONS_KEY = 'hanzipath.completedLessons'
@@ -703,6 +705,7 @@ function reviewRowToWord(row: any, index: number): Word {
     uz: row.uz ?? null,
     uzVerified: false,
     ruStatus: row.ruStatus,
+    enStatus: row.enStatus,
     uzStatus: row.uzStatus,
     membershipStatus: row.membershipStatus,
     level20: row.level20 ?? null,
@@ -726,6 +729,8 @@ export default function App() {
   const [vocabularyCollection, setVocabularyCollection] = useState<'course' | 'hsk'>('course')
   const [query, setQuery] = useState('')
   const [dictionaryPage, setDictionaryPage] = useState(0)
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [selectedDictionaryWord, setSelectedDictionaryWord] = useState<Word | null>(null)
   const [menu, setMenu] = useState(false)
   const [done, setDone] = useState<boolean[]>(() => {
     const saved = readStored<{ date: string; done: boolean[] } | null>(DAILY_TASKS_KEY, null)
@@ -734,6 +739,7 @@ export default function App() {
       : [false, false, false]
   })
   const [knownWords, setKnownWords] = useState<string[]>(() => readStored(KNOWN_WORDS_KEY, []))
+  const [favoriteWordIds, setFavoriteWordIds] = useState<string[]>(() => readStored(FAVORITE_WORDS_KEY, []))
   const [activityDays, setActivityDays] = useState<string[]>(() => readStored(ACTIVITY_DAYS_KEY, []))
   const [cardIndex, setCardIndex] = useState(0)
   const [showAnswer, setShowAnswer] = useState(false)
@@ -757,6 +763,7 @@ export default function App() {
   const [catalogError, setCatalogError] = useState(false)
 
   const localeChangeRef = useRef(0)
+  const wordDialogRef = useRef<HTMLDialogElement>(null)
   const t = (key: TranslationKey) => translate(lang, key)
 
   useEffect(() => {
@@ -796,6 +803,22 @@ export default function App() {
       // Learning remains available for this session.
     }
   }, [knownWords])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(FAVORITE_WORDS_KEY, JSON.stringify(favoriteWordIds))
+    } catch {
+      // Favorites remain available for this session.
+    }
+  }, [favoriteWordIds])
+
+  useEffect(() => {
+    const dialog = wordDialogRef.current
+    if (!dialog) return
+
+    if (selectedDictionaryWord && !dialog.open) dialog.showModal()
+    if (!selectedDictionaryWord && dialog.open) dialog.close()
+  }, [selectedDictionaryWord])
 
   useEffect(() => {
     try {
@@ -1005,6 +1028,10 @@ export default function App() {
       const membership = system === '2.0' ? word.level20 : word.level30
       return membership !== null && membership !== undefined && membership !== ''
     }), [availableWords, system, vocabularyCollection])
+  const currentFavoriteCount = useMemo(
+    () => currentWords.filter(word => favoriteWordIds.includes(wordId(word))).length,
+    [currentWords, favoriteWordIds],
+  )
   // Keep the eight demo dictionary entries out of course lessons. They are
   // examples for the HSK dictionary view and duplicate authored lesson words.
   const lessonEntries = [...(reviewWords?.length ? reviewWords : databaseWords ?? []), ...originalLessonWords]
@@ -1060,6 +1087,7 @@ export default function App() {
 
       return (
         (level === 'all' || String(activeLevel).replace('7-9', '7') === level) &&
+        (!favoritesOnly || favoriteWordIds.includes(wordId(word))) &&
         (
           searchable.toLocaleLowerCase().includes(query.toLocaleLowerCase()) ||
           (
@@ -1069,9 +1097,9 @@ export default function App() {
         )
       )
     })
-  }, [currentWords, level, query, system, vocabularyCollection])
+  }, [currentWords, favoriteWordIds, favoritesOnly, level, query, system, vocabularyCollection])
 
-  useEffect(() => setDictionaryPage(0), [system, level, query, vocabularyCollection])
+  useEffect(() => setDictionaryPage(0), [system, level, query, vocabularyCollection, favoritesOnly])
 
   const pageSize = 60
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
@@ -1129,6 +1157,30 @@ export default function App() {
     !status
       ? null
       : t(status === 'ai_draft_unverified' ? 'vocab.aiDraft' : 'vocab.sourceUnverified')
+
+  const toggleFavorite = (word: Word) => {
+    const id = wordId(word)
+    setFavoriteWordIds(items => items.includes(id)
+      ? items.filter(item => item !== id)
+      : [...items, id])
+  }
+
+  const toggleKnownWord = (word: Word) => {
+    const id = wordId(word)
+    if (knownWords.includes(id)) {
+      setKnownWords(items => items.filter(item => item !== id))
+      return
+    }
+
+    setKnownWords(items => items.includes(id) ? items : [...items, id])
+    recordActivity()
+  }
+
+  const dictionaryLevelLabel = (word: Word, standard: System) => {
+    const value = standard === '2.0' ? word.level20 : word.level30
+    if (value === null || value === undefined || value === '') return null
+    return `HSK ${String(value).replace('7-9', '7–9')}`
+  }
 
   const selectedExamQuestion = examQuestionsState[examIndex]
   const examCorrectCount = examQuestionsState.reduce((total, question, index) => {
@@ -1551,6 +1603,7 @@ export default function App() {
             <div className="dictionary-summary">
               <div><strong>{currentWords.length.toLocaleString(lang)}</strong><span>{vocabularyCollection === 'course' ? t('vocab.wordsInCourse') : system === '2.0' ? t('vocab.wordsInHsk20') : t('vocab.wordsInHsk30')}</span></div>
               <div><strong>{filtered.length.toLocaleString(lang)}</strong><span>{t('vocab.matchingWords')}</span></div>
+              <div><strong>{currentFavoriteCount.toLocaleString(lang)}</strong><span>{t('vocab.savedFavorites')}</span></div>
               <div><strong>{pageSize}</strong><span>{t('vocab.resultsPerPage')}</span></div>
             </div>
             {Boolean(reviewWords?.length) && !databaseWords && vocabularyCollection === 'hsk' && <p className="source-credit">
@@ -1594,6 +1647,17 @@ export default function App() {
               <option value="all">{t('vocab.allLevels')}</option>
               {levelFilterOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}
             </select>
+
+            <button
+              className={`outline favorites-filter ${favoritesOnly ? 'selected' : ''}`}
+              type="button"
+              aria-pressed={favoritesOnly}
+              onClick={() => setFavoritesOnly(value => !value)}
+            >
+              <Star size={15} fill={favoritesOnly ? 'currentColor' : 'none'}/>
+              {favoritesOnly ? t('vocab.showAllWords') : t('vocab.favorites')}
+              <span>{currentFavoriteCount.toLocaleString(lang)}</span>
+            </button>
           </div>
 
           {catalogLoading && <p className="notice-text">{t('vocab.loading')}</p>}
@@ -1606,31 +1670,51 @@ export default function App() {
           <div className="wordlist">
             {visibleWords.map((word, i) => (
               <article className="word" key={`${word.hanzi}-${word.pinyin}-${i}`}>
-                <div className="word-main">
-                  <strong>{word.hanzi}</strong>
-                  <div>
-                    <b>{word.pinyin}</b>
-                  </div>
+                <div className="word-card-head">
+                  <button
+                    type="button"
+                    className="word-open"
+                    onClick={() => setSelectedDictionaryWord(word)}
+                    aria-label={`${t('vocab.openDetails')}: ${word.hanzi}, ${word.pinyin}`}
+                  >
+                    <span className="word-main">
+                      <strong>{word.hanzi}</strong>
+                      <span><b>{word.pinyin}</b><small>{t('vocab.openDetails')}</small></span>
+                    </span>
+                    <ChevronRight size={17}/>
+                  </button>
+
+                  <span className="level-pill">
+                    {vocabularyCollection === 'course'
+                      ? `${t('vocab.courseStageShort')} ${word.courseStage}`
+                      : `HSK ${String(system === '2.0' ? word.level20 : word.level30).replace('7-9', '7–9')}`}
+                  </span>
+
+                  <button
+                    className={`sound favorite-button ${favoriteWordIds.includes(wordId(word)) ? 'is-favorite' : ''}`}
+                    type="button"
+                    onClick={() => toggleFavorite(word)}
+                    title={favoriteWordIds.includes(wordId(word)) ? t('vocab.removeFavorite') : t('vocab.addFavorite')}
+                    aria-label={`${favoriteWordIds.includes(wordId(word)) ? t('vocab.removeFavorite') : t('vocab.addFavorite')}: ${word.hanzi}`}
+                    aria-pressed={favoriteWordIds.includes(wordId(word))}
+                  >
+                    <Star size={17} fill={favoriteWordIds.includes(wordId(word)) ? 'currentColor' : 'none'}/>
+                  </button>
+
+                  <button
+                    className="sound"
+                    type="button"
+                    onClick={() => speak(word.hanzi)}
+                    title={t('vocab.listen')}
+                    aria-label={`${t('vocab.listen')}: ${word.hanzi}`}
+                  >
+                    <Volume2 size={18}/>
+                  </button>
                 </div>
-
-                <span className="level-pill">
-                  {vocabularyCollection === 'course'
-                    ? `${t('vocab.courseStageShort')} ${word.courseStage}`
-                    : `HSK ${String(system === '2.0' ? word.level20 : word.level30).replace('7-9', '7–9')}`}
-                </span>
-
-                <button
-                  className="sound"
-                  onClick={() => speak(word.hanzi)}
-                  title={t('vocab.listen')}
-                  aria-label={`${t('vocab.listen')}: ${word.hanzi}`}
-                >
-                  <Volume2 size={18}/>
-                </button>
 
                 <div className="word-meanings">
                   <div><b>RU</b><span>{word.ru || t('vocab.translationUnavailable')}</span>{word.ruStatus && <small>{translationStatusLabel(word.ruStatus)}</small>}</div>
-                  <div><b>EN</b><span>{word.en || t('vocab.translationUnavailable')}</span></div>
+                  <div><b>EN</b><span>{word.en || t('vocab.translationUnavailable')}</span>{word.enStatus && <small>{translationStatusLabel(word.enStatus)}</small>}</div>
                   <div><b>UZ</b><span>{word.uz || t('vocab.translationUnavailable')}</span>{word.uzStatus && <small>{translationStatusLabel(word.uzStatus)}</small>}</div>
                 </div>
 
@@ -1831,6 +1915,93 @@ export default function App() {
           <p>{supabase ? t('profile.languageSaved') : t('profile.languageLocal')}</p>
         </section>
       )}
+
+      <dialog
+        ref={wordDialogRef}
+        className="word-detail-dialog"
+        aria-labelledby="word-detail-title"
+        onClose={() => setSelectedDictionaryWord(null)}
+        onClick={event => {
+          if (event.target === event.currentTarget) event.currentTarget.close()
+        }}
+      >
+        {selectedDictionaryWord && <div className="word-detail">
+          <header className="word-detail-header">
+            <div>
+              <span className="kicker">{t('vocab.wordDetails')}</span>
+              <h2 id="word-detail-title">{selectedDictionaryWord.hanzi}</h2>
+            </div>
+            <button
+              className="word-detail-close"
+              type="button"
+              autoFocus
+              aria-label={t('vocab.closeDetails')}
+              onClick={() => wordDialogRef.current?.close()}
+            >
+              <X size={19}/>
+            </button>
+          </header>
+
+          <div className="word-detail-pronunciation">
+            <div>
+              <strong>{selectedDictionaryWord.pinyin || t('vocab.translationUnavailable')}</strong>
+              {selectedDictionaryWord.traditional && selectedDictionaryWord.traditional !== selectedDictionaryWord.hanzi && <span>{t('vocab.traditional')}: {selectedDictionaryWord.traditional}</span>}
+            </div>
+            <button className="primary" type="button" onClick={() => speak(selectedDictionaryWord.hanzi)}>
+              <Volume2 size={17}/>{t('vocab.listen')}
+            </button>
+          </div>
+
+          <div className="word-detail-levels">
+            {dictionaryLevelLabel(selectedDictionaryWord, '2.0') && <span>{t('vocab.hsk20')} · {dictionaryLevelLabel(selectedDictionaryWord, '2.0')}</span>}
+            {dictionaryLevelLabel(selectedDictionaryWord, '3.0') && <span>{t('vocab.hsk30')} · {dictionaryLevelLabel(selectedDictionaryWord, '3.0')}</span>}
+            {selectedDictionaryWord.courseStage && <span>{t('vocab.courseStage')} {selectedDictionaryWord.courseStage}</span>}
+            {selectedDictionaryWord.membershipStatus && <small>{t('vocab.membershipUnverified')}</small>}
+          </div>
+
+          <section className="word-detail-section">
+            <h3>{t('vocab.meanings')}</h3>
+            <div className="word-detail-meanings">
+              <div><b>RU</b><span>{selectedDictionaryWord.ru || t('vocab.translationUnavailable')}</span>{selectedDictionaryWord.ruStatus && <small>{translationStatusLabel(selectedDictionaryWord.ruStatus)}</small>}</div>
+              <div><b>EN</b><span>{selectedDictionaryWord.en || t('vocab.translationUnavailable')}</span>{selectedDictionaryWord.enStatus && <small>{translationStatusLabel(selectedDictionaryWord.enStatus)}</small>}</div>
+              <div><b>UZ</b><span>{selectedDictionaryWord.uz || t('vocab.translationUnavailable')}</span>{selectedDictionaryWord.uzStatus && <small>{translationStatusLabel(selectedDictionaryWord.uzStatus)}</small>}</div>
+            </div>
+          </section>
+
+          <section className="word-detail-section">
+            <h3>{t('vocab.example')}</h3>
+            {selectedDictionaryWord.example
+              ? <div className="word-detail-example">
+                <span>{selectedDictionaryWord.example}</span>
+                {selectedDictionaryWord.examplePinyin && <small>{selectedDictionaryWord.examplePinyin}</small>}
+                <p>{exampleMeaning(selectedDictionaryWord) || t('vocab.exampleUnavailable')}</p>
+                <button className="sound" type="button" onClick={() => speak(selectedDictionaryWord.example)} aria-label={`${t('vocab.listen')}: ${selectedDictionaryWord.example}`}><Volume2 size={17}/></button>
+              </div>
+              : <p className="word-detail-missing">{t('vocab.exampleUnavailable')}</p>}
+          </section>
+
+          <div className="word-detail-actions">
+            <button
+              className={`outline favorite-detail ${favoriteWordIds.includes(wordId(selectedDictionaryWord)) ? 'selected' : ''}`}
+              type="button"
+              aria-pressed={favoriteWordIds.includes(wordId(selectedDictionaryWord))}
+              onClick={() => toggleFavorite(selectedDictionaryWord)}
+            >
+              <Star size={16} fill={favoriteWordIds.includes(wordId(selectedDictionaryWord)) ? 'currentColor' : 'none'}/>
+              {favoriteWordIds.includes(wordId(selectedDictionaryWord)) ? t('vocab.removeFavorite') : t('vocab.addFavorite')}
+            </button>
+            <button
+              className="primary"
+              type="button"
+              aria-pressed={knownWords.includes(wordId(selectedDictionaryWord))}
+              onClick={() => toggleKnownWord(selectedDictionaryWord)}
+            >
+              <CheckCircle2 size={17}/>
+              {knownWords.includes(wordId(selectedDictionaryWord)) ? t('vocab.removeKnown') : t('vocab.markKnown')}
+            </button>
+          </div>
+        </div>}
+      </dialog>
 
       <footer>
         <span>© 2026 HanziPath · 汉字之路</span>
