@@ -387,16 +387,26 @@ function buildCourseUnits(
   const baseSize = Math.floor(uniqueWords.length / unitCount)
   const remainder = uniqueWords.length % unitCount
   const units: CourseUnit[] = []
-  let wordOffset = 0
+  const matchedAssignments = lessonWordAssignments(entries)
+  const assigned = new Set<string>()
   let lessonOffset = 0
 
   for (let index = 0; index < unitCount; index += 1) {
     const wordCount = baseSize + (index < remainder ? 1 : 0)
     const lessonCount = Math.floor(lessons.length / unitCount) + (index < lessons.length % unitCount ? 1 : 0)
     const unitLessons = lessons.slice(lessonOffset, lessonOffset + lessonCount)
-    const words = uniqueWords.slice(wordOffset, wordOffset + wordCount)
+    const topical = unitLessons.flatMap(lesson => matchedAssignments[lesson.id] ?? [])
+    const orderedCandidates = [...new Map([...topical, ...uniqueWords].map(word => [
+      `${word.hanzi}|${normalizePinyin(word.pinyin)}`,
+      word,
+    ])).values()]
+    const words = orderedCandidates.filter(word => {
+      const key = `${word.hanzi}|${normalizePinyin(word.pinyin)}`
+      if (assigned.has(key)) return false
+      assigned.add(key)
+      return true
+    }).slice(0, wordCount)
     if (unitLessons.length) units.push({ id: unitLessons[0].id, lessons: unitLessons, words })
-    wordOffset += wordCount
     lessonOffset += lessonCount
   }
 
@@ -1772,7 +1782,7 @@ export default function App() {
               </div>
             </section>
 
-            <LessonPractice lessonId={activeLesson.id} grammar={activeLesson.grammar} words={activeLessonWords} locale={lang} />
+            {activeUnitLessons.map(item => <LessonPractice key={item.id} lessonId={item.id} grammar={item.grammar} words={activeLessonWords} locale={lang} />)}
 
             <div className="lesson-finish-row">
               <button className="outline" onClick={() => setSection(5)}>{t('course.grammar')}<ChevronRight size={16}/></button>
