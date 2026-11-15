@@ -36,6 +36,7 @@ type Word = {
   membershipStatus?: string
   courseStage?: CourseLevel
   courseSystems?: CourseSystem[]
+  courseLessonId?: string
   level20: number | string | null
   level30: number | string | null
   example: string
@@ -148,6 +149,7 @@ const originalLessonWords: Word[] = lessonVocabulary.reduce<Word[]>((result, ent
     uzStatus: 'ai_draft_unverified',
     courseStage: entry.stage,
     courseSystems: entry.systems,
+    courseLessonId: entry.lessonId,
     // HanziPath course stages are not official HSK memberships.
     level20: null,
     level30: null,
@@ -319,18 +321,25 @@ function lessonWordAssignments(entries: Word[]): Record<string, Word[]> {
     const pool = wordsForCourseLevel(entries, system, level)
     if (!lessons.length || !pool.length) continue
 
-    const pending = [...pool]
-    const baseSize = Math.floor(pool.length / lessons.length)
+    const pinned = new Map(lessons.map(lesson => [
+      lesson.id,
+      pool.filter(word => word.courseLessonId === lesson.id),
+    ]))
+    for (const lesson of lessons) {
+      assignments[lesson.id].push(...(pinned.get(lesson.id) ?? []))
+    }
+    const pending = pool.filter(word => !word.courseLessonId)
+    const baseSize = Math.floor(pending.length / lessons.length)
     const extraWords = pool.length % lessons.length
 
     const targetSizes = new Map(lessons.map((lesson, index) => [
       lesson.id,
-      baseSize + (index < extraWords ? 1 : 0),
+      (pinned.get(lesson.id)?.length ?? 0) + baseSize + (index < extraWords ? 1 : 0),
     ]))
     const chapters = [...new Set(lessons.map(lesson => lesson.chapter))]
       .map(chapter => {
       const chapterLessons = lessons.filter(lesson => lesson.chapter === chapter)
-      const chapterTarget = chapterLessons.reduce((total, lesson) => total + (targetSizes.get(lesson.id) ?? 0), 0)
+      const chapterTarget = chapterLessons.reduce((total, lesson) => total + Math.max(0, (targetSizes.get(lesson.id) ?? 0) - assignments[lesson.id].length), 0)
       const keywords = [...new Set(chapterLessons.flatMap(lesson => lesson.keywords))]
         .map(term => term.toLocaleLowerCase())
       const scores = new Map(pool.map(word => {
