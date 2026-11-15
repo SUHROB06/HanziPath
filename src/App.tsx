@@ -1225,7 +1225,7 @@ export default function App() {
       value: isCombinedBand ? '7' : value,
       label: vocabularyCollection === 'course'
         ? `${t('vocab.courseStage')} ${index + 1} · ${count}`
-        : `${system === '2.0' ? 'HSK 2.0' : 'HSK 3.0'} · ${t('vocab.courseStage')} ${isCombinedBand ? '7–9' : index + 1} · ${count}`,
+        : `${system === '2.0' ? 'HSK 2.0' : 'HSK 3.0'} · ${t('vocab.hskLevel')} ${isCombinedBand ? '7–9' : index + 1} · ${count}`,
     }
   })
 
