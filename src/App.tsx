@@ -759,6 +759,16 @@ export default function App() {
   const [examStarted, setExamStarted] = useState(false)
   const [examFinished, setExamFinished] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [authReady, setAuthReady] = useState(false)
+  const [progressReady, setProgressReady] = useState(false)
+  const [progressOwnerId, setProgressOwnerId] = useState<string | null>(null)
+  const [authOpen, setAuthOpen] = useState(false)
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authBusy, setAuthBusy] = useState(false)
 
   const [databaseWords, setDatabaseWords] = useState<Word[] | null>(null)
   const [reviewWords, setReviewWords] = useState<Word[] | null>(null)
@@ -768,6 +778,92 @@ export default function App() {
   const localeChangeRef = useRef(0)
   const wordDialogRef = useRef<HTMLDialogElement>(null)
   const t = (key: TranslationKey) => translate(lang, key)
+
+  useEffect(() => {
+    if (!supabase) { setAuthReady(true); setProgressReady(true); return }
+    let mounted = true
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return
+      setUserEmail(session?.user.email ?? null)
+      setUserId(session?.user.id ?? null)
+      setAuthReady(true)
+    })
+    void supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return
+      if (error) setNotice({ text: error.message, kind: 'error' })
+      setUserEmail(data.session?.user.email ?? null)
+      setUserId(data.session?.user.id ?? null)
+      setAuthReady(true)
+    })
+    return () => { mounted = false; subscription.unsubscribe() }
+  }, [])
+
+  useEffect(() => {
+    if (!authReady) return
+    if (!userId || !supabase) { setProgressReady(true); setProgressOwnerId(null); return }
+    let cancelled = false
+    setProgressReady(false)
+    const loadProgress = async () => {
+      const { data, error } = await supabase.from('user_learning_progress').select('progress').eq('user_id', userId).maybeSingle()
+      if (cancelled) return
+      if (error) setNotice({ text: t('auth.progressLoadError'), kind: 'error' })
+      else if (data?.progress && typeof data.progress === 'object') {
+        const saved = data.progress as Record<string, any>
+        if (Array.isArray(saved.knownWords)) setKnownWords(saved.knownWords)
+        if (Array.isArray(saved.favoriteWordIds)) setFavoriteWordIds(saved.favoriteWordIds)
+        if (Array.isArray(saved.completedLessonIds)) setCompletedLessonIds(saved.completedLessonIds)
+        if (Array.isArray(saved.activityDays)) setActivityDays(saved.activityDays)
+        if (Array.isArray(saved.done) && saved.done.length === 3) setDone(saved.done)
+        if (saved.courseSystem === '2.0' || saved.courseSystem === '3.0') setCourseSystem(saved.courseSystem)
+        if (Number.isInteger(saved.courseLevel) && saved.courseLevel >= 1 && saved.courseLevel <= 9) setCourseLevel(saved.courseLevel)
+        if (typeof saved.cardIndex === 'number') setCardIndex(Math.max(0, saved.cardIndex))
+        if (typeof saved.section === 'number' && saved.section >= 0 && saved.section <= 7) setSection(saved.section)
+        if (typeof saved.activeLessonId === 'string' || saved.activeLessonId === null) setActiveLessonId(saved.activeLessonId)
+        if (typeof saved.lang === 'string' && isLocale(saved.lang)) setLang(saved.lang)
+      }
+      setProgressOwnerId(userId)
+      setProgressReady(true)
+    }
+    void loadProgress()
+    return () => { cancelled = true }
+  }, [authReady, userId])
+
+  useEffect(() => {
+    const progress = { knownWords, favoriteWordIds, completedLessonIds, activityDays, done, courseSystem, courseLevel, cardIndex, section, activeLessonId, lang }
+    try { window.localStorage.setItem('hanzipath.progress', JSON.stringify(progress)) } catch { /* optional local backup */ }
+    if (!userId || !supabase || !progressReady || progressOwnerId !== userId) return
+    const timer = window.setTimeout(() => {
+      void supabase.from('user_learning_progress').upsert({ user_id: userId, progress, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }).then(({ error }) => {
+        if (error) setNotice({ text: t('auth.progressSaveError'), kind: 'error' })
+      })
+    }, 900)
+    return () => window.clearTimeout(timer)
+  }, [knownWords, favoriteWordIds, completedLessonIds, activityDays, done, courseSystem, courseLevel, cardIndex, section, activeLessonId, lang, userId, progressReady, progressOwnerId])
+
+  const submitAuth = async () => {
+    if (!supabase) { setNotice({ text: t('auth.notConfigured'), kind: 'error' }); return }
+    const email = authEmail.trim()
+    if (!email || authPassword.length < 6) { setNotice({ text: t('auth.validation'), kind: 'error' }); return }
+    setAuthBusy(true)
+    const result = authMode === 'signup'
+      ? await supabase.auth.signUp({ email, password: authPassword, options: { emailRedirectTo: window.location.origin } })
+      : await supabase.auth.signInWithPassword({ email, password: authPassword })
+    setAuthBusy(false)
+    if (result.error) { setNotice({ text: result.error.message, kind: 'error' }); return }
+    if (authMode === 'signup' && !result.data.session) {
+      setNotice({ text: t('auth.confirmEmail'), kind: 'success' })
+      setAuthOpen(false); setAuthPassword(''); return
+    }
+    setNotice({ text: t('auth.success'), kind: 'success' })
+    setAuthOpen(false); setAuthPassword('')
+  }
+
+  const signOut = async () => {
+    if (!supabase) return
+    const { error } = await supabase.auth.signOut()
+    if (error) setNotice({ text: error.message, kind: 'error' })
+    else setNotice({ text: t('auth.signedOut'), kind: 'info' })
+  }
 
   useEffect(() => {
     try {
@@ -1160,10 +1256,10 @@ export default function App() {
         <div className="profile">
           <div className="avatar">H</div>
           <div className="profile-name">
-            <b>{t('profile.guest')}</b>
-            <small>{t('profile.settings')}</small>
+            <b>{userEmail ?? t('profile.guest')}</b>
+            <small>{userEmail ? t('auth.accountConnected') : t('profile.settings')}</small>
           </div>
-          <button className="profile-action" title={t('profile.signIn')} aria-label={t('profile.signIn')} onClick={() => setNotice({ text: t('profile.signInUnavailable'), kind: 'info' })}>
+          <button className="profile-action" title={t('profile.signIn')} aria-label={t('profile.signIn')} onClick={() => userEmail ? void signOut() : setAuthOpen(true)}>
             <LockKeyhole size={17}/>
           </button>
         </div>
@@ -1193,12 +1289,30 @@ export default function App() {
             </select>
           </label>
 
-          <button className="signin" onClick={() => setNotice({ text: t('profile.signInUnavailable'), kind: 'info' })}>
+          <button className="signin" onClick={() => userEmail ? void signOut() : setAuthOpen(true)}>
             <LockKeyhole size={16}/>
-            <span>{t('profile.signIn')}</span>
+            <span>{userEmail ? t('auth.signOut') : t('profile.signIn')}</span>
           </button>
         </div>
       </header>
+
+
+      {authOpen && (
+        <div className="auth-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setAuthOpen(false) }}>
+          <section className="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+            <button className="auth-close" type="button" onClick={() => setAuthOpen(false)} aria-label={t('common.closeMenu')}>×</button>
+            <span className="kicker">HANZIPATH</span>
+            <h2 id="auth-title">{authMode === 'signup' ? t('auth.createAccount') : t('auth.welcomeBack')}</h2>
+            <p>{t('auth.saveProgress')}</p>
+            <form onSubmit={event => { event.preventDefault(); void submitAuth() }}>
+              <label>{t('auth.email')}<input type="email" autoComplete="email" required value={authEmail} onChange={event => setAuthEmail(event.target.value)} placeholder="name@example.com"/></label>
+              <label>{t('auth.password')}<input type="password" autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} minLength={6} required value={authPassword} onChange={event => setAuthPassword(event.target.value)} placeholder="••••••••"/></label>
+              <button className="primary auth-submit" type="submit" disabled={authBusy}>{authBusy ? t('auth.pleaseWait') : authMode === 'signup' ? t('auth.createAccount') : t('profile.signIn')}</button>
+            </form>
+            <button className="auth-switch" type="button" onClick={() => setAuthMode(mode => mode === 'signup' ? 'signin' : 'signup')}>{authMode === 'signup' ? t('auth.haveAccount') : t('auth.noAccount')}</button>
+          </section>
+        </div>
+      )}
 
       {notice && (
         <div className={`notice ${notice.kind}`} role="status">
