@@ -1141,14 +1141,21 @@ export default function App() {
     ? ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6']
     : ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6', 'HSK 7–9']
 
-  const levelFilterOptions = Array.from({ length: system === '2.0' ? 6 : 7 }, (_, index) => {
-    const value = index === 6 ? '7-9' : String(index + 1)
-    const count = currentWords.filter(word => String(system === '2.0' ? word.level20 : word.level30) === value).length
+  const levelFilterOptions = Array.from({ length: vocabularyCollection === 'course' ? 6 : system === '2.0' ? 6 : 7 }, (_, index) => {
+    const isCombinedBand = vocabularyCollection === 'hsk' && system === '3.0' && index === 6
+    const value = isCombinedBand ? '7-9' : String(index + 1)
+    const count = currentWords.filter(word => String(
+      vocabularyCollection === 'course'
+        ? word.courseStage
+        : system === '2.0' ? word.level20 : word.level30,
+    ) === value).length
     return {
-      value: index === 6 ? '7' : value,
-      label: `${system === '2.0' ? 'HSK 2.0' : 'HSK 3.0'} · ${index === 6 ? '7–9' : index + 1} · ${count}`,
+      value: isCombinedBand ? '7' : value,
+      label: vocabularyCollection === 'course'
+        ? `${t('vocab.courseStage')} ${index + 1} · ${count}`
+        : `${system === '2.0' ? 'HSK 2.0' : 'HSK 3.0'} · ${isCombinedBand ? '7–9' : index + 1} · ${count}`,
     }
-  }).filter(option => system === '3.0' || option.value !== '7')
+  })
 
   const activeSectionName = section < 7
     ? t(navKeys[section])
