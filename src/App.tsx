@@ -1695,11 +1695,11 @@ export default function App() {
               <h2>{t('vocab.title')}</h2>
             </div>
             <span className="demo-tag">
-              {t('vocab.courseCollection')}
+              {t(vocabularyCollection === 'hsk' ? 'vocab.hskCollection' : 'vocab.courseCollection')}
             </span>
           </div>
 
-          <p className="notice-text">{t('vocab.courseNotice')}</p>
+          <p className="notice-text">{t(vocabularyCollection === 'hsk' ? 'vocab.hskCatalogNotice' : 'vocab.courseNotice')}</p>
 
           <div className="filters collection-switch" role="group" aria-label="Dictionary collection">
             <button type="button" className={vocabularyCollection === 'hsk' ? 'primary' : 'outline'} aria-pressed={vocabularyCollection === 'hsk'} onClick={() => { setVocabularyCollection('hsk'); setLevel('all') }}>
@@ -1715,21 +1715,16 @@ export default function App() {
             <button type="button" className={system === '3.0' ? 'primary' : 'outline'} aria-pressed={system === '3.0'} onClick={() => { setSystem('3.0'); setLevel('all') }}>HSK 3.0</button>
           </div>
 
-          {(vocabularyCollection === 'course' || (Boolean(reviewWords?.length) && !databaseWords)) && <>
+          {(vocabularyCollection === 'course' || databaseSystem === system) && <>
             <div className="dictionary-summary">
-              <div><strong>{currentWords.length.toLocaleString(lang)}</strong><span>{t('vocab.wordsInCourse')}</span></div>
+              <div><strong>{currentWords.length.toLocaleString(lang)}</strong><span>{t(vocabularyCollection === 'course' ? 'vocab.wordsInCourse' : system === '2.0' ? 'vocab.wordsInHsk20' : 'vocab.wordsInHsk30')}</span></div>
               <div><strong>{filtered.length.toLocaleString(lang)}</strong><span>{t('vocab.matchingWords')}</span></div>
               <div><strong>{currentFavoriteCount.toLocaleString(lang)}</strong><span>{t('vocab.savedFavorites')}</span></div>
               <div><strong>{pageSize}</strong><span>{t('vocab.resultsPerPage')}</span></div>
             </div>
-            {Boolean(reviewWords?.length) && !databaseWords && vocabularyCollection === 'hsk' && <p className="source-credit">
-              {t('vocab.attribution')}{' '}
-              <a href="https://hearmandarin.com/datasets/" target="_blank" rel="noreferrer">HearMandarin</a>{' · '}
-              <a href="https://huggingface.co/datasets/Maqsudjonpolatov/hsk-chinese-uzbek-russian" target="_blank" rel="noreferrer">Zitou</a>{' · '}
-              <a href="https://hanzibook.com/ru/hsk-3-0" target="_blank" rel="noreferrer">HanziBook</a>{' · '}
-              <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>
-            </p>}
           </>}
+          {vocabularyCollection === 'hsk' && catalogLoading && <p className="notice-text">{t('vocab.catalogLoadingPublic')}</p>}
+          {vocabularyCollection === 'hsk' && catalogError && <p className="notice-text" role="alert">{t('vocab.catalogLoadError')}</p>}
 
           
 
