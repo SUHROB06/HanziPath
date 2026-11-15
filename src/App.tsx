@@ -189,28 +189,32 @@ const classroomDialogue = [
 ] as const
 
 const closingReading = {
+  hanzi: '今天的课很有意思。回家以后，我要再读一次，也要多练习。',
+  pinyin: 'Jīntiān de kè hěn yǒu yìsi. Huí jiā yǐhòu, wǒ yào zài dú yí cì, yě yào duō liànxí.',
+  meaning: {
+    ru: 'Сегодняшний урок интересный. Дома я прочитаю его ещё раз и буду больше практиковаться.',
+    en: 'Today’s lesson is interesting. At home I’ll read it again and practice some more.',
+    uz: 'Bugungi dars qiziqarli. Uyda uni yana bir marta o‘qiyman va ko‘proq mashq qilaman.',
+  },
+  options: {
+    ru: ['Я ещё раз прочитаю урок дома и буду практиковаться.', 'Я пойду в библиотеку и выберу новую книгу.', 'Я закончил урок и больше не буду заниматься.'],
+    en: ['I’ll read the lesson again at home and practice more.', 'I’ll go to the library to choose a new book.', 'I finished the lesson and will stop studying.'],
+    uz: ['Darsni uyda yana o‘qib, ko‘proq mashq qilaman.', 'Kutubxonaga borib, yangi kitob tanlayman.', 'Darsni tugatdim va endi o‘qimayman.'],
+  },
+} as const
+
+const firstLessonReading = {
   hanzi: '你好！我叫安娜。我是学生。你呢？',
+  pinyin: 'Nǐ hǎo! Wǒ jiào Ānnà. Wǒ shì xuésheng. Nǐ ne?',
   meaning: {
     ru: 'Привет! Меня зовут Анна. Я студентка. А ты?',
     en: 'Hello! My name is Anna. I am a student. And you?',
     uz: 'Salom! Mening ismim Anna. Men talabaman. Siz-chi?',
   },
   options: {
-    ru: [
-      'Меня зовут Анна, я студентка.',
-      'Я покупаю яблоко в магазине.',
-      'Учитель идёт в библиотеку.',
-    ],
-    en: [
-      'My name is Anna. I am a student.',
-      'I am buying an apple at the shop.',
-      'The teacher is going to the library.',
-    ],
-    uz: [
-      'Mening ismim Anna. Men talabaman.',
-      'Men do‘kondan olma sotib olyapman.',
-      'O‘qituvchi kutubxonaga ketyapti.',
-    ],
+    ru: ['Меня зовут Анна, я студентка.', 'Я покупаю яблоко в магазине.', 'Учитель идёт в библиотеку.'],
+    en: ['My name is Anna. I am a student.', 'I am buying an apple at the shop.', 'The teacher is going to the library.'],
+    uz: ['Mening ismim Anna. Men talabaman.', 'Men do‘kondan olma sotib olyapman.', 'O‘qituvchi kutubxonaga ketyapti.'],
   },
 } as const
 
@@ -1135,6 +1139,7 @@ export default function App() {
   const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const activeLesson = lessonTemplates.find(lesson => lesson.id === activeLessonId && lesson.system === courseSystem && lesson.level === courseLevel) ?? courseLessons[0]
   const activeLessonWords = activeLesson ? lessonAssignments[activeLesson.id] ?? [] : []
+  const activeClosingReading = activeLesson?.id === 'hsk-1-1-1' ? firstLessonReading : closingReading
   const dialogueLines = activeLesson ? [
     {
       key: 'lesson-example',
@@ -1626,12 +1631,12 @@ export default function App() {
 
             <section className="course-block lesson-unassisted-reading">
               <div className="course-block-head"><div><span className="kicker">06 · {t('course.finalReading')}</span><h3>{t('course.readWithoutPinyin')}</h3></div>
-                <button className="sound" onClick={() => speak(closingReading.hanzi)} aria-label={`${t('vocab.listen')}: ${closingReading.hanzi}`}><Volume2 size={18}/></button>
+                <button className="sound" onClick={() => speak(activeClosingReading.hanzi)} aria-label={`${t('vocab.listen')}: ${activeClosingReading.hanzi}`}><Volume2 size={18}/></button>
               </div>
               <p className="unassisted-text" lang="zh-CN">{closingReading.hanzi}</p>
               <p className="reading-question">{t('course.readingQuestion')}</p>
               <div className="answer-options">
-                {closingReading.options[lang].map((option, index) => <button key={option} className={`answer-option ${closingChoice !== null && index === 0 ? 'correct' : ''} ${closingChoice === index && index !== 0 ? 'incorrect' : ''}`} disabled={closingChoice !== null} onClick={() => {
+                {activeClosingReading.options[lang].map((option, index) => <button key={option} className={`answer-option ${closingChoice !== null && index === 0 ? 'correct' : ''} ${closingChoice === index && index !== 0 ? 'incorrect' : ''}`} disabled={closingChoice !== null} onClick={() => {
                   setClosingChoice(index)
                   if (index === 0) recordActivity()
                 }}><span>{option}</span></button>)}
@@ -1654,7 +1659,7 @@ export default function App() {
                 <div className="lesson-recap-item">
                   <b>{t('course.reviewText')}</b>
                   <p className="recap-hanzi" lang="zh-CN">{closingReading.hanzi}</p>
-                  <span>{closingReading.meaning[lang]}</span>
+                  <span>{activeClosingReading.meaning[lang]}</span>
                 </div>
               </div>
             </section>
