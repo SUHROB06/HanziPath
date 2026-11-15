@@ -326,79 +326,36 @@ function lessonWordAssignments(entries: Word[]): Record<string, Word[]> {
     const pool = wordsForCourseLevel(entries, system, level)
     if (!lessons.length || !pool.length) continue
 
-    const pinned = new Map(lessons.map(lesson => [
-      lesson.id,
-      pool.filter(word => word.courseLessonIds?.includes(lesson.id)),
-    ]))
-    for (const lesson of lessons) {
-      assignments[lesson.id].push(...(pinned.get(lesson.id) ?? []))
-    }
-    const pending = pool.filter(word => !word.courseLessonIds?.length)
-    const baseSize = Math.floor(pending.length / lessons.length)
-    const extraWords = pending.length % lessons.length
-
-    const targetSizes = new Map(lessons.map((lesson, index) => [
-      lesson.id,
-      (pinned.get(lesson.id)?.length ?? 0) + baseSize + (index < extraWords ? 1 : 0),
-    ]))
     const chapters = [...new Set(lessons.map(lesson => lesson.chapter))]
-      .map(chapter => {
-      const chapterLessons = lessons.filter(lesson => lesson.chapter === chapter)
-      const chapterTarget = chapterLessons.reduce((total, lesson) => total + Math.max(0, (targetSizes.get(lesson.id) ?? 0) - assignments[lesson.id].length), 0)
+    for (const chapterNumber of chapters) {
+      const chapterLessons = lessons.filter(lesson => lesson.chapter === chapterNumber)
       const keywords = [...new Set(chapterLessons.flatMap(lesson => lesson.keywords))]
         .map(term => term.toLocaleLowerCase())
-      const scores = new Map(pool.map(word => {
-        const searchable = [word.hanzi, word.pinyin, word.ru, word.en, word.uz].filter(Boolean).join(' ').toLocaleLowerCase()
-        return [word, keywords.reduce((total, keyword) => total + (searchable.includes(keyword) ? 1 : 0), 0)] as const
-      }))
+      const scores = pool.map((word, index) => {
+        const searchable = [word.hanzi, word.pinyin, word.ru, word.en, word.uz]
+          .filter(Boolean).join(' ').toLocaleLowerCase()
+        const score = keywords.reduce((total, keyword) => total + (searchable.includes(keyword) ? 1 : 0), 0)
+        return { word, score, index }
+      })
 
-      return {
-        lessons: chapterLessons,
-        target: chapterTarget,
-        scores,
-        matchCount: [...scores.values()].filter(score => score > 0).length,
-        selected: [] as Word[],
-      }
-    })
-      // Give topics with fewer matching words first choice, then use the
-      // remaining HSK list entries to complete each lesson's new-word set.
-      .sort((a, b) => a.matchCount / a.target - b.matchCount / b.target || a.matchCount - b.matchCount)
+      // Every grammar part in one thematic chapter studies the same vocabulary.
+      // This avoids splitting a small chapter list into 1–3 words per lesson.
+      const pinned = chapterLessons.flatMap(lesson =>
+        pool.filter(word => word.courseLessonIds?.includes(lesson.id)),
+      )
+      const topical = scores
+        .filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score || a.index - b.index)
+        .map(item => item.word)
+      const fallback = scores
+        .sort((a, b) => a.index - b.index)
+        .map(item => item.word)
+      const chapterWords = [...new Map(
+        [...pinned, ...topical, ...fallback].map(word => [wordId(word), word]),
+      ).values()].slice(0, Math.max(10, pinned.length))
 
-    for (const chapter of chapters) {
-      while (chapter.selected.length < chapter.target && pending.length > 0) {
-        let bestIndex = 0
-        let bestScore = 0
-
-        pending.forEach((word, wordIndex) => {
-          const score = chapter.scores.get(word) ?? 0
-          if (score > bestScore) {
-            bestScore = score
-            bestIndex = wordIndex
-          }
-        })
-
-        if (bestScore === 0) break
-        chapter.selected.push(pending.splice(bestIndex, 1)[0])
-      }
-    }
-
-    for (const chapter of chapters) {
-      while (chapter.selected.length < chapter.target && pending.length > 0) {
-        chapter.selected.push(pending.shift()!)
-      }
-
-      // Distribute a chapter's topical words across its grammar modules so
-      // later parts do not start with only the leftover, unrelated entries.
-      let lessonIndex = 0
-      for (const word of chapter.selected) {
-        for (let attempt = 0; attempt < chapter.lessons.length; attempt += 1) {
-          const lesson = chapter.lessons[lessonIndex % chapter.lessons.length]
-          lessonIndex += 1
-          if (assignments[lesson.id].length < (targetSizes.get(lesson.id) ?? 0)) {
-            assignments[lesson.id].push(word)
-            break
-          }
-        }
+      for (const lesson of chapterLessons) {
+        assignments[lesson.id] = [...chapterWords]
       }
     }
   }
