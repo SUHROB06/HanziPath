@@ -824,8 +824,11 @@ export default function App() {
         const rows: any[] = []
         for (let from = 0; ; from += pageSize) {
           const { data, error } = await client
-            .rpc('get_hanzipath_vocabulary', { p_standard_code: standardCode })
-            .range(from, from + pageSize - 1)
+            .rpc('get_hanzipath_vocabulary', {
+              p_standard_code: standardCode,
+              p_offset: from,
+              p_limit: pageSize,
+            })
           if (error) throw error
           const page = Array.isArray(data) ? data : []
           rows.push(...page)
