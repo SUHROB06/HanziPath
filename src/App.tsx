@@ -1466,11 +1466,11 @@ export default function App() {
         <section className="hp-tools-section">
           <div className="hp-section-heading"><div><span className="hp-eyebrow">{lang === 'ru' ? 'УЧИСЬ В СВОЁМ ТЕМПЕ' : lang === 'uz' ? 'O‘Z SUR’ATINGIZDA O‘RGANING' : 'STUDY AT YOUR OWN PACE'}</span><h2>{lang === 'ru' ? 'Инструменты обучения' : lang === 'uz' ? 'O‘quv vositalari' : 'Learning tools'}</h2></div></div>
           <div className="hp-tools-grid">
-            <button className="hp-tool-card" onClick={() => setSection(2)}><span><BookOpen size={25}/></span><b>{t('nav.dictionary')}</b><small>{currentWords.length.toLocaleString(lang)} {lang === 'ru' ? 'слов' : lang === 'uz' ? 'so‘z' : 'words'}</small></button>
+            <button className="hp-tool-card" onClick={() => setSection(2)}><span><BookOpen size={25}/></span><b>{t('nav.vocabulary')}</b><small>{currentWords.length.toLocaleString(lang)} {lang === 'ru' ? 'слов' : lang === 'uz' ? 'so‘z' : 'words'}</small></button>
             <button className="hp-tool-card" onClick={() => setSection(3)}><span><Layers size={25}/></span><b>{t('nav.flashcards')}</b><small>{lang === 'ru' ? 'Повторение слов' : lang === 'uz' ? 'So‘zlarni takrorlash' : 'Word review'}</small></button>
             <button className="hp-tool-card" onClick={() => setSection(4)}><span><Headphones size={25}/></span><b>{t('nav.listening')}</b><small>{lang === 'ru' ? 'Тренировка слуха' : lang === 'uz' ? 'Tinglab tushunish' : 'Listening practice'}</small></button>
             <button className="hp-tool-card" onClick={() => setSection(5)}><span><GraduationCap size={25}/></span><b>{t('nav.grammar')}</b><small>{lang === 'ru' ? 'Правила и примеры' : lang === 'uz' ? 'Qoidalar va misollar' : 'Rules and examples'}</small></button>
-            <button className="hp-tool-card" onClick={() => setSection(6)}><span><CheckCircle2 size={25}/></span><b>{t('nav.exams')}</b><small>{lang === 'ru' ? 'Проверка знаний' : lang === 'uz' ? 'Bilimni tekshirish' : 'Test your knowledge'}</small></button>
+            <button className="hp-tool-card" onClick={() => setSection(6)}><span><CheckCircle2 size={25}/></span><b>{t('nav.tests')}</b><small>{lang === 'ru' ? 'Проверка знаний' : lang === 'uz' ? 'Bilimni tekshirish' : 'Test your knowledge'}</small></button>
           </div>
         </section>
 
