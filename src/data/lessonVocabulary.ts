@@ -496,14 +496,23 @@ const rows = `
 `.trim()
 
 export const lessonVocabulary: LessonVocabularyEntry[] = rows.split('\n').map((line, index) => {
-  const [stageValue, hanzi, pinyin, ru, en, uz] = line.split('|')
+  const fields = line.split('|')
+  const [stageValue, second, third, fourth, fifth, sixth, seventh] = fields
+  const hasLessonId = fields.length === 7
   const stage = Number(stageValue) as CourseLevel
+  const lessonId = hasLessonId ? second : undefined
+  const hanzi = hasLessonId ? third : second
+  const pinyin = hasLessonId ? fourth : third
+  const ru = hasLessonId ? fifth : fourth
+  const en = hasLessonId ? sixth : fifth
+  const uz = hasLessonId ? seventh : sixth
   if (!stage || !hanzi || !pinyin || !ru || !en || !uz) {
     throw new Error(`Invalid lesson vocabulary row ${index + 1}`)
   }
   return {
     stage,
     systems: stage <= 6 ? ['2.0', '3.0'] : ['3.0'],
+    lessonId,
     hanzi,
     pinyin,
     ru,
@@ -511,4 +520,3 @@ export const lessonVocabulary: LessonVocabularyEntry[] = rows.split('\n').map((l
     uz,
   }
 })
-
