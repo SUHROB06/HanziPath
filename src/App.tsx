@@ -820,20 +820,14 @@ export default function App() {
     const loadCatalog = async () => {
       try {
         const standardCode = vocabularyCollection === 'all' ? 'all' : system === '2.0' ? 'hsk20' : 'hsk30'
-        const pageSize = 1000
-        const rows: any[] = []
-        for (let from = 0; ; from += pageSize) {
-          const { data, error } = await client
-            .rpc('get_hanzipath_vocabulary', {
-              p_standard_code: standardCode,
-              p_offset: from,
-              p_limit: pageSize,
-            })
-          if (error) throw error
-          const page = Array.isArray(data) ? data : []
-          rows.push(...page)
-          if (page.length < pageSize) break
-        }
+        // Fetch the catalog as one JSON payload. PostgREST caps table-shaped
+        // RPC responses at 1,000 rows, which previously made the multi-page
+        // loader stall on mobile even though the database contained all words.
+        const { data, error } = await client.rpc('get_hanzipath_vocabulary_bundle', {
+          p_standard_code: standardCode,
+        })
+        if (error) throw error
+        const rows: any[] = Array.isArray(data) ? data : []
 
         if (cancelled) return
         const mapped: Word[] = rows.map((row: any) => ({
