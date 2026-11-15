@@ -1420,81 +1420,65 @@ export default function App() {
         </div>
       )}
 
-      {section === 0 && <>
-        <section className="hero">
-          <div className="hero-copy">
-            <div className="eyebrow"><span/>{t('dashboard.eyebrow')}</div>
-            <h1>{t('dashboard.title')}<br/><em>汉字之路</em></h1>
-            <p>{t('dashboard.subtitle')}</p>
-            <button className="primary" onClick={() => setSection(1)}>
-              {t('dashboard.continue')}<ChevronRight size={18}/>
-            </button>
+      {section === 0 && <section className="hp-dashboard">
+        <div className="hp-welcome">
+          <div>
+            <span className="hp-eyebrow">{lang === 'ru' ? 'ТВОЙ ПУТЬ К КИТАЙСКОМУ' : lang === 'uz' ? 'XITOY TILIGA YO‘LINGIZ' : 'YOUR JOURNEY INTO CHINESE'}</span>
+            <h1>{lang === 'ru' ? 'Добро пожаловать в HanziPath' : lang === 'uz' ? 'HanziPath’ga xush kelibsiz' : 'Welcome to HanziPath'}</h1>
+            <p>{lang === 'ru' ? 'Системное изучение китайского языка по уровням HSK' : lang === 'uz' ? 'HSK darajalari bo‘yicha xitoy tilini tizimli o‘rganing' : 'A structured way to learn Chinese, one HSK level at a time'}</p>
           </div>
+          <div className="hp-welcome-art" aria-hidden="true"><span>汉</span><i>汉字之路</i></div>
+        </div>
 
-          <div className="hero-art" aria-hidden="true">
-            <div className="orbit orbit1"/>
-            <div className="orbit orbit2"/>
-            <div className="big-hanzi">汉</div>
-            <div className="float-card"><span>你好</span><small>nǐ hǎo</small></div>
-            <div className="mini-dot"/>
+        <div className="hp-dashboard-grid">
+          <section className="hp-resume">
+            <div className="hp-resume-art" aria-hidden="true"><span>中</span><i>山</i></div>
+            <div className="hp-resume-copy">
+              <span className="hp-eyebrow">{lang === 'ru' ? 'ТВОЙ СЛЕДУЮЩИЙ ШАГ' : lang === 'uz' ? 'KEYINGI QADAM' : 'PICK UP WHERE YOU LEFT OFF'}</span>
+              <h2>{lang === 'ru' ? 'Продолжить обучение' : lang === 'uz' ? 'O‘qishni davom ettirish' : 'Continue learning'}</h2>
+              <p>HSK {courseSystem} · {lang === 'ru' ? 'Этап' : lang === 'uz' ? 'Bosqich' : 'Level'} {courseLevel}</p>
+              <div className="hp-resume-progress"><span><i style={{width: `${Math.min(100, Math.round(knownInCurrentWords / Math.max(1,currentWords.length) * 100))}%`}}/></span><b>{currentWords.length ? Math.round(knownInCurrentWords / currentWords.length * 100) : 0}%</b></div>
+              <button className="hp-gold-button" onClick={() => setSection(1)}>{lang === 'ru' ? 'Продолжить' : lang === 'uz' ? 'Davom etish' : 'Continue'} <ChevronRight size={17}/></button>
+            </div>
+          </section>
+
+          <section className="hp-progress-card">
+            <div className="hp-card-heading"><span>{lang === 'ru' ? 'Мой прогресс' : lang === 'uz' ? 'Mening natijam' : 'My progress'}</span><span className="hp-mini-seal">进</span></div>
+            <div className="hp-progress-ring" style={{'--hp-progress': `${currentWords.length ? Math.round(knownInCurrentWords / currentWords.length * 100) : 0}%`} as React.CSSProperties}><strong>{currentWords.length ? Math.round(knownInCurrentWords / currentWords.length * 100) : 0}%</strong></div>
+            <b className="hp-progress-count">{knownInCurrentWords.toLocaleString(lang)} / {currentWords.length.toLocaleString(lang)}</b>
+            <small>{t('dashboard.wordsLearned')}</small>
+          </section>
+        </div>
+
+        <section className="hp-path-section">
+          <div className="hp-section-heading"><div><span className="hp-eyebrow">{lang === 'ru' ? 'ТВОЯ ПРОГРАММА' : lang === 'uz' ? 'O‘QUV DASTURINGIZ' : 'YOUR CURRICULUM'}</span><h2>{lang === 'ru' ? 'Мой учебный путь' : lang === 'uz' ? 'Mening o‘quv yo‘lim' : 'My learning path'}</h2></div><button onClick={() => setSection(1)}>{lang === 'ru' ? 'Все уровни' : lang === 'uz' ? 'Barcha darajalar' : 'All levels'} <ChevronRight size={15}/></button></div>
+          <div className="hp-path-track">
+            <button className={courseSystem === '2.0' ? 'done' : ''} onClick={() => {setCourseSystem('2.0');setCourseLevel(1);setSection(1)}}><span className="hp-path-icon"><CheckCircle2 size={20}/></span><b>HSK 2.0</b><small>{lang === 'ru' ? 'Классическая программа' : lang === 'uz' ? 'Klassik dastur' : 'Classic curriculum'}</small></button>
+            <span className="hp-path-arrow">→</span>
+            <button className={courseSystem === '3.0' ? 'current' : ''} onClick={() => {setCourseSystem('3.0');setCourseLevel(1);setSection(1)}}><span className="hp-path-icon"><span className="hp-path-spinner"/></span><b>HSK 3.0</b><small>{lang === 'ru' ? 'Текущий курс' : lang === 'uz' ? 'Joriy kurs' : 'Current course'}</small></button>
+            <span className="hp-path-arrow">→</span>
+            <div className="locked"><span className="hp-path-icon"><LockKeyhole size={18}/></span><b>HSK 4.0</b><small>{lang === 'ru' ? 'Скоро' : lang === 'uz' ? 'Tez orada' : 'Coming soon'}</small></div>
+            <span className="hp-path-arrow">→</span>
+            <div className="locked"><span className="hp-path-icon"><LockKeyhole size={18}/></span><b>HSK 5.0</b><small>{lang === 'ru' ? 'Скоро' : lang === 'uz' ? 'Tez orada' : 'Coming soon'}</small></div>
           </div>
         </section>
 
-        <div className="stats">
-          <div className="stat">
-            <div className="stat-icon blue"><BookOpen/></div>
-            <div><strong>{knownInCurrentWords}</strong><small>{t('dashboard.wordsLearned')}</small></div>
-            <span className="stat-note">/ {currentWords.length}</span>
+        <section className="hp-tools-section">
+          <div className="hp-section-heading"><div><span className="hp-eyebrow">{lang === 'ru' ? 'УЧИСЬ В СВОЁМ ТЕМПЕ' : lang === 'uz' ? 'O‘Z SUR’ATINGIZDA O‘RGANING' : 'STUDY AT YOUR OWN PACE'}</span><h2>{lang === 'ru' ? 'Инструменты обучения' : lang === 'uz' ? 'O‘quv vositalari' : 'Learning tools'}</h2></div></div>
+          <div className="hp-tools-grid">
+            <button className="hp-tool-card" onClick={() => setSection(2)}><span><BookOpen size={25}/></span><b>{t('nav.dictionary')}</b><small>{currentWords.length.toLocaleString(lang)} {lang === 'ru' ? 'слов' : lang === 'uz' ? 'so‘z' : 'words'}</small></button>
+            <button className="hp-tool-card" onClick={() => setSection(3)}><span><Layers size={25}/></span><b>{t('nav.flashcards')}</b><small>{lang === 'ru' ? 'Повторение слов' : lang === 'uz' ? 'So‘zlarni takrorlash' : 'Word review'}</small></button>
+            <button className="hp-tool-card" onClick={() => setSection(4)}><span><Headphones size={25}/></span><b>{t('nav.listening')}</b><small>{lang === 'ru' ? 'Тренировка слуха' : lang === 'uz' ? 'Tinglab tushunish' : 'Listening practice'}</small></button>
+            <button className="hp-tool-card" onClick={() => setSection(5)}><span><GraduationCap size={25}/></span><b>{t('nav.grammar')}</b><small>{lang === 'ru' ? 'Правила и примеры' : lang === 'uz' ? 'Qoidalar va misollar' : 'Rules and examples'}</small></button>
+            <button className="hp-tool-card" onClick={() => setSection(6)}><span><CheckCircle2 size={25}/></span><b>{t('nav.exams')}</b><small>{lang === 'ru' ? 'Проверка знаний' : lang === 'uz' ? 'Bilimni tekshirish' : 'Test your knowledge'}</small></button>
           </div>
-          <div className="stat">
-            <div className="stat-icon orange"><Flame/></div>
-            <div><strong>{getStreak(activityDays)}</strong><small>{t('dashboard.streak')}</small></div>
-          </div>
-          <div className="stat">
-            <div className="stat-icon green"><ChartNoAxesColumnIncreasing/></div>
-            <div><strong>{currentWords.length ? Math.round(knownInCurrentWords / currentWords.length * 100) : 0}%</strong><small>{t('dashboard.progress')}</small></div>
-          </div>
-        </div>
+        </section>
 
-        <div className="content-grid">
-          <section className="panel daily">
-            <div className="panel-head">
-              <div><span className="kicker">{t('dashboard.due')}</span><h2>{t('dashboard.today')}</h2></div>
-              <span className="date-chip">{t('dashboard.todayTag')}</span>
-            </div>
-
-            {(['dashboard.task1', 'dashboard.task2', 'dashboard.task3'] as TranslationKey[]).map((key, i) => (
-              <label className={`task ${done[i] ? 'checked' : ''}`} key={key}>
-                <input
-                  type="checkbox"
-                  checked={done[i]}
-                  onChange={() => {
-                    setDone(items => items.map((value, index) => index === i ? !value : value))
-                    if (!done[i]) recordActivity()
-                  }}
-                />
-                <span className="fakecheck">{done[i] ? '✓' : ''}</span>
-                <span className="task-copy">{t(key)}<small>{[10, 5, 8][i]} {t('common.minutes')}</small></span>
-              </label>
-            ))}
-
-            <div className="daily-foot">
-              <span>{done.filter(Boolean).length}/3 {t('dashboard.completed')}</span>
-              <div className="progress"><i style={{width: `${done.filter(Boolean).length / 3 * 100}%`}}/></div>
-            </div>
-          </section>
-
-          <section className="panel review">
-            <div className="review-icon"><Layers/></div>
-            <span className="kicker">{t('dashboard.reviewTitle')}</span>
-            <h2>{t('dashboard.review')}</h2>
-            <p>{t('dashboard.reviewText')}</p>
-            <button className="outline" onClick={() => setSection(3)}>
-              {t('dashboard.openFlashcards')}<ChevronRight size={16}/>
-            </button>
-          </section>
-        </div>
-      </>}
+        <section className="hp-daily-row">
+          <div className="hp-daily-streak"><Flame size={21}/><div><b>{getStreak(activityDays)} {lang === 'ru' ? 'дней подряд' : lang === 'uz' ? 'kun ketma-ket' : 'day streak'}</b><small>{lang === 'ru' ? 'Твоя учебная серия' : lang === 'uz' ? 'O‘quv seriyangiz' : 'Your learning streak'}</small></div></div>
+          <div className="hp-daily-tasks"><div><b>{lang === 'ru' ? 'Задачи на сегодня' : lang === 'uz' ? 'Bugungi vazifalar' : 'Today’s goals'}</b><small>{done.filter(Boolean).length}/3 {lang === 'ru' ? 'выполнено' : lang === 'uz' ? 'bajarildi' : 'completed'}</small></div><div className="hp-task-checks">{done.map((isDone,index)=><button key={index} className={isDone?'checked':''} aria-label={`Task ${index+1}`} onClick={()=>{setDone(items=>items.map((value,i)=>i===index?!value:value));if(!isDone)recordActivity()}}>{isDone?'✓':index+1}</button>)}</div></div>
+        </section>
+      </section>}
 
       {section === 1 && (
         <section className="panel learning-page course-page">
