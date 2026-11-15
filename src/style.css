@@ -1159,3 +1159,117 @@ footer .ok {
 .auth-fields{display:grid;gap:14px}.auth-feedback{margin:0!important;padding:11px 13px;border-radius:10px;font-size:13px!important;overflow-wrap:anywhere}.auth-feedback.error{background:#fff0ed;color:#a34835!important;border:1px solid #f0d2ca}.auth-feedback.success{background:#edf5ef;color:#28614d!important;border:1px solid #d5e8db}
 
 .auth-backdrop{position:fixed;inset:0;z-index:30;background:#14201dcc;display:grid;place-items:center;padding:18px;backdrop-filter:blur(4px)}.auth-card{position:relative;width:min(100%,420px);background:#fffdf7;border:1px solid #e8e0d2;border-radius:20px;padding:30px;box-shadow:0 24px 80px #10201944;color:#203c35}.auth-card h2{font-size:25px;margin:9px 0;color:#203c35}.auth-card p{font-size:13px;line-height:1.6;color:#77847c;margin:0 0 20px}.auth-card form{display:grid;gap:14px}.auth-card label{display:grid;gap:7px;font-size:12px;font-weight:700;color:#53675e}.auth-card input{width:100%;height:44px;border:1px solid #ddd7ca;border-radius:10px;padding:0 12px;background:#fff;color:#243b34;font-size:14px}.auth-submit{width:100%;height:44px;background:#245d4e;color:white;margin-top:4px}.auth-submit:disabled{opacity:.65;cursor:wait}.auth-close{position:absolute;right:14px;top:12px;border:0;background:transparent;color:#7b887e;font-size:25px}.auth-switch{display:block;margin:17px auto 0;border:0;background:none;color:#356b5c;font-size:12px;font-weight:700}
+
+/* HanziPath responsive visual system — warm cream, seal burgundy and gold. */
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+:root {
+  --ink:#332824; --ink-soft:#66564e; --muted:#95877d;
+  --paper:#f7f2e9; --paper-light:#fffaf2; --surface:#fffdf8;
+  --line:#eadfd2; --jade:#7f2634; --jade-dark:#641c2a; --jade-pale:#f4e7e5;
+  --seal:#8b2635; --seal-pale:#f4e7e5; --gold:#c49a55;
+  font-family:'Manrope','Noto Sans SC',sans-serif;
+  color:var(--ink); background:var(--paper);
+}
+body{background:var(--paper);color:var(--ink);font-family:'Manrope','Noto Sans SC',sans-serif}
+.sidebar{background:#7f1f2d;color:#fff;border-right:0;box-shadow:5px 0 24px #4b172014}
+.brand b,.brand small{color:#fff}
+.brand small{opacity:.76}
+.brandmark{background:#fff3e4;color:#842536;box-shadow:none}
+.side-label{color:#e9c99d}
+.navitem{color:#f8e9df}
+.navitem:hover{background:#ffffff18;color:#fff}
+.navitem.active{background:#a93643;color:#fff;box-shadow:inset 3px 0 #e9c56e}
+.navitem.active::before{background:#f1cf77}
+.navcount{color:#f5d88f}
+.streak{background:#fff4dd;color:#9b7136}
+.streak b{color:#49372c}
+.profile{border-top-color:#ffffff30}
+.avatar{background:#f6e9dc;color:#842536}
+.profile-name b,.profile-name small{color:#fff}
+.profile-action{color:#ffe6c5}
+.main{color:var(--ink)}
+.topbar{border-bottom-color:var(--line)}
+.crumb{color:var(--muted)}
+.hero{background:linear-gradient(115deg,#842536,#b33e36 72%,#c56b43);border:0;color:#fff}
+.hero h1,.hero p,.hero .eyebrow{color:#fff}
+.hero h1 em{color:#f5d88f}
+.hero .primary,.primary{background:#8b2635;color:#fff}
+.hero .primary{background:#f4d77d;color:#4a3027}
+.panel,.stat,.hp-progress-card,.hp-tool-card,.hp-path-track,.course-block{background:var(--surface);border-color:var(--line)}
+.panel h2,.lesson-card h3{color:var(--ink)}
+.kicker,.side-label{letter-spacing:1.6px}
+.kicker{color:#9a7c50}
+.lesson-card,.lesson-word,.word{border-color:var(--line);background:var(--surface)}
+.lesson-card code,.lesson-example code{background:#f5e9e2;color:#812b37}
+.lesson-example b,.word-main>strong{color:#842536}
+.study-card{background:linear-gradient(145deg,#fffaf2,#f2e8dc);border-color:var(--line)}
+.study-hanzi{color:#842536}
+.auth-card{background:var(--surface);color:var(--ink)}
+button{touch-action:manipulation}
+img,svg{max-width:100%}
+@media(max-width:700px){
+  .sidebar{width:min(330px,88vw);padding:22px 16px calc(22px + env(safe-area-inset-bottom));}
+  .brand{padding-bottom:25px}
+  .main{padding:0 14px;min-width:0;width:100%}
+  .topbar{height:60px;position:sticky;top:0;z-index:3;background:var(--paper);gap:7px}
+  .crumb{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .top-actions{gap:5px;flex:none}
+  .language-select{height:34px;padding:0 7px}
+  .signin{padding:7px}
+  .hero{min-height:0;margin:17px 0;border-radius:15px}
+  .hero-copy{padding:23px 18px;max-width:100%;width:100%}
+  .hero h1{font-size:clamp(21px,6vw,27px);line-height:1.25;max-width:100%}
+  .hero p{font-size:12px;max-width:100%}
+  .hero-art{left:55%;opacity:.2}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stat{min-width:0}
+  .content-grid{grid-template-columns:minmax(0,1fr)}
+  .hp-dashboard-grid{grid-template-columns:minmax(0,1fr)!important}
+  .hp-path-track{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;padding:10px}
+  .hp-path-track>*{min-width:0}
+  .hp-path-arrow{display:none}
+  .hp-path-track button,.hp-path-track .locked{min-height:94px;padding:12px 8px}
+  .hp-tools-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px}
+  .hp-tool-card{min-width:0;padding:13px 10px!important}
+  .hp-tool-card b,.hp-tool-card small{overflow-wrap:anywhere}
+  .hp-resume{min-width:0}
+  .hp-resume-copy{max-width:100%;padding:22px 18px!important}
+  .hp-progress-card{min-width:0}
+  .hp-daily-row{grid-template-columns:minmax(0,1fr)!important}
+  .course-levels{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .course-level{min-width:0;overflow-wrap:anywhere}
+  .lesson-route{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important}
+  .lesson-route span{min-width:0;white-space:normal!important}
+  .lesson-detail-heading{align-items:flex-start;gap:10px}
+  .lesson-detail-heading h2{font-size:22px;overflow-wrap:anywhere}
+  .course-block{padding:14px!important;min-width:0}
+  .course-block-head{align-items:flex-start;flex-wrap:wrap}
+  .lesson-words{grid-template-columns:minmax(0,1fr)!important}
+  .lesson-word{min-width:0}
+  .lesson-word-meanings{grid-template-columns:1fr!important}
+  .dialogue-script li{grid-template-columns:minmax(0,1fr) 30px!important;gap:8px}
+  .dialogue-speaker{grid-column:1/-1}
+  .dialogue-line-copy{min-width:0}
+  .dialogue-hanzi{overflow-wrap:anywhere;line-height:1.7}
+  .answer-options{grid-template-columns:minmax(0,1fr)!important}
+  .dictionary-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .word-meanings{grid-template-columns:minmax(0,1fr)!important}
+  .panel{padding:14px}
+  .panel-head{align-items:flex-start}
+  .lesson-card{grid-template-columns:25px minmax(0,1fr) 28px;gap:8px;padding:12px}
+  .learning-page{margin:13px auto}
+  .study-card{min-height:190px;padding:20px}
+  .study-hanzi{font-size:clamp(44px,13vw,62px)}
+  .filters{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .filters select{min-width:0}
+  .searchbox{grid-column:1/-1}
+  footer{padding-bottom:calc(22px + env(safe-area-inset-bottom))}
+}
+@media(max-width:390px){
+  .main{padding:0 10px}
+  .hp-tools-grid{grid-template-columns:minmax(0,1fr)!important}
+  .hp-path-track{grid-template-columns:minmax(0,1fr)}
+  .course-levels{grid-template-columns:minmax(0,1fr)!important}
+  .topbar{gap:4px}
+  .language-select select{font-size:10px}
+}
