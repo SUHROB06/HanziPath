@@ -36,7 +36,7 @@ type Word = {
   membershipStatus?: string
   courseStage?: CourseLevel
   courseSystems?: CourseSystem[]
-  courseLessonId?: string
+  courseLessonIds?: string[]
   level20: number | string | null
   level30: number | string | null
   example: string
@@ -149,7 +149,7 @@ const originalLessonWords: Word[] = lessonVocabulary.reduce<Word[]>((result, ent
     uzStatus: 'ai_draft_unverified',
     courseStage: entry.stage,
     courseSystems: entry.systems,
-    courseLessonId: entry.lessonId,
+    courseLessonIds: entry.lessonIds,
     // HanziPath course stages are not official HSK memberships.
     level20: null,
     level30: null,
@@ -327,7 +327,7 @@ function lessonWordAssignments(entries: Word[]): Record<string, Word[]> {
 
     const pinned = new Map(lessons.map(lesson => [
       lesson.id,
-      pool.filter(word => word.courseLessonId === lesson.id),
+      pool.filter(word => word.courseLessonIds?.includes(lesson.id)),
     ]))
     for (const lesson of lessons) {
       assignments[lesson.id].push(...(pinned.get(lesson.id) ?? []))
@@ -1139,7 +1139,7 @@ export default function App() {
   const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const activeLesson = lessonTemplates.find(lesson => lesson.id === activeLessonId && lesson.system === courseSystem && lesson.level === courseLevel) ?? courseLessons[0]
   const activeLessonWords = activeLesson ? lessonAssignments[activeLesson.id] ?? [] : []
-  const activeClosingReading = activeLesson?.id === 'hsk-1-1-1' ? firstLessonReading : closingReading
+  const activeClosingReading = (activeLesson?.id === 'hsk-1-1-1' || activeLesson?.id === 'hsk30-1-1-1') ? firstLessonReading : closingReading
   const dialogueLines = activeLesson ? [
     {
       key: 'lesson-example',
