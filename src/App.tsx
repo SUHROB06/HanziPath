@@ -148,8 +148,9 @@ const originalLessonWords: Word[] = lessonVocabulary.reduce<Word[]>((result, ent
     uzStatus: 'ai_draft_unverified',
     courseStage: entry.stage,
     courseSystems: entry.systems,
-    level20: null,
-    level30: null,
+    // These are HanziPath curriculum stages, not claims of official HSK membership.
+    level20: entry.systems.includes('2.0') ? entry.stage : null,
+    level30: entry.systems.includes('3.0') ? (entry.stage >= 7 ? '7-9' : entry.stage) : null,
     example: '',
     examplePinyin: '',
     exampleRu: '',
@@ -769,6 +770,7 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('')
   const [authPassword, setAuthPassword] = useState('')
   const [authBusy, setAuthBusy] = useState(false)
+  const [authFeedback, setAuthFeedback] = useState<{ text: string; kind: 'success' | 'error' } | null>(null)
 
   const [databaseWords, setDatabaseWords] = useState<Word[] | null>(null)
   const [reviewWords, setReviewWords] = useState<Word[] | null>(null)
@@ -847,17 +849,17 @@ export default function App() {
     const email = authEmail.trim()
     if (!email || authPassword.length < 6) { setNotice({ text: t('auth.validation'), kind: 'error' }); return }
     setAuthBusy(true)
+    setAuthFeedback(null)
     try {
       const result = authMode === 'signup'
         ? await supabase.auth.signUp({ email, password: authPassword, options: { emailRedirectTo: window.location.origin } })
         : await supabase.auth.signInWithPassword({ email, password: authPassword })
       if (result.error) {
-        setNotice({ text: result.error.message, kind: 'error' })
+        setAuthFeedback({ text: result.error.message, kind: 'error' })
         return
       }
       if (authMode === 'signup' && !result.data.session) {
-        setNotice({ text: t('auth.confirmEmail'), kind: 'success' })
-        setAuthOpen(false)
+        setAuthFeedback({ text: t('auth.confirmEmail'), kind: 'success' })
         setAuthPassword('')
         return
       }
@@ -866,7 +868,7 @@ export default function App() {
       setAuthPassword('')
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      setNotice({ text: message || 'Authentication request failed. Please try again.', kind: 'error' })
+      setAuthFeedback({ text: message || 'Authentication request failed. Please try again.', kind: 'error' })
     } finally {
       setAuthBusy(false)
     }
@@ -1153,7 +1155,7 @@ export default function App() {
       value: isCombinedBand ? '7' : value,
       label: vocabularyCollection === 'course'
         ? `${t('vocab.courseStage')} ${index + 1} · ${count}`
-        : `${system === '2.0' ? 'HSK 2.0' : 'HSK 3.0'} · ${isCombinedBand ? '7–9' : index + 1} · ${count}`,
+        : `${system === '2.0' ? 'HSK 2.0' : 'HSK 3.0'} · ${t('vocab.courseStage')} ${isCombinedBand ? '7–9' : index + 1} · ${count}`,
     }
   })
 
@@ -1332,12 +1334,13 @@ export default function App() {
             <span className="kicker">HANZIPATH</span>
             <h2 id="auth-title">{authMode === 'signup' ? t('auth.createAccount') : t('auth.welcomeBack')}</h2>
             <p>{t('auth.saveProgress')}</p>
-            <form onSubmit={event => { event.preventDefault(); void submitAuth() }}>
+            <div className="auth-fields">
               <label>{t('auth.email')}<input type="email" autoComplete="email" required value={authEmail} onChange={event => setAuthEmail(event.target.value)} placeholder="name@example.com"/></label>
               <label>{t('auth.password')}<input type="password" autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} minLength={6} required value={authPassword} onChange={event => setAuthPassword(event.target.value)} placeholder="••••••••"/></label>
-              <button className="primary auth-submit" type="submit" disabled={authBusy}>{authBusy ? t('auth.pleaseWait') : authMode === 'signup' ? t('auth.createAccount') : t('profile.signIn')}</button>
-            </form>
-            <button className="auth-switch" type="button" onClick={() => setAuthMode(mode => mode === 'signup' ? 'signin' : 'signup')}>{authMode === 'signup' ? t('auth.haveAccount') : t('auth.noAccount')}</button>
+              {authFeedback && <p className={`auth-feedback ${authFeedback.kind}`} role="status">{authFeedback.text}</p>}
+              <button className="primary auth-submit" type="button" disabled={authBusy || !authEmail.trim() || authPassword.length < 6} onClick={() => void submitAuth()}>{authBusy ? t('auth.pleaseWait') : authMode === 'signup' ? t('auth.createAccount') : t('profile.signIn')}</button>
+            </div>
+            <button className="auth-switch" type="button" onClick={() => { setAuthFeedback(null); setAuthMode(mode => mode === 'signup' ? 'signin' : 'signup') }}>{authMode === 'signup' ? t('auth.haveAccount') : t('auth.noAccount')}</button>
           </section>
         </div>
       )}
@@ -1715,7 +1718,7 @@ export default function App() {
                   </button>
 
                   <span className="level-pill">
-                    {`${vocabularyCollection === 'course' ? `${t('vocab.courseStageShort')} ${word.courseStage}` : dictionaryLevelLabel(word, system) ?? (lang === 'ru' ? 'Вне уровня' : 'Unlevelled')}`}
+                    {`${vocabularyCollection === 'course' || word.courseStage ? `${t('vocab.courseStageShort')} ${word.courseStage}` : dictionaryLevelLabel(word, system) ?? (lang === 'ru' ? 'Вне уровня' : 'Unlevelled')}`}
                   </span>
 
                   <button
