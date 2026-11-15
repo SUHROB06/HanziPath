@@ -1118,9 +1118,10 @@ export default function App() {
     () => currentWords.filter(word => favoriteWordIds.includes(wordId(word))).length,
     [currentWords, favoriteWordIds],
   )
-  // Keep the eight demo dictionary entries out of course lessons. They are
-  // examples for the HSK dictionary view and duplicate authored lesson words.
-  const lessonEntries = currentWords
+  // Course exercises must use the dedicated HanziPath course vocabulary.
+  // The HSK dictionary can be on a different standard than the selected course;
+  // using currentWords here left cards and listening empty whenever they differed.
+  const lessonEntries = originalLessonWords
   const lessonAssignments = useMemo(() => lessonWordAssignments(lessonEntries), [lessonEntries])
   const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const activeLesson = lessonTemplates.find(lesson => lesson.id === activeLessonId && lesson.system === courseSystem && lesson.level === courseLevel) ?? courseLessons[0]
