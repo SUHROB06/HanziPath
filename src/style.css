@@ -1272,3 +1272,26 @@ img,svg{max-width:100%}
   .topbar{gap:4px}
   .language-select select{font-size:10px}
 }
+
+/* Lesson typography and detailed grammar panels. */
+.hero h1,.hp-welcome h1,.hp-resume h2,.hp-section-heading h2,.lesson-detail-heading h2,.panel h2{
+  font-family:'Playfair Display','Noto Sans SC',serif;
+}
+.grammar-deep-dive,.grammar-extra-examples,.grammar-mistakes{
+  margin-top:16px;padding:14px 15px;border:1px solid #eadfd2;border-radius:11px;background:#fbf5eb;
+}
+.grammar-deep-dive h4,.grammar-extra-examples h4,.grammar-mistakes h4{
+  margin:0 0 8px;color:#842536;font-size:12px;font-weight:800;
+}
+.grammar-deep-dive p,.grammar-mistakes li{
+  color:#66564e;font-size:12px;line-height:1.8;
+}
+.grammar-deep-dive p{margin:0}
+.grammar-mistakes ul{margin:0;padding-left:18px}
+.grammar-mistakes li+li{margin-top:6px}
+.grammar-extra-examples .lesson-example{margin-top:8px;padding-top:8px}
+.unassisted-pinyin{margin:7px 0 0;color:#987e69;font-size:11px;line-height:1.7;letter-spacing:.2px}
+@media(max-width:700px){
+  .grammar-deep-dive,.grammar-extra-examples,.grammar-mistakes{padding:12px}
+  .grammar-deep-dive p,.grammar-mistakes li{font-size:11px;line-height:1.75}
+}
