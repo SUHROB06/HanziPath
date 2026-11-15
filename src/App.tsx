@@ -18,6 +18,7 @@ import {
 } from './data/curriculum'
 import { hsk30LessonTemplates } from './data/hsk30Curriculum'
 import { lessonVocabulary } from './data/lessonVocabulary'
+import LessonPractice from './components/LessonPractice'
 
 type System = '2.0' | '3.0'
 
@@ -1139,36 +1140,106 @@ export default function App() {
   const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const activeLesson = lessonTemplates.find(lesson => lesson.id === activeLessonId && lesson.system === courseSystem && lesson.level === courseLevel) ?? courseLessons[0]
   const activeLessonWords = activeLesson ? lessonAssignments[activeLesson.id] ?? [] : []
+  const lessonFocusWords = activeLessonWords.slice(0, 3)
+  const lessonHanzi = lessonFocusWords.map(word => word.hanzi)
+  const lessonPinyin = lessonFocusWords.map(word => word.pinyin)
+  const lessonWordGlosses = lessonFocusWords.map(word => word.ru).filter(Boolean)
   const activeClosingReading = (activeLesson?.id === 'hsk-1-1-1' || activeLesson?.id === 'hsk30-1-1-1')
     ? firstLessonReading
-    : activeLesson ? {
-      hanzi: activeLesson.grammar.example,
-      pinyin: activeLesson.grammar.pinyin,
-      meaning: {
-        ru: activeLesson.grammar.meaning,
-        en: activeLesson.grammar.meaning,
-        uz: activeLesson.grammar.meaning,
+    : activeLesson?.id === 'hsk-1-2-1'
+      ? {
+        hanzi: '我在大学学习汉语。我们班有很多学生，王老师是我们的汉语老师。每天上午我们在教室读课本、听老师说汉语，也练习写汉字。下课以后，我和同学一起做作业。',
+        pinyin: 'Wǒ zài dàxué xuéxí Hànyǔ. Wǒmen bān yǒu hěn duō xuésheng, Wáng lǎoshī shì wǒmen de Hànyǔ lǎoshī. Měitiān shàngwǔ wǒmen zài jiàoshì dú kèběn, tīng lǎoshī shuō Hànyǔ, yě liànxí xiě Hànzì. Xiàkè yǐhòu, wǒ hé tóngxué yìqǐ zuò zuòyè.',
+        meaning: {
+          ru: 'Я изучаю китайский язык в университете. В нашей группе много студентов, преподаватель Ван — наш учитель китайского. Каждое утро мы читаем учебник в аудитории, слушаем, как учитель говорит по-китайски, и тренируемся писать иероглифы. После занятий я делаю домашнее задание вместе с однокурсниками.',
+          en: 'I study Chinese at the university. There are many students in our class, and Teacher Wang is our Chinese teacher. Every morning we read the textbook in the classroom, listen to the teacher speak Chinese, and practise writing characters. After class, I do homework with my classmates.',
+          uz: 'Men universitetda xitoy tilini o‘rganaman. Guruhimizda ko‘p talabalar bor, Van ustoz bizning xitoy tili o‘qituvchimiz. Har kuni ertalab auditoriyada darslikni o‘qiymiz, ustozning xitoycha gapirishini tinglaymiz va ieroglif yozishni mashq qilamiz. Darsdan keyin kursdoshlarim bilan uy vazifasini bajaramiz.',
+        },
+        options: {
+          ru: ['Студенты изучают китайский язык в университете.', 'Студенты учат английский дома.', 'Преподаватель Ван изучает математику.', 'После уроков студенты идут в магазин.'],
+          en: ['The students study Chinese at the university.', 'The students study English at home.', 'Teacher Wang studies mathematics.', 'After class, the students go shopping.'],
+          uz: ['Talabalar universitetda xitoy tilini o‘rganadilar.', 'Talabalar uyda ingliz tilini o‘rganadilar.', 'Van ustoz matematikani o‘rganadi.', 'Darsdan keyin talabalar xarid qilishga boradilar.'],
+        },
+      }
+      : activeLesson ? (() => {
+      const example = activeLesson.grammar.example.replace(/[。！？!?]+$/, '')
+      const vocabularyPhrase = lessonHanzi.length ? lessonHanzi.join('、') : activeLesson.grammar.title
+      const pinyinPhrase = lessonPinyin.length ? lessonPinyin.join(', ') : ''
+      const glossPhrase = lessonWordGlosses.length ? lessonWordGlosses.join('、') : activeLesson.grammar.title
+      const meaningRu = `${activeLesson.grammar.meaning} Мы используем слова «${glossPhrase}», чтобы потренировать тему урока. Сначала прочитай текст, затем попробуй пересказать его самостоятельно.`
+      const meaningEn = `${activeLesson.grammar.meaning} We use the lesson words (${glossPhrase}) to practise this topic. Read the text first, then try to retell it yourself.`
+      const meaningUz = `${activeLesson.grammar.meaning} Dars mavzusini mashq qilish uchun «${glossPhrase}» so‘zlaridan foydalanamiz. Avval matnni o‘qing, keyin uni mustaqil qayta aytib ko‘ring.`
+      return {
+        hanzi: `${example}。我们用${vocabularyPhrase}练习今天的内容。请先读一遍，再自己说一次。`,
+        pinyin: `${activeLesson.grammar.pinyin} Wǒmen yòng ${pinyinPhrase || 'xīn cí'} liànxí jīntiān de nèiróng. Qǐng xiān dú yí biàn, zài zìjǐ shuō yí cì.`,
+        meaning: { ru: meaningRu, en: meaningEn, uz: meaningUz },
+        options: {
+          ru: [meaningRu, ...closingReading.options.ru.slice(1)],
+          en: [meaningEn, ...closingReading.options.en.slice(1)],
+          uz: [meaningUz, ...closingReading.options.uz.slice(1)],
+        },
+      }
+    })() : closingReading
+  const dialogueLines = activeLesson ? (activeLesson.id === 'hsk-1-2-1'
+    ? [
+      { key: 'class-dialogue-1', speaker: t('course.speaker.learner'), hanzi: '老师，您好！您是我们的汉语老师吗？', pinyin: 'Lǎoshī, nín hǎo! Nín shì wǒmen de Hànyǔ lǎoshī ma?', meaning: lang === 'ru' ? 'Здравствуйте, учитель! Вы наш преподаватель китайского языка?' : lang === 'uz' ? 'Assalomu alaykum, ustoz! Siz bizning xitoy tili o‘qituvchimizmisiz?' : 'Hello, teacher! Are you our Chinese teacher?' },
+      { key: 'class-dialogue-2', speaker: t('course.speaker.teacher'), hanzi: '是的，我是王老师。你们是新学生吗？', pinyin: 'Shì de, wǒ shì Wáng lǎoshī. Nǐmen shì xīn xuésheng ma?', meaning: lang === 'ru' ? 'Да, я преподаватель Ван. Вы новые студенты?' : lang === 'uz' ? 'Ha, men Van ustozman. Sizlar yangi talabamisiz?' : 'Yes, I am Teacher Wang. Are you new students?' },
+      { key: 'class-dialogue-3', speaker: t('course.speaker.learner'), hanzi: '是的。我们在大学学习汉语。', pinyin: 'Shì de. Wǒmen zài dàxué xuéxí Hànyǔ.', meaning: lang === 'ru' ? 'Да. Мы изучаем китайский язык в университете.' : lang === 'uz' ? 'Ha. Biz universitetda xitoy tilini o‘rganamiz.' : 'Yes. We study Chinese at the university.' },
+      { key: 'class-dialogue-4', speaker: t('course.speaker.teacher'), hanzi: '很好。请打开课本，跟我读。', pinyin: 'Hěn hǎo. Qǐng dǎkāi kèběn, gēn wǒ dú.', meaning: lang === 'ru' ? 'Отлично. Откройте учебник и читайте за мной.' : lang === 'uz' ? 'Juda yaxshi. Darslikni oching va men bilan o‘qing.' : 'Very good. Please open your textbook and read after me.' },
+      { key: 'class-dialogue-5', speaker: t('course.speaker.learner'), hanzi: '我们今天读汉字，也写汉字吗？', pinyin: 'Wǒmen jīntiān dú Hànzì, yě xiě Hànzì ma?', meaning: lang === 'ru' ? 'Сегодня мы читаем иероглифы и тоже пишем их?' : lang === 'uz' ? 'Bugun ierogliflarni o‘qiymiz va yozamizmi?' : 'Will we read and also write Chinese characters today?' },
+      { key: 'class-dialogue-6', speaker: t('course.speaker.teacher'), hanzi: '对。先听，再说，最后写。', pinyin: 'Duì. Xiān tīng, zài shuō, zuìhòu xiě.', meaning: lang === 'ru' ? 'Верно. Сначала слушаем, затем говорим и в конце пишем.' : lang === 'uz' ? 'To‘g‘ri. Avval tinglaymiz, keyin gapiramiz, oxirida yozamiz.' : 'Correct. First listen, then speak, and finally write.' },
+      { key: 'class-dialogue-7', speaker: t('course.speaker.learner'), hanzi: '我明白了。我会认真学习。', pinyin: 'Wǒ míngbai le. Wǒ huì rènzhēn xuéxí.', meaning: lang === 'ru' ? 'Я понял. Я буду старательно учиться.' : lang === 'uz' ? 'Tushundim. Men astoydil o‘qiyman.' : 'I understand. I will study carefully.' },
+      { key: 'class-dialogue-8', speaker: t('course.speaker.teacher'), hanzi: '很好！下课以后，记得做作业。', pinyin: 'Hěn hǎo! Xiàkè yǐhòu, jìde zuò zuòyè.', meaning: lang === 'ru' ? 'Отлично! После занятий не забудьте выполнить домашнее задание.' : lang === 'uz' ? 'Juda yaxshi! Darsdan keyin uy vazifasini bajarishni unutmang.' : 'Excellent! Remember to do your homework after class.' },
+    ]
+    : (activeLesson.id === 'hsk-1-1-1' || activeLesson.id === 'hsk30-1-1-1')
+    ? [
+      {
+        key: 'lesson-example',
+        speaker: t('course.speaker.teacher'),
+        hanzi: activeLesson.grammar.example,
+        pinyin: activeLesson.grammar.pinyin,
+        meaning: activeLesson.grammar.meaning,
       },
-      options: {
-        ru: [activeLesson.grammar.meaning, ...closingReading.options.ru.slice(1)],
-        en: [activeLesson.grammar.meaning, ...closingReading.options.en.slice(1)],
-        uz: [activeLesson.grammar.meaning, ...closingReading.options.uz.slice(1)],
+      ...classroomDialogue.map(line => ({
+        ...line,
+        speaker: t(line.key === 'teacher' ? 'course.speaker.teacher' : 'course.speaker.learner'),
+        meaning: line.meaning[lang],
+      })),
+    ]
+    : [
+      {
+        key: 'teacher-intro',
+        speaker: t('course.speaker.teacher'),
+        hanzi: `今天我们学习${lessonHanzi.length ? lessonHanzi.join('、') : '这个主题'}。`,
+        pinyin: `Jīntiān wǒmen xuéxí ${lessonPinyin.length ? lessonPinyin.join(', ') : 'zhège zhǔtí'}.`,
+        meaning: lang === 'ru'
+          ? `Сегодня мы изучаем новые слова: ${lessonWordGlosses.join(', ') || activeLesson.title}.`
+          : lang === 'uz'
+            ? `Bugun biz yangi so‘zlarni o‘rganamiz: ${lessonWordGlosses.join(', ') || activeLesson.title}.`
+            : `Today we are learning these new words: ${lessonWordGlosses.join(', ') || activeLesson.title}.`,
       },
-    } : closingReading
-  const dialogueLines = activeLesson ? [
-    {
-      key: 'lesson-example',
-      speaker: t('course.speaker.teacher'),
-      hanzi: activeLesson.grammar.example,
-      pinyin: activeLesson.grammar.pinyin,
-      meaning: activeLesson.grammar.meaning,
-    },
-    ...classroomDialogue.map(line => ({
-      ...line,
-      speaker: t(line.key === 'teacher' ? 'course.speaker.teacher' : 'course.speaker.learner'),
-      meaning: line.meaning[lang],
-    })),
-  ] : []
+      {
+        key: 'learner-question',
+        speaker: t('course.speaker.learner'),
+        hanzi: '这些词怎么用？',
+        pinyin: 'Zhèxiē cí zěnme yòng?',
+        meaning: lang === 'ru' ? 'Как использовать эти слова?' : lang === 'uz' ? 'Bu so‘zlardan qanday foydalaniladi?' : 'How do we use these words?',
+      },
+      {
+        key: 'teacher-example',
+        speaker: t('course.speaker.teacher'),
+        hanzi: activeLesson.grammar.example,
+        pinyin: activeLesson.grammar.pinyin,
+        meaning: activeLesson.grammar.meaning,
+      },
+      {
+        key: 'learner-response',
+        speaker: t('course.speaker.learner'),
+        hanzi: '我明白了，我来试一试。',
+        pinyin: 'Wǒ míngbai le, wǒ lái shì yi shì.',
+        meaning: lang === 'ru' ? 'Понятно, я попробую.' : lang === 'uz' ? 'Tushundim, o‘zim sinab ko‘raman.' : 'I understand. I will try it.',
+      },
+    ]) : []
   const courseFallbackWords = wordsForCourseLevel(lessonEntries, courseSystem, courseLevel)
   const studyWords = activeLessonWords.length ? activeLessonWords : courseFallbackWords
   const knownInCurrentWords = knownWords.filter(id => currentWords.some(word => wordId(word) === id)).length
@@ -1686,6 +1757,8 @@ export default function App() {
                 </div>
               </div>
             </section>
+
+            <LessonPractice lessonId={activeLesson.id} grammar={activeLesson.grammar} words={activeLessonWords} locale={lang} />
 
             <div className="lesson-finish-row">
               <button className="outline" onClick={() => setSection(5)}>{t('course.grammar')}<ChevronRight size={16}/></button>

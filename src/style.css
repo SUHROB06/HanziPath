@@ -1303,3 +1303,22 @@ img,svg{max-width:100%}
 .grammar-extra-examples ol li+li,.grammar-deep-dive ul li+li{margin-top:6px}
 .grammar-extra-examples ol li::marker,.grammar-deep-dive ul li::marker{color:#9a6b45;font-weight:800}
 .unassisted-pinyin{margin:7px 0 0;color:#987e69;font-size:11px;line-height:1.7;letter-spacing:.2px}
+
+
+/* Interactive exercises embedded at the end of every lesson. */
+.lesson-practice{border-color:#dfc9a8;background:linear-gradient(145deg,#fffaf2,#fff)}
+.lesson-practice>h3{margin:7px 0;color:#642638;font-size:19px}
+.lesson-practice>p{color:#78665a;font-size:13px;line-height:1.7}
+.practice-question{margin:18px 0;padding-top:14px;border-top:1px solid #eadfd2}
+.practice-question>b{display:block;margin-bottom:10px;color:#45352f;font-size:14px;line-height:1.6}
+.practice-question .answer-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.practice-question .answer-option{min-width:0;text-align:left;overflow-wrap:anywhere}
+.practice-question .answer-option.selected{border-color:#9b6a40;background:#f7ecdc;color:#5c2b38}
+.practice-result{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid #eadfd2}
+.practice-result>b{color:#642638;font-size:16px}
+.lesson-practice .feedback{font-size:12px;line-height:1.6}
+@media(max-width:700px){
+  .practice-question .answer-options{grid-template-columns:minmax(0,1fr)}
+  .practice-question>b{font-size:13px}
+  .practice-result{align-items:stretch;flex-direction:column}
+}
