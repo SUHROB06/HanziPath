@@ -3,6 +3,7 @@ import type { CourseLevel, CourseSystem } from './curriculum'
 export type LessonVocabularyEntry = {
   stage: CourseLevel
   systems: CourseSystem[]
+  lessonId?: string
   hanzi: string
   pinyin: string
   ru: string
@@ -14,7 +15,21 @@ export type LessonVocabularyEntry = {
 // Stage labels describe our learning sequence; they do not assert official HSK membership.
 // RU/UZ glosses are draft translations and need a fluent human review before release.
 const rows = `
-1|你好|nǐ hǎo|привет|hello|salom
+1|hsk-1-1-1|你好|nǐ hǎo|привет|hello|salom
+1|hsk-1-1-1|你|nǐ|ты; вы|you|sen; siz
+1|hsk-1-1-1|我|wǒ|я|I; me|men
+1|hsk-1-1-1|好|hǎo|хороший; хорошо|good; well|yaxshi
+1|hsk-1-1-1|吗|ma|вопросительная частица|question particle|so‘roq yuklamasi
+1|hsk-1-1-1|很|hěn|очень; довольно|very; quite|juda
+1|hsk-1-1-1|呢|ne|вопросительная/уточняющая частица|question or follow-up particle|so‘roq yoki davom yuklamasi
+1|hsk-1-1-1|叫|jiào|зваться; называть|to be called|deb atalmoq
+1|hsk-1-1-1|什么|shénme|что; какой|what|nima
+1|hsk-1-1-1|名字|míngzi|имя|name|ism
+1|hsk-1-1-1|是|shì|быть; являться|to be|bo‘lmoq
+1|hsk-1-1-1|学生|xuésheng|студент; ученик|student|talaba; o‘quvchi
+1|hsk-1-1-1|老师|lǎoshī|учитель|teacher|o‘qituvchi
+1|hsk-1-1-1|请|qǐng|пожалуйста; просить|please; to invite|iltimos; taklif qilmoq
+1|hsk-1-1-1|谢谢|xièxie|спасибо|thank you|rahmat
 1|谢谢|xièxie|спасибо|thank you|rahmat
 1|再见|zàijiàn|до свидания|goodbye|xayr
 1|请|qǐng|пожалуйста; просить|please; to invite|iltimos; taklif qilmoq
