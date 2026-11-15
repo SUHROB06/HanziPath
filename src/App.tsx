@@ -853,12 +853,12 @@ export default function App() {
           exampleEn: '',
         }))
         setDatabaseWords(mapped)
-        setDatabaseSystem(system)
+        setDatabaseSystem(vocabularyCollection === 'all' ? 'all' : system)
       } catch (error) {
         console.error('HanziPath vocabulary catalog failed to load:', error)
         if (!cancelled) {
           setDatabaseWords([])
-          setDatabaseSystem(system)
+          setDatabaseSystem(vocabularyCollection === 'all' ? 'all' : system)
           setCatalogError(true)
         }
       } finally {
