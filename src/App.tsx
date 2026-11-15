@@ -18,6 +18,7 @@ import {
 } from './data/curriculum'
 import { hsk30LessonTemplates } from './data/hsk30Curriculum'
 import { lessonVocabulary } from './data/lessonVocabulary'
+import LessonPractice from './components/LessonPractice'
 
 type System = '2.0' | '3.0'
 
@@ -1756,6 +1757,8 @@ export default function App() {
                 </div>
               </div>
             </section>
+
+            <LessonPractice lessonId={activeLesson.id} grammar={activeLesson.grammar} words={activeLessonWords} locale={lang} />
 
             <div className="lesson-finish-row">
               <button className="outline" onClick={() => setSection(5)}>{t('course.grammar')}<ChevronRight size={16}/></button>
