@@ -730,7 +730,7 @@ export default function App() {
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>(() => readStored(COMPLETED_LESSONS_KEY, []))
   const [level, setLevel] = useState('all')
-  const [vocabularyCollection, setVocabularyCollection] = useState<'course' | 'hsk'>('hsk')
+  const [vocabularyCollection, setVocabularyCollection] = useState<'course' | 'hsk' | 'all'>('hsk')
   const [query, setQuery] = useState('')
   const [dictionaryPage, setDictionaryPage] = useState(0)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
