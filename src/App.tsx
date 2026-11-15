@@ -1137,11 +1137,13 @@ export default function App() {
     () => buildCourseUnits(courseSystem, courseLevel, lessonEntries),
     [courseSystem, courseLevel, lessonEntries],
   )
-  const courseLessons = courseUnits.map(unit => unit.lessons[0])
-  const activeUnit = courseUnits.find(unit => unit.id === activeLessonId) ?? courseUnits[0]
+  const activeUnit = courseUnits.find(unit => unit.id === activeLessonId)
   const activeLesson = activeUnit?.lessons[0]
   const activeUnitLessons = activeUnit?.lessons ?? []
   const activeLessonWords = activeUnit?.words ?? []
+  useEffect(() => {
+    if (activeLessonId && !activeUnit) setActiveLessonId(null)
+  }, [activeLessonId, activeUnit])
   const lessonFocusWords = activeLessonWords.slice(0, 3)
   const lessonHanzi = lessonFocusWords.map(word => word.hanzi)
   const lessonPinyin = lessonFocusWords.map(word => word.pinyin)
