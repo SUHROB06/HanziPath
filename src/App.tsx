@@ -807,7 +807,7 @@ export default function App() {
     const loadProgress = async () => {
       const { data, error } = await client.from('user_learning_progress').select('progress').eq('user_id', userId).maybeSingle()
       if (cancelled) return
-      if (error) setNotice({ text: t('auth.progressLoadError'), kind: 'error' })
+      if (error) setNotice({ text: `${t('auth.progressLoadError')}: ${error.message}`, kind: 'error' })
       else if (data?.progress && typeof data.progress === 'object') {
         const saved = data.progress as Record<string, any>
         if (Array.isArray(saved.knownWords)) setKnownWords(saved.knownWords)
@@ -847,17 +847,29 @@ export default function App() {
     const email = authEmail.trim()
     if (!email || authPassword.length < 6) { setNotice({ text: t('auth.validation'), kind: 'error' }); return }
     setAuthBusy(true)
-    const result = authMode === 'signup'
-      ? await supabase.auth.signUp({ email, password: authPassword, options: { emailRedirectTo: window.location.origin } })
-      : await supabase.auth.signInWithPassword({ email, password: authPassword })
-    setAuthBusy(false)
-    if (result.error) { setNotice({ text: result.error.message, kind: 'error' }); return }
-    if (authMode === 'signup' && !result.data.session) {
-      setNotice({ text: t('auth.confirmEmail'), kind: 'success' })
-      setAuthOpen(false); setAuthPassword(''); return
+    try {
+      const result = authMode === 'signup'
+        ? await supabase.auth.signUp({ email, password: authPassword, options: { emailRedirectTo: window.location.origin } })
+        : await supabase.auth.signInWithPassword({ email, password: authPassword })
+      if (result.error) {
+        setNotice({ text: result.error.message, kind: 'error' })
+        return
+      }
+      if (authMode === 'signup' && !result.data.session) {
+        setNotice({ text: t('auth.confirmEmail'), kind: 'success' })
+        setAuthOpen(false)
+        setAuthPassword('')
+        return
+      }
+      setNotice({ text: t('auth.success'), kind: 'success' })
+      setAuthOpen(false)
+      setAuthPassword('')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setNotice({ text: message || 'Authentication request failed. Please try again.', kind: 'error' })
+    } finally {
+      setAuthBusy(false)
     }
-    setNotice({ text: t('auth.success'), kind: 'success' })
-    setAuthOpen(false); setAuthPassword('')
   }
 
   const signOut = async () => {
@@ -1029,7 +1041,7 @@ export default function App() {
   }
 
   // One combined HanziPath study vocabulary; course stages are not official HSK levels.
-  const currentWords = originalLessonWords
+  const currentWords = originalLessonWords.filter(word => word.courseSystems?.includes(system === '2.0' ? '2.0' : '3.0'))
   const currentFavoriteCount = useMemo(
     () => currentWords.filter(word => favoriteWordIds.includes(wordId(word))).length,
     [currentWords, favoriteWordIds],
@@ -1602,7 +1614,10 @@ export default function App() {
 
           <p className="notice-text">{t('vocab.courseNotice')}</p>
 
-
+          <div className="filters standard-switch" role="group" aria-label="HSK standard">
+            <button type="button" className={system === '2.0' ? 'primary' : 'outline'} aria-pressed={system === '2.0'} onClick={() => { setSystem('2.0'); setLevel('all') }}>HSK 2.0</button>
+            <button type="button" className={system === '3.0' ? 'primary' : 'outline'} aria-pressed={system === '3.0'} onClick={() => { setSystem('3.0'); setLevel('all') }}>HSK 3.0</button>
+          </div>
 
           {(vocabularyCollection === 'course' || (Boolean(reviewWords?.length) && !databaseWords)) && <>
             <div className="dictionary-summary">
