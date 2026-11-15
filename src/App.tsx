@@ -938,7 +938,7 @@ export default function App() {
   )
   // Keep the eight demo dictionary entries out of course lessons. They are
   // examples for the HSK dictionary view and duplicate authored lesson words.
-  const lessonEntries = [...(reviewWords?.length ? reviewWords : databaseWords ?? []), ...originalLessonWords]
+  const lessonEntries = currentWords
   const lessonAssignments = useMemo(() => lessonWordAssignments(lessonEntries), [lessonEntries])
   const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const activeLesson = lessonTemplates.find(lesson => lesson.id === activeLessonId && lesson.system === courseSystem && lesson.level === courseLevel) ?? courseLessons[0]
@@ -1100,7 +1100,7 @@ export default function App() {
   const examManualTotal = examQuestionsState.filter(question => question.manualReview).length
 
   const startExam = () => {
-    const generated = examQuestions(examSystem, examLevel, reviewWords?.length ? reviewWords : availableWords, lang)
+    const generated = examQuestions(examSystem, examLevel, currentWords, lang)
     setExamQuestionsState(generated)
     setExamAnswers(Array(generated.length).fill(''))
     setExamIndex(0)
