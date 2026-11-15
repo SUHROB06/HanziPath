@@ -1145,6 +1145,7 @@ export default function App() {
     () => buildCourseUnits(courseSystem, courseLevel, lessonEntries),
     [courseSystem, courseLevel, lessonEntries],
   )
+  const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const activeUnit = courseUnits.find(unit => unit.id === activeLessonId)
   const activeLesson = activeUnit?.lessons[0]
   const activeUnitLessons = activeUnit?.lessons ?? []
@@ -2049,7 +2050,7 @@ export default function App() {
                 <div className="lesson-example"><b>{lesson.grammar.example}</b><span>{lesson.grammar.pinyin}</span><small>{lesson.grammar.meaning}</small></div>
               </div>
               <button className="sound" aria-label={t('vocab.listen')} onClick={() => speak(lesson.grammar.example)}><Volume2 size={18}/></button>
-              <button className="outline grammar-open" onClick={() => { setActiveLessonId(lesson.id); setSection(1) }}>{t('course.open')}</button>
+              <button className="outline grammar-open" onClick={() => { setActiveLessonId(courseUnits.find(unit => unit.lessons.some(item => item.id === lesson.id))?.id ?? null); setSection(1) }}>{t('course.open')}</button>
             </article>)}
           </div>
         </section>
