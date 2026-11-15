@@ -773,7 +773,7 @@ export default function App() {
   const [authFeedback, setAuthFeedback] = useState<{ text: string; kind: 'success' | 'error' } | null>(null)
 
   const [databaseWords, setDatabaseWords] = useState<Word[] | null>(null)
-  const [databaseSystem, setDatabaseSystem] = useState<System | null>(null)
+  const [databaseSystem, setDatabaseSystem] = useState<System | 'all' | null>(null)
   const [reviewWords, setReviewWords] = useState<Word[] | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogError, setCatalogError] = useState(false)
@@ -802,7 +802,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (vocabularyCollection !== 'hsk') return
+    if (vocabularyCollection === 'course') return
     if (!supabase) {
       setCatalogError(true)
       setDatabaseWords([])
@@ -819,7 +819,7 @@ export default function App() {
 
     const loadCatalog = async () => {
       try {
-        const standardCode = system === '2.0' ? 'hsk20' : 'hsk30'
+        const standardCode = vocabularyCollection === 'all' ? 'all' : system === '2.0' ? 'hsk20' : 'hsk30'
         const pageSize = 1000
         const rows: any[] = []
         for (let from = 0; ; from += pageSize) {
@@ -834,7 +834,7 @@ export default function App() {
 
         if (cancelled) return
         const mapped: Word[] = rows.map((row: any) => ({
-          sourceEntryKey: `hsk-${system}-${row.id}`,
+          sourceEntryKey: `hsk-${standardCode}-${row.id}`,
           hanzi: row.simplified,
           traditional: row.traditional ?? '',
           pinyin: row.pinyin ?? '',
@@ -845,8 +845,8 @@ export default function App() {
           enStatus: row.en_status ?? 'unverified',
           uzStatus: row.uz_status ?? 'unverified',
           membershipStatus: row.membership_status ?? 'unverified',
-          level20: system === '2.0' ? row.level_order : null,
-          level30: system === '3.0' ? (Number(row.level_order) >= 7 ? '7-9' : row.level_order) : null,
+          level20: vocabularyCollection === 'all' ? null : system === '2.0' ? row.level_order : null,
+          level30: vocabularyCollection === 'all' ? null : system === '3.0' ? (Number(row.level_order) >= 7 ? '7-9' : row.level_order) : null,
           example: '',
           examplePinyin: '',
           exampleRu: '',
@@ -1116,7 +1116,7 @@ export default function App() {
   // HSK membership is shown only where the authored curriculum explicitly assigns it.
   const currentWords = vocabularyCollection === 'course'
     ? originalLessonWords
-    : databaseSystem === system ? (databaseWords ?? []) : []
+    : databaseSystem === (vocabularyCollection === 'all' ? 'all' : system) ? (databaseWords ?? []) : []
   const currentFavoriteCount = useMemo(
     () => currentWords.filter(word => favoriteWordIds.includes(wordId(word))).length,
     [currentWords, favoriteWordIds],
@@ -1213,7 +1213,7 @@ export default function App() {
     ? ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6']
     : ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6', 'HSK 7–9']
 
-  const levelFilterOptions = Array.from({ length: vocabularyCollection === 'course' ? 6 : system === '2.0' ? 6 : 7 }, (_, index) => {
+  const levelFilterOptions = Array.from({ length: vocabularyCollection === 'all' ? 0 : vocabularyCollection === 'course' ? 6 : system === '2.0' ? 6 : 7 }, (_, index) => {
     const isCombinedBand = vocabularyCollection === 'hsk' && system === '3.0' && index === 6
     const value = isCombinedBand ? '7-9' : String(index + 1)
     const count = currentWords.filter(word => String(
@@ -1695,11 +1695,11 @@ export default function App() {
               <h2>{t('vocab.title')}</h2>
             </div>
             <span className="demo-tag">
-              {t(vocabularyCollection === 'hsk' ? 'vocab.hskCollection' : 'vocab.courseCollection')}
+              {t(vocabularyCollection === 'course' ? 'vocab.courseCollection' : vocabularyCollection === 'all' ? 'vocab.allCandidateCollection' : 'vocab.hskCollection')}
             </span>
           </div>
 
-          <p className="notice-text">{t(vocabularyCollection === 'hsk' ? 'vocab.hskCatalogNotice' : 'vocab.courseNotice')}</p>
+          <p className="notice-text">{t(vocabularyCollection === 'course' ? 'vocab.courseNotice' : 'vocab.hskCatalogNotice')}</p>
 
           <div className="filters collection-switch" role="group" aria-label="Dictionary collection">
             <button type="button" className={vocabularyCollection === 'hsk' ? 'primary' : 'outline'} aria-pressed={vocabularyCollection === 'hsk'} onClick={() => { setVocabularyCollection('hsk'); setLevel('all') }}>
@@ -1708,23 +1708,26 @@ export default function App() {
             <button type="button" className={vocabularyCollection === 'course' ? 'primary' : 'outline'} aria-pressed={vocabularyCollection === 'course'} onClick={() => { setVocabularyCollection('course'); setLevel('all') }}>
               {lang === 'ru' ? 'Слова курса HanziPath' : lang === 'uz' ? 'HanziPath kurs so‘zlari' : 'HanziPath course words'}
             </button>
+            <button type="button" className={vocabularyCollection === 'all' ? 'primary' : 'outline'} aria-pressed={vocabularyCollection === 'all'} onClick={() => { setVocabularyCollection('all'); setLevel('all') }}>
+              {t('vocab.allCandidateCollection')}
+            </button>
           </div>
 
-          <div className="filters standard-switch" role="group" aria-label="HSK standard">
+          {vocabularyCollection !== 'all' && <div className="filters standard-switch" role="group" aria-label="HSK standard">
             <button type="button" className={system === '2.0' ? 'primary' : 'outline'} aria-pressed={system === '2.0'} onClick={() => { setSystem('2.0'); setLevel('all') }}>HSK 2.0</button>
             <button type="button" className={system === '3.0' ? 'primary' : 'outline'} aria-pressed={system === '3.0'} onClick={() => { setSystem('3.0'); setLevel('all') }}>HSK 3.0</button>
           </div>
 
           {(vocabularyCollection === 'course' || databaseSystem === system) && <>
             <div className="dictionary-summary">
-              <div><strong>{currentWords.length.toLocaleString(lang)}</strong><span>{t(vocabularyCollection === 'course' ? 'vocab.wordsInCourse' : system === '2.0' ? 'vocab.wordsInHsk20' : 'vocab.wordsInHsk30')}</span></div>
+              <div><strong>{currentWords.length.toLocaleString(lang)}</strong><span>{t(vocabularyCollection === 'course' ? 'vocab.wordsInCourse' : vocabularyCollection === 'all' ? 'vocab.allCandidateWords' : system === '2.0' ? 'vocab.wordsInHsk20' : 'vocab.wordsInHsk30')}</span></div>
               <div><strong>{filtered.length.toLocaleString(lang)}</strong><span>{t('vocab.matchingWords')}</span></div>
               <div><strong>{currentFavoriteCount.toLocaleString(lang)}</strong><span>{t('vocab.savedFavorites')}</span></div>
               <div><strong>{pageSize}</strong><span>{t('vocab.resultsPerPage')}</span></div>
             </div>
           </>}
-          {vocabularyCollection === 'hsk' && catalogLoading && <p className="notice-text">{t('vocab.catalogLoadingPublic')}</p>}
-          {vocabularyCollection === 'hsk' && catalogError && <p className="notice-text" role="alert">{t('vocab.catalogLoadError')}</p>}
+          {vocabularyCollection !== 'course' && catalogLoading && <p className="notice-text">{t('vocab.catalogLoadingPublic')}</p>}
+          {vocabularyCollection !== 'course' && catalogError && <p className="notice-text" role="alert">{t('vocab.catalogLoadError')}</p>}
 
           
 
