@@ -806,7 +806,7 @@ export default function App() {
     if (!supabase) {
       setCatalogError(true)
       setDatabaseWords([])
-      setDatabaseSystem(system)
+      setDatabaseSystem(vocabularyCollection === 'all' ? 'all' : system)
       return
     }
 
@@ -1716,9 +1716,9 @@ export default function App() {
           {vocabularyCollection !== 'all' && <div className="filters standard-switch" role="group" aria-label="HSK standard">
             <button type="button" className={system === '2.0' ? 'primary' : 'outline'} aria-pressed={system === '2.0'} onClick={() => { setSystem('2.0'); setLevel('all') }}>HSK 2.0</button>
             <button type="button" className={system === '3.0' ? 'primary' : 'outline'} aria-pressed={system === '3.0'} onClick={() => { setSystem('3.0'); setLevel('all') }}>HSK 3.0</button>
-          </div>
+          </div>}
 
-          {(vocabularyCollection === 'course' || databaseSystem === system) && <>
+          {(vocabularyCollection === 'course' || databaseSystem === (vocabularyCollection === 'all' ? 'all' : system)) && <>
             <div className="dictionary-summary">
               <div><strong>{currentWords.length.toLocaleString(lang)}</strong><span>{t(vocabularyCollection === 'course' ? 'vocab.wordsInCourse' : vocabularyCollection === 'all' ? 'vocab.allCandidateWords' : system === '2.0' ? 'vocab.wordsInHsk20' : 'vocab.wordsInHsk30')}</span></div>
               <div><strong>{filtered.length.toLocaleString(lang)}</strong><span>{t('vocab.matchingWords')}</span></div>
