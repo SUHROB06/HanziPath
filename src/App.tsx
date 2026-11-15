@@ -168,48 +168,48 @@ const originalLessonWords: Word[] = lessonVocabulary.reduce<Word[]>((result, ent
 const classroomDialogue = [
   {
     key: 'learner',
-    hanzi: '老师，可以再说一遍吗？',
-    pinyin: 'Lǎoshī, kěyǐ zài shuō yí biàn ma?',
+    hanzi: '老师，你好！',
+    pinyin: 'Lǎoshī, nǐ hǎo!',
     meaning: {
-      ru: 'Учитель, можно повторить ещё раз?',
-      en: 'Teacher, could you say that again?',
-      uz: 'Ustoz, yana bir marta ayta olasizmi?',
+      ru: 'Учитель, здравствуйте!',
+      en: 'Hello, teacher!',
+      uz: 'Assalomu alaykum, ustoz!',
     },
   },
   {
     key: 'teacher',
-    hanzi: '当然可以。我们一起练习吧。',
-    pinyin: 'Dāngrán kěyǐ. Wǒmen yìqǐ liànxí ba.',
+    hanzi: '你好！你叫什么名字？',
+    pinyin: 'Nǐ hǎo! Nǐ jiào shénme míngzi?',
     meaning: {
-      ru: 'Конечно. Давай потренируемся вместе.',
-      en: 'Of course. Let’s practice together.',
-      uz: 'Albatta. Keling, birga mashq qilamiz.',
+      ru: 'Привет! Как тебя зовут?',
+      en: 'Hello! What is your name?',
+      uz: 'Salom! Ismingiz nima?',
     },
   },
 ] as const
 
 const closingReading = {
-  hanzi: '今天的课很有意思。回家以后，我要再读一次，也要多练习。',
+  hanzi: '你好！我叫安娜。我是学生。你呢？',
   meaning: {
-    ru: 'Сегодняшний урок интересный. Дома я прочитаю его ещё раз и буду больше практиковаться.',
-    en: 'Today’s lesson is interesting. At home I’ll read it again and practice some more.',
-    uz: 'Bugungi dars qiziqarli. Uyda uni yana bir marta o‘qiyman va ko‘proq mashq qilaman.',
+    ru: 'Привет! Меня зовут Анна. Я студентка. А ты?',
+    en: 'Hello! My name is Anna. I am a student. And you?',
+    uz: 'Salom! Mening ismim Anna. Men talabaman. Siz-chi?',
   },
   options: {
     ru: [
-      'Я ещё раз прочитаю урок дома и буду практиковаться.',
-      'Я пойду в библиотеку и выберу новую книгу.',
-      'Я закончил урок и больше не буду заниматься.',
+      'Меня зовут Анна, я студентка.',
+      'Я покупаю яблоко в магазине.',
+      'Учитель идёт в библиотеку.',
     ],
     en: [
-      'I’ll read the lesson again at home and practice more.',
-      'I’ll go to the library to choose a new book.',
-      'I finished the lesson and will stop studying.',
+      'My name is Anna. I am a student.',
+      'I am buying an apple at the shop.',
+      'The teacher is going to the library.',
     ],
     uz: [
-      'Darsni uyda yana o‘qib, ko‘proq mashq qilaman.',
-      'Kutubxonaga borib, yangi kitob tanlayman.',
-      'Darsni tugatdim va endi o‘qimayman.',
+      'Mening ismim Anna. Men talabaman.',
+      'Men do‘kondan olma sotib olyapman.',
+      'O‘qituvchi kutubxonaga ketyapti.',
     ],
   },
 } as const
@@ -1589,6 +1589,18 @@ export default function App() {
               <p>{activeLesson.grammar.explanation}</p>
               <code>{activeLesson.grammar.pattern}</code>
               <div className="lesson-example"><b>{activeLesson.grammar.example}</b><span>{activeLesson.grammar.pinyin}</span><small>{activeLesson.grammar.meaning}</small></div>
+              {activeLesson.grammar.deepDive && <div className="grammar-deep-dive">
+                <h4>{lang === 'ru' ? 'Подробный разбор' : lang === 'uz' ? 'Batafsil tushuntirish' : 'In-depth explanation'}</h4>
+                <p>{activeLesson.grammar.deepDive}</p>
+              </div>}
+              {activeLesson.grammar.extraExamples?.length ? <div className="grammar-extra-examples">
+                <h4>{lang === 'ru' ? 'Ещё примеры' : lang === 'uz' ? 'Qo‘shimcha misollar' : 'More examples'}</h4>
+                {activeLesson.grammar.extraExamples.map(example => <div className="lesson-example" key={example.hanzi}><b>{example.hanzi}</b><span>{example.pinyin}</span><small>{example.meaning}</small></div>)}
+              </div> : null}
+              {activeLesson.grammar.commonMistakes?.length ? <div className="grammar-mistakes">
+                <h4>{lang === 'ru' ? 'Частые ошибки' : lang === 'uz' ? 'Ko‘p uchraydigan xatolar' : 'Common mistakes'}</h4>
+                <ul>{activeLesson.grammar.commonMistakes.map(mistake => <li key={mistake}>{mistake}</li>)}</ul>
+              </div> : null}
             </section>
 
             <section className="course-block lesson-listening">
