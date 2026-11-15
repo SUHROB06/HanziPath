@@ -3,7 +3,7 @@ import type { CourseLevel, CourseSystem } from './curriculum'
 export type LessonVocabularyEntry = {
   stage: CourseLevel
   systems: CourseSystem[]
-  lessonId?: string
+  lessonIds?: string[]
   hanzi: string
   pinyin: string
   ru: string
@@ -15,7 +15,7 @@ export type LessonVocabularyEntry = {
 // Stage labels describe our learning sequence; they do not assert official HSK membership.
 // RU/UZ glosses are draft translations and need a fluent human review before release.
 const rows = `
-1|hsk-1-1-1|你好|nǐ hǎo|привет|hello|salom
+1|hsk-1-1-1,hsk30-1-1-1|你好|nǐ hǎo|привет|hello|salom
 1|hsk-1-1-1|你|nǐ|ты; вы|you|sen; siz
 1|hsk-1-1-1|我|wǒ|я|I; me|men
 1|hsk-1-1-1|好|hǎo|хороший; хорошо|good; well|yaxshi
@@ -500,7 +500,7 @@ export const lessonVocabulary: LessonVocabularyEntry[] = rows.split('\n').map((l
   const [stageValue, second, third, fourth, fifth, sixth, seventh] = fields
   const hasLessonId = fields.length === 7
   const stage = Number(stageValue) as CourseLevel
-  const lessonId = hasLessonId ? second : undefined
+  const lessonIds = hasLessonId ? second.split(',') : undefined
   const hanzi = hasLessonId ? third : second
   const pinyin = hasLessonId ? fourth : third
   const ru = hasLessonId ? fifth : fourth
@@ -512,7 +512,7 @@ export const lessonVocabulary: LessonVocabularyEntry[] = rows.split('\n').map((l
   return {
     stage,
     systems: stage <= 6 ? ['2.0', '3.0'] : ['3.0'],
-    lessonId,
+    lessonIds,
     hanzi,
     pinyin,
     ru,
