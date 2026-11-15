@@ -40,7 +40,8 @@ const focus = (
   example: string,
   pinyin: string,
   meaning: string,
-): GrammarFocus => ({ title, pattern, explanation, example, pinyin, meaning })
+  details?: Pick<GrammarFocus, 'deepDive' | 'commonMistakes' | 'extraExamples'>,
+): GrammarFocus => ({ title, pattern, explanation, example, pinyin, meaning, ...details })
 
 // Original lessons follow the broad progression of the supplied Russian
 // textbooks. Their prose, dialogue examples and exercises are newly written.
