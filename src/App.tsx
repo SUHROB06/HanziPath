@@ -1139,36 +1139,80 @@ export default function App() {
   const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const activeLesson = lessonTemplates.find(lesson => lesson.id === activeLessonId && lesson.system === courseSystem && lesson.level === courseLevel) ?? courseLessons[0]
   const activeLessonWords = activeLesson ? lessonAssignments[activeLesson.id] ?? [] : []
+  const lessonFocusWords = activeLessonWords.slice(0, 3)
+  const lessonHanzi = lessonFocusWords.map(word => word.hanzi)
+  const lessonPinyin = lessonFocusWords.map(word => word.pinyin)
+  const lessonWordGlosses = lessonFocusWords.map(word => word.ru).filter(Boolean)
   const activeClosingReading = (activeLesson?.id === 'hsk-1-1-1' || activeLesson?.id === 'hsk30-1-1-1')
     ? firstLessonReading
-    : activeLesson ? {
-      hanzi: activeLesson.grammar.example,
-      pinyin: activeLesson.grammar.pinyin,
-      meaning: {
-        ru: activeLesson.grammar.meaning,
-        en: activeLesson.grammar.meaning,
-        uz: activeLesson.grammar.meaning,
+    : activeLesson ? (() => {
+      const example = activeLesson.grammar.example.replace(/[。！？!?]+$/, '')
+      const vocabularyPhrase = lessonHanzi.length ? lessonHanzi.join('、') : activeLesson.grammar.title
+      const pinyinPhrase = lessonPinyin.length ? lessonPinyin.join(', ') : ''
+      const glossPhrase = lessonWordGlosses.length ? lessonWordGlosses.join('、') : activeLesson.grammar.title
+      const meaningRu = `${activeLesson.grammar.meaning} Мы используем слова «${glossPhrase}», чтобы потренировать тему урока. Сначала прочитай текст, затем попробуй пересказать его самостоятельно.`
+      const meaningEn = `${activeLesson.grammar.meaning} We use the lesson words (${glossPhrase}) to practise this topic. Read the text first, then try to retell it yourself.`
+      const meaningUz = `${activeLesson.grammar.meaning} Dars mavzusini mashq qilish uchun «${glossPhrase}» so‘zlaridan foydalanamiz. Avval matnni o‘qing, keyin uni mustaqil qayta aytib ko‘ring.`
+      return {
+        hanzi: `${example}。我们用${vocabularyPhrase}练习今天的内容。请先读一遍，再自己说一次。`,
+        pinyin: `${activeLesson.grammar.pinyin} Wǒmen yòng ${pinyinPhrase || 'xīn cí'} liànxí jīntiān de nèiróng. Qǐng xiān dú yí biàn, zài zìjǐ shuō yí cì.`,
+        meaning: { ru: meaningRu, en: meaningEn, uz: meaningUz },
+        options: {
+          ru: [meaningRu, ...closingReading.options.ru.slice(1)],
+          en: [meaningEn, ...closingReading.options.en.slice(1)],
+          uz: [meaningUz, ...closingReading.options.uz.slice(1)],
+        },
+      }
+    })() : closingReading
+  const dialogueLines = activeLesson ? (activeLesson.id === 'hsk-1-1-1' || activeLesson.id === 'hsk30-1-1-1'
+    ? [
+      {
+        key: 'lesson-example',
+        speaker: t('course.speaker.teacher'),
+        hanzi: activeLesson.grammar.example,
+        pinyin: activeLesson.grammar.pinyin,
+        meaning: activeLesson.grammar.meaning,
       },
-      options: {
-        ru: [activeLesson.grammar.meaning, ...closingReading.options.ru.slice(1)],
-        en: [activeLesson.grammar.meaning, ...closingReading.options.en.slice(1)],
-        uz: [activeLesson.grammar.meaning, ...closingReading.options.uz.slice(1)],
+      ...classroomDialogue.map(line => ({
+        ...line,
+        speaker: t(line.key === 'teacher' ? 'course.speaker.teacher' : 'course.speaker.learner'),
+        meaning: line.meaning[lang],
+      })),
+    ]
+    : [
+      {
+        key: 'teacher-intro',
+        speaker: t('course.speaker.teacher'),
+        hanzi: `今天我们学习${lessonHanzi.length ? lessonHanzi.join('、') : '这个主题'}。`,
+        pinyin: `Jīntiān wǒmen xuéxí ${lessonPinyin.length ? lessonPinyin.join(', ') : 'zhège zhǔtí'}.`,
+        meaning: lang === 'ru'
+          ? `Сегодня мы изучаем новые слова: ${lessonWordGlosses.join(', ') || activeLesson.title}.`
+          : lang === 'uz'
+            ? `Bugun biz yangi so‘zlarni o‘rganamiz: ${lessonWordGlosses.join(', ') || activeLesson.title}.`
+            : `Today we are learning these new words: ${lessonWordGlosses.join(', ') || activeLesson.title}.`,
       },
-    } : closingReading
-  const dialogueLines = activeLesson ? [
-    {
-      key: 'lesson-example',
-      speaker: t('course.speaker.teacher'),
-      hanzi: activeLesson.grammar.example,
-      pinyin: activeLesson.grammar.pinyin,
-      meaning: activeLesson.grammar.meaning,
-    },
-    ...classroomDialogue.map(line => ({
-      ...line,
-      speaker: t(line.key === 'teacher' ? 'course.speaker.teacher' : 'course.speaker.learner'),
-      meaning: line.meaning[lang],
-    })),
-  ] : []
+      {
+        key: 'learner-question',
+        speaker: t('course.speaker.learner'),
+        hanzi: '这些词怎么用？',
+        pinyin: 'Zhèxiē cí zěnme yòng?',
+        meaning: lang === 'ru' ? 'Как использовать эти слова?' : lang === 'uz' ? 'Bu so‘zlardan qanday foydalaniladi?' : 'How do we use these words?',
+      },
+      {
+        key: 'teacher-example',
+        speaker: t('course.speaker.teacher'),
+        hanzi: activeLesson.grammar.example,
+        pinyin: activeLesson.grammar.pinyin,
+        meaning: activeLesson.grammar.meaning,
+      },
+      {
+        key: 'learner-response',
+        speaker: t('course.speaker.learner'),
+        hanzi: '我明白了，我来试一试。',
+        pinyin: 'Wǒ míngbai le, wǒ lái shì yi shì.',
+        meaning: lang === 'ru' ? 'Понятно, я попробую.' : lang === 'uz' ? 'Tushundim, o‘zim sinab ko‘raman.' : 'I understand. I will try it.',
+      },
+    ]) : []
   const courseFallbackWords = wordsForCourseLevel(lessonEntries, courseSystem, courseLevel)
   const studyWords = activeLessonWords.length ? activeLessonWords : courseFallbackWords
   const knownInCurrentWords = knownWords.filter(id => currentWords.some(word => wordId(word) === id)).length
