@@ -364,6 +364,45 @@ function lessonWordAssignments(entries: Word[]): Record<string, Word[]> {
 
   return assignments
 }
+type CourseUnit = {
+  id: string
+  lessons: LessonTemplate[]
+  words: Word[]
+}
+
+function buildCourseUnits(
+  system: CourseSystem,
+  level: CourseLevel,
+  entries: Word[],
+): CourseUnit[] {
+  const lessons = lessonTemplates.filter(lesson => lesson.system === system && lesson.level === level)
+  const pool = wordsForCourseLevel(entries, system, level)
+  const uniqueWords = [...new Map(pool.map(word => [
+    `${word.hanzi}|${normalizePinyin(word.pinyin)}`,
+    word,
+  ])).values()]
+
+  if (!lessons.length) return []
+  const unitCount = Math.max(1, Math.ceil(uniqueWords.length / 25))
+  const baseSize = Math.floor(uniqueWords.length / unitCount)
+  const remainder = uniqueWords.length % unitCount
+  const units: CourseUnit[] = []
+  let wordOffset = 0
+  let lessonOffset = 0
+
+  for (let index = 0; index < unitCount; index += 1) {
+    const wordCount = baseSize + (index < remainder ? 1 : 0)
+    const lessonCount = Math.floor(lessons.length / unitCount) + (index < lessons.length % unitCount ? 1 : 0)
+    const unitLessons = lessons.slice(lessonOffset, lessonOffset + lessonCount)
+    const words = uniqueWords.slice(wordOffset, wordOffset + wordCount)
+    if (unitLessons.length) units.push({ id: unitLessons[0].id, lessons: unitLessons, words })
+    wordOffset += wordCount
+    lessonOffset += lessonCount
+  }
+
+  return units
+}
+
 function shuffleWithSeed<T>(items: T[], seed: number): T[] {
   const result = [...items]
   let value = seed >>> 0
@@ -1094,10 +1133,15 @@ export default function App() {
   // The HSK dictionary can be on a different standard than the selected course;
   // using currentWords here left cards and listening empty whenever they differed.
   const lessonEntries = originalLessonWords
-  const lessonAssignments = useMemo(() => lessonWordAssignments(lessonEntries), [lessonEntries])
-  const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
-  const activeLesson = lessonTemplates.find(lesson => lesson.id === activeLessonId && lesson.system === courseSystem && lesson.level === courseLevel) ?? courseLessons[0]
-  const activeLessonWords = activeLesson ? lessonAssignments[activeLesson.id] ?? [] : []
+  const courseUnits = useMemo(
+    () => buildCourseUnits(courseSystem, courseLevel, lessonEntries),
+    [courseSystem, courseLevel, lessonEntries],
+  )
+  const courseLessons = courseUnits.map(unit => unit.lessons[0])
+  const activeUnit = courseUnits.find(unit => unit.id === activeLessonId) ?? courseUnits[0]
+  const activeLesson = activeUnit?.lessons[0]
+  const activeUnitLessons = activeUnit?.lessons ?? []
+  const activeLessonWords = activeUnit?.words ?? []
   const lessonFocusWords = activeLessonWords.slice(0, 3)
   const lessonHanzi = lessonFocusWords.map(word => word.hanzi)
   const lessonPinyin = lessonFocusWords.map(word => word.pinyin)
@@ -1560,8 +1604,9 @@ export default function App() {
 
           <div className="course-levels" role="group" aria-label={t('course.level')}>
             {(courseSystem === '2.0' ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 7, 8, 9]).map(course => {
-              const count = lessonTemplates.filter(item => item.system === courseSystem && item.level === course).length
-              const completed = lessonTemplates.filter(item => item.system === courseSystem && item.level === course && completedLessonIds.includes(item.id)).length
+              const units = buildCourseUnits(courseSystem, course as CourseLevel, lessonEntries)
+              const count = units.length
+              const completed = units.filter(unit => unit.lessons.every(item => completedLessonIds.includes(item.id))).length
               return <button key={course} className={`course-level ${courseLevel === course ? 'selected' : ''}`} onClick={() => {
                 setCourseLevel(course as CourseLevel)
                 setActiveLessonId(null)
@@ -1658,6 +1703,15 @@ export default function App() {
                 <h4>{lang === 'ru' ? 'Самостоятельная практика' : lang === 'uz' ? 'Mustaqil mashq' : 'Independent practice'}</h4>
                 <ul>{activeLesson.grammar.practicePrompts.map(prompt => <li key={prompt}>{prompt}</li>)}</ul>
               </div> : null}
+              {activeUnitLessons.length > 1 && <div className="grammar-extra-examples">
+                <h4>{lang === 'ru' ? 'Остальные грамматические темы этого урока' : lang === 'uz' ? 'Ushbu darsning boshqa grammatika mavzulari' : 'Other grammar points in this lesson'}</h4>
+                {activeUnitLessons.slice(1).map(item => <article className="lesson-example" key={item.id}>
+                  <b>{item.grammar.title}</b><code>{item.grammar.pattern}</code>
+                  <p>{item.grammar.explanation}</p>
+                  <strong>{item.grammar.example}</strong><span>{item.grammar.pinyin}</span><small>{item.grammar.meaning}</small>
+                  {item.grammar.extraExamples?.map(example => <div key={example.hanzi}><b>{example.hanzi}</b><span>{example.pinyin}</span><small>{example.meaning}</small></div>)}
+                </article>)}
+              </div>}
             </section>
 
             <section className="course-block lesson-listening">
@@ -1720,22 +1774,23 @@ export default function App() {
 
             <div className="lesson-finish-row">
               <button className="outline" onClick={() => setSection(5)}>{t('course.grammar')}<ChevronRight size={16}/></button>
-              <button className="primary" disabled={completedLessonIds.includes(activeLesson.id)} onClick={() => {
-                setCompletedLessonIds(ids => ids.includes(activeLesson.id) ? ids : [...ids, activeLesson.id])
+              <button className="primary" disabled={activeUnitLessons.length > 0 && activeUnitLessons.every(item => completedLessonIds.includes(item.id))} onClick={() => {
+                setCompletedLessonIds(ids => [...new Set([...ids, ...activeUnitLessons.map(item => item.id)])])
                 recordActivity()
-              }}>{completedLessonIds.includes(activeLesson.id) ? <><CheckCircle2 size={17}/>{t('course.completed')}</> : t('course.markComplete')}</button>
+              }}>{activeUnitLessons.length > 0 && activeUnitLessons.every(item => completedLessonIds.includes(item.id)) ? <><CheckCircle2 size={17}/>{t('course.completed')}</> : t('course.markComplete')}</button>
             </div>
           </div>}
 
           {!activeLessonId && <div className="lesson-list course-lesson-grid">
-            {courseLessons.map(lesson => {
-              const completed = completedLessonIds.includes(lesson.id)
-              const newWordCount = lessonAssignments[lesson.id]?.length ?? 0
-              return <article className={`lesson-card course-lesson-card ${completed ? 'completed' : ''}`} key={lesson.id}>
-                <span className="lesson-number">{String(lesson.chapter).padStart(2, '0')}{lesson.part > 1 ? `.${lesson.part}` : ''}</span>
-                <div><h3>{lesson.title}</h3><p>{lesson.grammar.title} · {newWordsCountLabel(newWordCount, lang)}</p><code>{lesson.grammar.pattern}</code></div>
+            {courseUnits.map((unit, index) => {
+              const lesson = unit.lessons[0]
+              const completed = unit.lessons.every(item => completedLessonIds.includes(item.id))
+              const grammarCount = unit.lessons.length
+              return <article className={`lesson-card course-lesson-card ${completed ? 'completed' : ''}`} key={unit.id}>
+                <span className="lesson-number">{String(index + 1).padStart(2, '0')}</span>
+                <div><h3>{lesson.title}</h3><p>{newWordsCountLabel(unit.words.length, lang)} · {grammarCount} {lang === 'ru' ? 'тем грамматики' : lang === 'uz' ? 'grammatika mavzusi' : 'grammar points'}</p><code>{unit.lessons.map(item => item.grammar.title).join(' · ')}</code></div>
               <button className="course-open" onClick={() => {
-                setActiveLessonId(lesson.id)
+                setActiveLessonId(unit.id)
                 setLessonListeningChoice(null)
                 setClosingChoice(null)
                 setListeningChoice(null)
