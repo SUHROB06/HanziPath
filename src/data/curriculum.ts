@@ -11,6 +11,8 @@ export type GrammarFocus = {
   deepDive?: string
   commonMistakes?: string[]
   extraExamples?: { hanzi: string; pinyin: string; meaning: string }[]
+  studySteps?: string[]
+  practicePrompts?: string[]
 }
 
 export type LessonTemplate = {
@@ -41,7 +43,26 @@ const focus = (
   pinyin: string,
   meaning: string,
   details?: Pick<GrammarFocus, 'deepDive' | 'commonMistakes' | 'extraExamples'>,
-): GrammarFocus => ({ title, pattern, explanation, example, pinyin, meaning, ...details })
+): GrammarFocus => ({
+  title, pattern, explanation, example, pinyin, meaning,
+  deepDive: details?.deepDive ?? `В этой теме разбирается конструкция «${title}». Сначала посмотри на формулу: ${pattern}. Она показывает, какие элементы нужны и в каком порядке их соединять. Затем сравни формулу с примером «${example}». Прочитай китайское предложение вслух, сверь произношение с пиньинем и только после этого проверь перевод. Старайся понять функцию каждого элемента в предложении, а не заучивать пример как отдельную фразу.`,
+  commonMistakes: details?.commonMistakes ?? [
+    `Не меняй порядок частей конструкции: ориентируйся на формулу «${pattern}».`,
+    'Не пытайся переводить китайское предложение механически слово за словом: сначала определи роль каждого элемента.',
+    'Не пропускай тоны и нейтральный тон при чтении пиньиня; произнеси пример несколько раз.',
+  ],
+  extraExamples: details?.extraExamples ?? [],
+  studySteps: details?.studySteps ?? [
+    `Найди в примере «${example}» части, соответствующие формуле.`,
+    'Прочитай пример вслух три раза, затем закрой пиньинь и повтори самостоятельно.',
+    'Составь собственное предложение по той же модели, используя слова из списка этого урока.',
+  ],
+  practicePrompts: details?.practicePrompts ?? [
+    `Объясни своими словами, что показывает конструкция «${title}».`,
+    `Восстанови порядок элементов по формуле: ${pattern}.`,
+    'Придумай один новый пример по этой модели и проверь его по словарю урока.',
+  ],
+})
 
 // Original lessons follow the broad progression of the supplied Russian
 // textbooks. Their prose, dialogue examples and exercises are newly written.
