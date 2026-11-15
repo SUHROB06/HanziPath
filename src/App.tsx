@@ -730,7 +730,7 @@ export default function App() {
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>(() => readStored(COMPLETED_LESSONS_KEY, []))
   const [level, setLevel] = useState('all')
-  const [vocabularyCollection, setVocabularyCollection] = useState<'course' | 'hsk'>('course')
+  const [vocabularyCollection, setVocabularyCollection] = useState<'course' | 'hsk'>('hsk')
   const [query, setQuery] = useState('')
   const [dictionaryPage, setDictionaryPage] = useState(0)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
@@ -773,6 +773,7 @@ export default function App() {
   const [authFeedback, setAuthFeedback] = useState<{ text: string; kind: 'success' | 'error' } | null>(null)
 
   const [databaseWords, setDatabaseWords] = useState<Word[] | null>(null)
+  const [databaseSystem, setDatabaseSystem] = useState<System | null>(null)
   const [reviewWords, setReviewWords] = useState<Word[] | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogError, setCatalogError] = useState(false)
@@ -799,6 +800,75 @@ export default function App() {
     })
     return () => { mounted = false; subscription.unsubscribe() }
   }, [])
+
+  useEffect(() => {
+    if (vocabularyCollection !== 'hsk') return
+    if (!supabase) {
+      setCatalogError(true)
+      setDatabaseWords([])
+      setDatabaseSystem(system)
+      return
+    }
+
+    let cancelled = false
+    const client = supabase
+    setCatalogLoading(true)
+    setCatalogError(false)
+    setDatabaseWords(null)
+    setDatabaseSystem(null)
+
+    const loadCatalog = async () => {
+      try {
+        const standardCode = system === '2.0' ? 'hsk20' : 'hsk30'
+        const pageSize = 1000
+        const rows: any[] = []
+        for (let from = 0; ; from += pageSize) {
+          const { data, error } = await client
+            .rpc('get_hanzipath_vocabulary', { p_standard_code: standardCode })
+            .range(from, from + pageSize - 1)
+          if (error) throw error
+          const page = Array.isArray(data) ? data : []
+          rows.push(...page)
+          if (page.length < pageSize) break
+        }
+
+        if (cancelled) return
+        const mapped: Word[] = rows.map((row: any) => ({
+          sourceEntryKey: `hsk-${system}-${row.id}`,
+          hanzi: row.simplified,
+          traditional: row.traditional ?? '',
+          pinyin: row.pinyin ?? '',
+          ru: row.ru ?? '',
+          en: row.en ?? '',
+          uz: row.uz ?? '',
+          ruStatus: row.ru_status ?? 'unverified',
+          enStatus: row.en_status ?? 'unverified',
+          uzStatus: row.uz_status ?? 'unverified',
+          membershipStatus: row.membership_status ?? 'unverified',
+          level20: system === '2.0' ? row.level_order : null,
+          level30: system === '3.0' ? (Number(row.level_order) >= 7 ? '7-9' : row.level_order) : null,
+          example: '',
+          examplePinyin: '',
+          exampleRu: '',
+          exampleEn: '',
+        }))
+        setDatabaseWords(mapped)
+        setDatabaseSystem(system)
+      } catch (error) {
+        console.error('HanziPath vocabulary catalog failed to load:', error)
+        if (!cancelled) {
+          setDatabaseWords([])
+          setDatabaseSystem(system)
+          setCatalogError(true)
+        }
+      } finally {
+        if (!cancelled) setCatalogLoading(false)
+      }
+    }
+
+    void loadCatalog()
+    return () => { cancelled = true }
+  }, [system, vocabularyCollection])
 
   useEffect(() => {
     if (!authReady) return
@@ -1044,9 +1114,9 @@ export default function App() {
 
   // Keep the original HanziPath course collection distinct from the HSK-aligned views.
   // HSK membership is shown only where the authored curriculum explicitly assigns it.
-  const currentWords = originalLessonWords.filter(word =>
-    vocabularyCollection === 'course' || word.courseSystems?.includes(system)
-  )
+  const currentWords = vocabularyCollection === 'course'
+    ? originalLessonWords
+    : databaseSystem === system ? (databaseWords ?? []) : []
   const currentFavoriteCount = useMemo(
     () => currentWords.filter(word => favoriteWordIds.includes(wordId(word))).length,
     [currentWords, favoriteWordIds],
