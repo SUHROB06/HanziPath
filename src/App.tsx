@@ -400,12 +400,10 @@ function buildCourseUnits(
       `${word.hanzi}|${normalizePinyin(word.pinyin)}`,
       word,
     ])).values()]
-    const words = orderedCandidates.filter(word => {
-      const key = `${word.hanzi}|${normalizePinyin(word.pinyin)}`
-      if (assigned.has(key)) return false
-      assigned.add(key)
-      return true
-    }).slice(0, wordCount)
+    const words = orderedCandidates.filter(word =>
+      !assigned.has(`${word.hanzi}|${normalizePinyin(word.pinyin)}`),
+    ).slice(0, wordCount)
+    words.forEach(word => assigned.add(`${word.hanzi}|${normalizePinyin(word.pinyin)}`))
     if (unitLessons.length) units.push({ id: unitLessons[0].id, lessons: unitLessons, words })
     lessonOffset += lessonCount
   }
