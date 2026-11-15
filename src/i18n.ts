@@ -39,7 +39,7 @@ const en = {
   'auth.validation': 'Enter a valid email and a password of at least 6 characters.',
   'auth.notConfigured': 'Account access is not configured yet. Please contact the site administrator.',
   'auth.progressLoadError': 'Could not load cloud progress. Your local progress is still available.',
-  'auth.progressSaveError': 'Could not sync progress. Your local copy is still saved.'
+  'auth.progressSaveError': 'Could not sync progress. Your local copy is still saved.',
   'profile.languageSaved': 'Language preference saved.',
   'profile.languageLocal': 'Language saved on this device.',
   'profile.languageSaveError': 'Could not save your profile preference. Your device preference is still saved.',
@@ -268,7 +268,7 @@ const ru: Record<TranslationKey, string> = {
   'auth.validation': 'Введи корректную почту и пароль не короче 6 символов.',
   'auth.notConfigured': 'Авторизация пока не настроена. Обратись к администратору сайта.',
   'auth.progressLoadError': 'Не удалось загрузить прогресс из облака. Локальная копия сохранена.',
-  'auth.progressSaveError': 'Не удалось синхронизировать прогресс. Локальная копия сохранена.'
+  'auth.progressSaveError': 'Не удалось синхронизировать прогресс. Локальная копия сохранена.',
   'profile.languageSaved': 'Язык интерфейса сохранён.',
   'profile.languageLocal': 'Язык сохранён на этом устройстве.',
   'profile.languageSaveError': 'Не удалось сохранить настройку профиля. Выбор языка сохранён на устройстве.',
@@ -495,7 +495,7 @@ const uz: Record<TranslationKey, string> = {
   'auth.validation': 'To‘g‘ri email va kamida 6 belgili parol kiriting.',
   'auth.notConfigured': 'Hisobga kirish hali sozlanmagan. Sayt administratoriga murojaat qiling.',
   'auth.progressLoadError': 'Bulutdagi jarayonni yuklab bo‘lmadi. Mahalliy nusxa saqlangan.',
-  'auth.progressSaveError': 'Jarayon sinxronlanmadi. Mahalliy nusxa saqlangan.'
+  'auth.progressSaveError': 'Jarayon sinxronlanmadi. Mahalliy nusxa saqlangan.',
   'profile.languageSaved': 'Interfeys tili saqlandi.',
   'profile.languageLocal': 'Til tanlovi ushbu qurilmada saqlandi.',
   'profile.languageSaveError': 'Profil sozlamasini saqlab bo‘lmadi. Til tanlovi qurilmada saqlandi.',
