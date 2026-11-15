@@ -8,6 +8,9 @@ export type GrammarFocus = {
   example: string
   pinyin: string
   meaning: string
+  deepDive?: string
+  commonMistakes?: string[]
+  extraExamples?: { hanzi: string; pinyin: string; meaning: string }[]
 }
 
 export type LessonTemplate = {
@@ -37,13 +40,14 @@ const focus = (
   example: string,
   pinyin: string,
   meaning: string,
-): GrammarFocus => ({ title, pattern, explanation, example, pinyin, meaning })
+  details?: Pick<GrammarFocus, 'deepDive' | 'commonMistakes' | 'extraExamples'>,
+): GrammarFocus => ({ title, pattern, explanation, example, pinyin, meaning, ...details })
 
 // Original lessons follow the broad progression of the supplied Russian
 // textbooks. Their prose, dialogue examples and exercises are newly written.
 const chapters: LessonSeed[] = [
   { level: 1, title: 'Первое знакомство', keywords: ['привет', 'здравствуйте', 'hello', '你好', '你', '我', '吗', '好', '请', '没关系', '先生', '小姐', '喂', '谢谢', '对不起', '不客气', '再见'], modules: [
-    focus('Приветствие и короткий ответ', '你好！你好吗？', 'Китайское приветствие часто строится как короткий вопрос о самочувствии. Ответь так же просто.', '你好！我很好。', 'Nǐ hǎo! Wǒ hěn hǎo.', 'Привет! У меня всё хорошо.'),
+    focus('Приветствие и короткий ответ', '你好！你好吗？', 'Китайское приветствие часто строится как короткий вопрос о самочувствии. Ответь так же просто.', '你好！我很好。', 'Nǐ hǎo! Wǒ hěn hǎo.', 'Привет! У меня всё хорошо.', { deepDive: '你好 буквально состоит из 你 — «ты» и 好 — «хороший». В разговоре это устойчивое приветствие, поэтому его не нужно переводить дословно. Чтобы спросить «Как ты?», добавь 吗 в конец утвердительной фразы: 你 + 好 + 吗？ Частица 吗 превращает предложение в общий вопрос и сама не имеет отдельного перевода. В ответе можно сказать 我很好 — «У меня всё хорошо». Здесь 很 связывает подлежащее с прилагательным и часто звучит естественно даже без значения «очень».', commonMistakes: ['Не ставь 吗 в начало предложения: она обычно стоит в конце общего вопроса.', 'Не добавляй 是 перед прилагательным 好: фраза 你好 не требует связки 是.', 'Не путай 吗 (вопросительная частица) и 呢 (частица для встречного вопроса или продолжения темы).'], extraExamples: [{ hanzi: '你好吗？', pinyin: 'Nǐ hǎo ma?', meaning: 'Как ты?' }, { hanzi: '我很好。', pinyin: 'Wǒ hěn hǎo.', meaning: 'У меня всё хорошо.' }, { hanzi: '我很好，你呢？', pinyin: 'Wǒ hěn hǎo, nǐ ne?', meaning: 'У меня всё хорошо, а ты?' }] }),
   ] },
   { level: 1, title: 'Занятия китайским', keywords: ['китайский', 'язык', 'учить', 'урок', 'chinese', 'language', 'study', '汉语', '中文', '学习', '学生', '学校', '老师', '同学', '书', '读', '说', '写'], modules: [
     focus('Утвердительное предложение с 是', 'A + 是 + B', 'Связка 是 соединяет человека или предмет с названием, ролью или характеристикой.', '我是学生。', 'Wǒ shì xuésheng.', 'Я студент.'),
