@@ -260,7 +260,6 @@ footer { color: #978b7d; }
 /* =========================================================
    HANZIPATH — complete premium academy interface
    ========================================================= */
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Manrope:wght@400;500;600;700;800&family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
 :root{
  --hp-red:#8f1d27;--hp-red-deep:#64151e;--hp-red-bright:#a82b32;
  --hp-gold:#d8a94f;--hp-gold-light:#f1d99c;--hp-cream:#fbf5e9;
