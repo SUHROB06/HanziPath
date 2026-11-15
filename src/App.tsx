@@ -148,9 +148,9 @@ const originalLessonWords: Word[] = lessonVocabulary.reduce<Word[]>((result, ent
     uzStatus: 'ai_draft_unverified',
     courseStage: entry.stage,
     courseSystems: entry.systems,
-    // These are HanziPath curriculum stages, not claims of official HSK membership.
-    level20: entry.systems.includes('2.0') ? entry.stage : null,
-    level30: entry.systems.includes('3.0') ? (entry.stage >= 7 ? '7-9' : entry.stage) : null,
+    // HanziPath course stages are not official HSK memberships.
+    level20: null,
+    level30: null,
     example: '',
     examplePinyin: '',
     exampleRu: '',
@@ -730,7 +730,7 @@ export default function App() {
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>(() => readStored(COMPLETED_LESSONS_KEY, []))
   const [level, setLevel] = useState('all')
-  const [vocabularyCollection, setVocabularyCollection] = useState<'course' | 'hsk'>('hsk')
+  const [vocabularyCollection, setVocabularyCollection] = useState<'course' | 'hsk'>('course')
   const [query, setQuery] = useState('')
   const [dictionaryPage, setDictionaryPage] = useState(0)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
