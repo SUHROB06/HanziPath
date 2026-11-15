@@ -729,7 +729,7 @@ export default function App() {
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null)
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>(() => readStored(COMPLETED_LESSONS_KEY, []))
   const [level, setLevel] = useState('all')
-  const [vocabularyCollection, setVocabularyCollection] = useState<'course' | 'hsk'>('course')
+  const [vocabularyCollection, setVocabularyCollection] = useState<'course' | 'hsk'>('hsk')
   const [query, setQuery] = useState('')
   const [dictionaryPage, setDictionaryPage] = useState(0)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
@@ -1040,8 +1040,11 @@ export default function App() {
     }
   }
 
-  // One combined HanziPath study vocabulary; course stages are not official HSK levels.
-  const currentWords = originalLessonWords.filter(word => word.courseSystems?.includes(system === '2.0' ? '2.0' : '3.0'))
+  // Keep the original HanziPath course collection distinct from the HSK-aligned views.
+  // HSK membership is shown only where the authored curriculum explicitly assigns it.
+  const currentWords = originalLessonWords.filter(word =>
+    vocabularyCollection === 'course' || word.courseSystems?.includes(system)
+  )
   const currentFavoriteCount = useMemo(
     () => currentWords.filter(word => favoriteWordIds.includes(wordId(word))).length,
     [currentWords, favoriteWordIds],
@@ -1138,10 +1141,14 @@ export default function App() {
     ? ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6']
     : ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6', 'HSK 7–9']
 
-  const levelFilterOptions = Array.from({ length: 9 }, (_, index) => ({
-    value: String(index + 1),
-    label: `${t('vocab.courseStage')} ${index + 1} · ${currentWords.filter(word => word.courseStage === index + 1).length}`,
-  }))
+  const levelFilterOptions = Array.from({ length: system === '2.0' ? 6 : 7 }, (_, index) => {
+    const value = index === 6 ? '7-9' : String(index + 1)
+    const count = currentWords.filter(word => String(system === '2.0' ? word.level20 : word.level30) === value).length
+    return {
+      value: index === 6 ? '7' : value,
+      label: `${system === '2.0' ? 'HSK 2.0' : 'HSK 3.0'} · ${index === 6 ? '7–9' : index + 1} · ${count}`,
+    }
+  }).filter(option => system === '3.0' || option.value !== '7')
 
   const activeSectionName = section < 7
     ? t(navKeys[section])
@@ -1614,6 +1621,15 @@ export default function App() {
 
           <p className="notice-text">{t('vocab.courseNotice')}</p>
 
+          <div className="filters collection-switch" role="group" aria-label="Dictionary collection">
+            <button type="button" className={vocabularyCollection === 'hsk' ? 'primary' : 'outline'} aria-pressed={vocabularyCollection === 'hsk'} onClick={() => { setVocabularyCollection('hsk'); setLevel('all') }}>
+              {lang === 'ru' ? 'Словарь HSK' : lang === 'uz' ? 'HSK lug‘ati' : 'HSK dictionary'}
+            </button>
+            <button type="button" className={vocabularyCollection === 'course' ? 'primary' : 'outline'} aria-pressed={vocabularyCollection === 'course'} onClick={() => { setVocabularyCollection('course'); setLevel('all') }}>
+              {lang === 'ru' ? 'Слова курса HanziPath' : lang === 'uz' ? 'HanziPath kurs so‘zlari' : 'HanziPath course words'}
+            </button>
+          </div>
+
           <div className="filters standard-switch" role="group" aria-label="HSK standard">
             <button type="button" className={system === '2.0' ? 'primary' : 'outline'} aria-pressed={system === '2.0'} onClick={() => { setSystem('2.0'); setLevel('all') }}>HSK 2.0</button>
             <button type="button" className={system === '3.0' ? 'primary' : 'outline'} aria-pressed={system === '3.0'} onClick={() => { setSystem('3.0'); setLevel('all') }}>HSK 3.0</button>
@@ -1692,7 +1708,7 @@ export default function App() {
                   </button>
 
                   <span className="level-pill">
-                    {`${t('vocab.courseStageShort')} ${word.courseStage}`}
+                    {`${vocabularyCollection === 'course' ? `${t('vocab.courseStageShort')} ${word.courseStage}` : dictionaryLevelLabel(word, system) ?? (lang === 'ru' ? 'Вне уровня' : 'Unlevelled')}`}
                   </span>
 
                   <button
