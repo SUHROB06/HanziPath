@@ -801,10 +801,11 @@ export default function App() {
   useEffect(() => {
     if (!authReady) return
     if (!userId || !supabase) { setProgressReady(true); setProgressOwnerId(null); return }
+    const client = supabase
     let cancelled = false
     setProgressReady(false)
     const loadProgress = async () => {
-      const { data, error } = await supabase.from('user_learning_progress').select('progress').eq('user_id', userId).maybeSingle()
+      const { data, error } = await client.from('user_learning_progress').select('progress').eq('user_id', userId).maybeSingle()
       if (cancelled) return
       if (error) setNotice({ text: t('auth.progressLoadError'), kind: 'error' })
       else if (data?.progress && typeof data.progress === 'object') {
@@ -832,8 +833,9 @@ export default function App() {
     const progress = { knownWords, favoriteWordIds, completedLessonIds, activityDays, done, courseSystem, courseLevel, cardIndex, section, activeLessonId, lang }
     try { window.localStorage.setItem('hanzipath.progress', JSON.stringify(progress)) } catch { /* optional local backup */ }
     if (!userId || !supabase || !progressReady || progressOwnerId !== userId) return
+    const client = supabase
     const timer = window.setTimeout(() => {
-      void supabase.from('user_learning_progress').upsert({ user_id: userId, progress, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }).then(({ error }) => {
+      void client.from('user_learning_progress').upsert({ user_id: userId, progress, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }).then(({ error }) => {
         if (error) setNotice({ text: t('auth.progressSaveError'), kind: 'error' })
       })
     }, 900)
