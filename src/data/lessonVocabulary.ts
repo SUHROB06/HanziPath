@@ -15,7 +15,26 @@ export type LessonVocabularyEntry = {
 // Stage labels describe our learning sequence; they do not assert official HSK membership.
 // RU/UZ glosses are draft translations and need a fluent human review before release.
 const rows = `
-1|hsk-1-1-1,hsk30-1-1-1|你好|nǐ hǎo|привет|hello|salom
+1|hsk-1-2-1|汉语|Hànyǔ|китайский язык|Chinese language|xitoy tili
+1|hsk-1-2-1|中文|Zhōngwén|китайский язык; китайский текст|Chinese language; written Chinese|xitoy tili; xitoycha matn
+1|hsk-1-2-1|学习|xuéxí|учиться; изучать|to study; to learn|o‘rganmoq
+1|hsk-1-2-1|学生|xuésheng|студент; ученик|student|talaba; o‘quvchi
+1|hsk-1-2-1|大学|dàxué|университет|university|universitet
+1|hsk-1-2-1|学校|xuéxiào|школа; учебное заведение|school|maktab; ta’lim muassasasi
+1|hsk-1-2-1|老师|lǎoshī|учитель; преподаватель|teacher|o‘qituvchi
+1|hsk-1-2-1|同学|tóngxué|однокурсник; одноклассник|classmate|kursdosh; sinfdosh
+1|hsk-1-2-1|教室|jiàoshì|аудитория; класс|classroom|sinf xonasi
+1|hsk-1-2-1|课|kè|урок; занятие|lesson; class|dars; mashg‘ulot
+1|hsk-1-2-1|课本|kèběn|учебник|textbook|darslik
+1|hsk-1-2-1|书|shū|книга|book|kitob
+1|hsk-1-2-1|说|shuō|говорить|to speak; to say|gapirmoq; aytmoq
+1|hsk-1-2-1|读|dú|читать вслух; читать|to read|o‘qimoq
+1|hsk-1-2-1|写|xiě|писать|to write|yozmoq
+1|hsk-1-2-1|听|tīng|слушать|to listen|tinglamoq
+1|hsk-1-2-1|汉字|Hànzì|китайский иероглиф|Chinese character|xitoy ieroglifi
+1|hsk-1-2-1|作业|zuòyè|домашнее задание|homework|uy vazifasi
+1|hsk-1-2-1|认真|rènzhēn|старательно; внимательно|carefully; seriously|diqqat bilan; astoydil
+1|hsk-1-2-1,hsk30-1-1-1|你好|nǐ hǎo|привет|hello|salom
 1|hsk-1-1-1|你|nǐ|ты; вы|you|sen; siz
 1|hsk-1-1-1|我|wǒ|я|I; me|men
 1|hsk-1-1-1|好|hǎo|хороший; хорошо|good; well|yaxshi
