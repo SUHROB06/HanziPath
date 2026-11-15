@@ -2,6 +2,7 @@ import {
   type CourseLevel,
   type GrammarFocus,
   type LessonTemplate,
+  enrichGrammarFocus,
 } from './curriculum'
 
 type HSK30Level = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
@@ -14,7 +15,7 @@ const grammar = (
   example: string,
   pinyin: string,
   meaning: string,
-): GrammarFocus => ({ title, pattern, explanation, example, pinyin, meaning })
+): GrammarFocus => enrichGrammarFocus({ title, pattern, explanation, example, pinyin, meaning })
 
 // Original HanziPath lesson themes, grammar notes, examples and listening
 // prompts. The official 7–9 vocabulary band stays intact; stages 7/8/9 below

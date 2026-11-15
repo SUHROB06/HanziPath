@@ -1295,3 +1295,11 @@ img,svg{max-width:100%}
   .grammar-deep-dive,.grammar-extra-examples,.grammar-mistakes{padding:12px}
   .grammar-deep-dive p,.grammar-mistakes li{font-size:11px;line-height:1.75}
 }
+
+/* Guided learning blocks are used consistently throughout both HSK tracks. */
+.grammar-extra-examples ol,.grammar-deep-dive ul{
+  margin:0;padding-left:19px;color:#66564e;font-size:12px;line-height:1.8;
+}
+.grammar-extra-examples ol li+li,.grammar-deep-dive ul li+li{margin-top:6px}
+.grammar-extra-examples ol li::marker,.grammar-deep-dive ul li::marker{color:#9a6b45;font-weight:800}
+.unassisted-pinyin{margin:7px 0 0;color:#987e69;font-size:11px;line-height:1.7;letter-spacing:.2px}

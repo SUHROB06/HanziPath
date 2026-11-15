@@ -11,6 +11,8 @@ export type GrammarFocus = {
   deepDive?: string
   commonMistakes?: string[]
   extraExamples?: { hanzi: string; pinyin: string; meaning: string }[]
+  studySteps?: string[]
+  practicePrompts?: string[]
 }
 
 export type LessonTemplate = {
@@ -33,6 +35,27 @@ type LessonSeed = {
   modules: GrammarFocus[]
 }
 
+export const enrichGrammarFocus = (base: GrammarFocus): GrammarFocus => ({
+  ...base,
+  deepDive: base.deepDive ?? `В этой теме разбирается конструкция «${base.title}». Сначала посмотри на формулу: ${base.pattern}. Она показывает, какие элементы нужны и в каком порядке их соединять. Затем сравни формулу с примером «${base.example}». Прочитай китайское предложение вслух, сверь произношение с пиньинем и только после этого проверь перевод. Старайся понять функцию каждого элемента в предложении, а не заучивать пример как отдельную фразу.`,
+  commonMistakes: base.commonMistakes ?? [
+    `Не меняй порядок частей конструкции: ориентируйся на формулу «${base.pattern}».`,
+    'Не пытайся переводить китайское предложение механически слово за словом: сначала определи роль каждого элемента.',
+    'Не пропускай тоны и нейтральный тон при чтении пиньиня; произнеси пример несколько раз.',
+  ],
+  extraExamples: base.extraExamples ?? [],
+  studySteps: base.studySteps ?? [
+    `Найди в примере «${base.example}» части, соответствующие формуле.`,
+    'Прочитай пример вслух три раза, затем закрой пиньинь и повтори самостоятельно.',
+    'Составь собственное предложение по той же модели, используя слова из списка этого урока.',
+  ],
+  practicePrompts: base.practicePrompts ?? [
+    `Объясни своими словами, что показывает конструкция «${base.title}».`,
+    `Восстанови порядок элементов по формуле: ${base.pattern}.`,
+    'Придумай один новый пример по этой модели и проверь его по словарю урока.',
+  ],
+})
+
 const focus = (
   title: string,
   pattern: string,
@@ -40,8 +63,8 @@ const focus = (
   example: string,
   pinyin: string,
   meaning: string,
-  details?: Pick<GrammarFocus, 'deepDive' | 'commonMistakes' | 'extraExamples'>,
-): GrammarFocus => ({ title, pattern, explanation, example, pinyin, meaning, ...details })
+  details?: Pick<GrammarFocus, 'deepDive' | 'commonMistakes' | 'extraExamples' | 'studySteps' | 'practicePrompts'>,
+): GrammarFocus => enrichGrammarFocus({ title, pattern, explanation, example, pinyin, meaning, ...details })
 
 // Original lessons follow the broad progression of the supplied Russian
 // textbooks. Their prose, dialogue examples and exercises are newly written.

@@ -332,9 +332,9 @@ function lessonWordAssignments(entries: Word[]): Record<string, Word[]> {
     for (const lesson of lessons) {
       assignments[lesson.id].push(...(pinned.get(lesson.id) ?? []))
     }
-    const pending = pool.filter(word => !word.courseLessonId)
+    const pending = pool.filter(word => !word.courseLessonIds?.length)
     const baseSize = Math.floor(pending.length / lessons.length)
-    const extraWords = pool.length % lessons.length
+    const extraWords = pending.length % lessons.length
 
     const targetSizes = new Map(lessons.map((lesson, index) => [
       lesson.id,
@@ -1139,7 +1139,22 @@ export default function App() {
   const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const activeLesson = lessonTemplates.find(lesson => lesson.id === activeLessonId && lesson.system === courseSystem && lesson.level === courseLevel) ?? courseLessons[0]
   const activeLessonWords = activeLesson ? lessonAssignments[activeLesson.id] ?? [] : []
-  const activeClosingReading = (activeLesson?.id === 'hsk-1-1-1' || activeLesson?.id === 'hsk30-1-1-1') ? firstLessonReading : closingReading
+  const activeClosingReading = (activeLesson?.id === 'hsk-1-1-1' || activeLesson?.id === 'hsk30-1-1-1')
+    ? firstLessonReading
+    : activeLesson ? {
+      hanzi: activeLesson.grammar.example,
+      pinyin: activeLesson.grammar.pinyin,
+      meaning: {
+        ru: activeLesson.grammar.meaning,
+        en: activeLesson.grammar.meaning,
+        uz: activeLesson.grammar.meaning,
+      },
+      options: {
+        ru: [activeLesson.grammar.meaning, ...closingReading.options.ru.slice(1)],
+        en: [activeLesson.grammar.meaning, ...closingReading.options.en.slice(1)],
+        uz: [activeLesson.grammar.meaning, ...closingReading.options.uz.slice(1)],
+      },
+    } : closingReading
   const dialogueLines = activeLesson ? [
     {
       key: 'lesson-example',
@@ -1606,6 +1621,14 @@ export default function App() {
                 <h4>{lang === 'ru' ? 'Частые ошибки' : lang === 'uz' ? 'Ko‘p uchraydigan xatolar' : 'Common mistakes'}</h4>
                 <ul>{activeLesson.grammar.commonMistakes.map(mistake => <li key={mistake}>{mistake}</li>)}</ul>
               </div> : null}
+              {activeLesson.grammar.studySteps?.length ? <div className="grammar-extra-examples">
+                <h4>{lang === 'ru' ? 'Как освоить тему' : lang === 'uz' ? 'Mavzuni qanday o‘zlashtirish' : 'How to master this topic'}</h4>
+                <ol>{activeLesson.grammar.studySteps.map(step => <li key={step}>{step}</li>)}</ol>
+              </div> : null}
+              {activeLesson.grammar.practicePrompts?.length ? <div className="grammar-deep-dive">
+                <h4>{lang === 'ru' ? 'Самостоятельная практика' : lang === 'uz' ? 'Mustaqil mashq' : 'Independent practice'}</h4>
+                <ul>{activeLesson.grammar.practicePrompts.map(prompt => <li key={prompt}>{prompt}</li>)}</ul>
+              </div> : null}
             </section>
 
             <section className="course-block lesson-listening">
@@ -1633,7 +1656,7 @@ export default function App() {
               <div className="course-block-head"><div><span className="kicker">06 · {t('course.finalReading')}</span><h3>{t('course.readWithoutPinyin')}</h3></div>
                 <button className="sound" onClick={() => speak(activeClosingReading.hanzi)} aria-label={`${t('vocab.listen')}: ${activeClosingReading.hanzi}`}><Volume2 size={18}/></button>
               </div>
-              <p className="unassisted-text" lang="zh-CN">{closingReading.hanzi}</p>
+              <p className="unassisted-text" lang="zh-CN">{activeClosingReading.hanzi}</p>\n              <p className="unassisted-pinyin">{activeClosingReading.pinyin}</p>
               <p className="reading-question">{t('course.readingQuestion')}</p>
               <div className="answer-options">
                 {activeClosingReading.options[lang].map((option, index) => <button key={option} className={`answer-option ${closingChoice !== null && index === 0 ? 'correct' : ''} ${closingChoice === index && index !== 0 ? 'incorrect' : ''}`} disabled={closingChoice !== null} onClick={() => {
@@ -1658,7 +1681,7 @@ export default function App() {
                 </div>
                 <div className="lesson-recap-item">
                   <b>{t('course.reviewText')}</b>
-                  <p className="recap-hanzi" lang="zh-CN">{closingReading.hanzi}</p>
+                  <p className="recap-hanzi" lang="zh-CN">{activeClosingReading.hanzi}</p>
                   <span>{activeClosingReading.meaning[lang]}</span>
                 </div>
               </div>
