@@ -318,7 +318,7 @@ function lessonWordAssignments(entries: Word[]): Record<string, Word[]> {
     lessonTemplates.map(lesson => [lesson.id, []]),
   )
 
-  const groups = [...new Set(lessonTemplates.map(lesson => `${lesson.system}:${lesson.level}`))]
+  const groups = [...new Set(lessonTemplates.map(lesson => lesson.system + ':' + lesson.level))]
   for (const group of groups) {
     const [system, levelValue] = group.split(':') as [CourseSystem, string]
     const level = Number(levelValue) as CourseLevel
@@ -329,40 +329,41 @@ function lessonWordAssignments(entries: Word[]): Record<string, Word[]> {
     const chapters = [...new Set(lessons.map(lesson => lesson.chapter))]
     for (const chapterNumber of chapters) {
       const chapterLessons = lessons.filter(lesson => lesson.chapter === chapterNumber)
-      const keywords = [...new Set(chapterLessons.flatMap(lesson => lesson.keywords))]
+      const chapterKeywords = [...new Set(chapterLessons.flatMap(lesson => lesson.keywords))]
         .map(term => term.toLocaleLowerCase())
-      const scores = pool.map((word, index) => {
+      const chapterScores = pool.map((word, index) => {
         const searchable = [word.hanzi, word.pinyin, word.ru, word.en, word.uz]
           .filter(Boolean).join(' ').toLocaleLowerCase()
-        const score = keywords.reduce((total, keyword) => total + (searchable.includes(keyword) ? 1 : 0), 0)
+        const score = chapterKeywords.reduce((total, keyword) => total + (searchable.includes(keyword) ? 1 : 0), 0)
         return { word, score, index }
       })
-
-      // Every grammar part in one thematic chapter studies the same vocabulary.
-      // This avoids splitting a small chapter list into 1–3 words per lesson.
-      const pinned = chapterLessons.flatMap(lesson =>
+      const chapterPinned = chapterLessons.flatMap(lesson =>
         pool.filter(word => word.courseLessonIds?.includes(lesson.id)),
       )
-      const topical = scores
-        .filter(item => item.score > 0)
-        .sort((a, b) => b.score - a.score || a.index - b.index)
-        .map(item => item.word)
-      const fallback = scores
-        .sort((a, b) => a.index - b.index)
-        .map(item => item.word)
-      const chapterWords = [...new Map(
-        [...pinned, ...topical, ...fallback].map(word => [wordId(word), word]),
-      ).values()].slice(0, Math.max(10, pinned.length))
+      const chapterTopical = chapterScores.filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score || a.index - b.index).map(item => item.word)
 
       for (const lesson of chapterLessons) {
-        assignments[lesson.id] = [...chapterWords]
+        const lessonText = [lesson.grammar.example, ...(lesson.grammar.extraExamples ?? []).map(example => example.hanzi)].join(' ')
+        const lessonKeywords = lesson.keywords.map(term => term.toLocaleLowerCase())
+        const lessonMatches = pool.map((word, index) => {
+          const searchable = [word.hanzi, word.pinyin, word.ru, word.en, word.uz]
+            .filter(Boolean).join(' ').toLocaleLowerCase()
+          const keywordScore = lessonKeywords.reduce((total, keyword) => total + (searchable.includes(keyword) ? 1 : 0), 0)
+          const exampleScore = lessonText.includes(word.hanzi) ? 3 : 0
+          return { word, score: keywordScore + exampleScore, index }
+        })
+        const pinned = pool.filter(word => word.courseLessonIds?.includes(lesson.id))
+        const topical = lessonMatches.filter(item => item.score > 0)
+          .sort((a, b) => b.score - a.score || a.index - b.index).map(item => item.word)
+        const selected = pinned.length || topical.length ? [...pinned, ...topical] : [...chapterPinned, ...chapterTopical]
+        assignments[lesson.id] = [...new Map(selected.map(word => [wordId(word), word])).values()]
       }
     }
   }
 
   return assignments
 }
-
 function shuffleWithSeed<T>(items: T[], seed: number): T[] {
   const result = [...items]
   let value = seed >>> 0
@@ -1684,7 +1685,7 @@ export default function App() {
               <div className="course-block-head"><div><span className="kicker">06 · {t('course.finalReading')}</span><h3>{t('course.readWithoutPinyin')}</h3></div>
                 <button className="sound" onClick={() => speak(activeClosingReading.hanzi)} aria-label={`${t('vocab.listen')}: ${activeClosingReading.hanzi}`}><Volume2 size={18}/></button>
               </div>
-              <p className="unassisted-text" lang="zh-CN">{activeClosingReading.hanzi}</p>\n              <p className="unassisted-pinyin">{activeClosingReading.pinyin}</p>
+              <p className="unassisted-text" lang="zh-CN">{activeClosingReading.hanzi}</p>\n              <details className="reading-pinyin-toggle"><summary>{lang === 'ru' ? 'Открыть пиньинь и подсказку' : lang === 'uz' ? 'Pinyin va yordamni ochish' : 'Show pinyin and hint'}</summary><p className="unassisted-pinyin">{activeClosingReading.pinyin}</p></details>
               <p className="reading-question">{t('course.readingQuestion')}</p>
               <div className="answer-options">
                 {activeClosingReading.options[lang].map((option, index) => <button key={option} className={`answer-option ${closingChoice !== null && index === 0 ? 'correct' : ''} ${closingChoice === index && index !== 0 ? 'incorrect' : ''}`} disabled={closingChoice !== null} onClick={() => {
