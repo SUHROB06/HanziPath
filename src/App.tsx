@@ -1665,9 +1665,9 @@ export default function App() {
           {!activeLessonId && <div className="lesson-list course-lesson-grid">
             {courseLessons.map(lesson => {
               const completed = completedLessonIds.includes(lesson.id)
-              const newWordCount = lessonAssignments[lesson.id]?.length ?? 0
+              const newWordCount = expandedLessonData.assignments[lesson.id]?.length ?? 0
               return <article className={`lesson-card course-lesson-card ${completed ? 'completed' : ''}`} key={lesson.id}>
-                <span className="lesson-number">{String(lesson.volumeLesson).padStart(2, '0')</span>
+                <span className="lesson-number">{String(lesson.volumeLesson).padStart(2, '0')}</span>
                 <div><h3>{lesson.title}</h3><p>{lesson.grammar.title} · {newWordsCountLabel(newWordCount, lang)}</p><code>{lesson.grammar.pattern}</code></div>
               <button className="course-open" onClick={() => {
                 setActiveLessonId(lesson.id)
