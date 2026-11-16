@@ -52,6 +52,7 @@ type Word = {
 }
 
 type Notice = { text: string; kind: 'success' | 'error' | 'info' }
+type DisplayLesson = LessonTemplate & { volume: number; volumeLesson: number }
 
 function normalizePinyin(value: string): string {
   return value.toLowerCase()
@@ -756,6 +757,13 @@ export default function App() {
   const [examStarted, setExamStarted] = useState(false)
   const [examFinished, setExamFinished] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [authOpen, setAuthOpen] = useState(false)
+  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'reset'>('signin')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authBusy, setAuthBusy] = useState(false)
+  const [authUser, setAuthUser] = useState<{ id: string; email: string } | null>(null)
+  const [selectedVolume, setSelectedVolume] = useState(1)
 
   const [databaseWords, setDatabaseWords] = useState<Word[] | null>(null)
   const [reviewWords, setReviewWords] = useState<Word[] | null>(null)
@@ -1021,6 +1029,70 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    if (!supabase) return
+    void supabase.auth.getSession().then(({ data }) => {
+      const user = data.session?.user
+      setAuthUser(user ? { id: user.id, email: user.email ?? '' } : null)
+    })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const user = session?.user
+      setAuthUser(user ? { id: user.id, email: user.email ?? '' } : null)
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  const submitAuth = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!supabase) {
+      setNotice({ text: lang === 'ru' ? 'Авторизация пока не настроена: проверьте подключение Supabase.' : 'Authentication is not configured. Check the Supabase connection.', kind: 'error' })
+      return
+    }
+    if (!authEmail.trim() || (authMode !== 'reset' && authPassword.length < 8)) {
+      setNotice({ text: lang === 'ru' ? 'Введите email и пароль не короче 8 символов.' : 'Enter an email and a password of at least 8 characters.', kind: 'error' })
+      return
+    }
+    setAuthBusy(true)
+    try {
+      if (authMode === 'signup') {
+        const { data, error } = await supabase.auth.signUp({
+          email: authEmail.trim(),
+          password: authPassword,
+          options: { emailRedirectTo: window.location.origin },
+        })
+        if (error) throw error
+        setAuthOpen(false)
+        setAuthPassword('')
+        setNotice({ text: data.session
+          ? (lang === 'ru' ? 'Аккаунт создан. Вы вошли в систему.' : 'Account created. You are signed in.')
+          : (lang === 'ru' ? 'Аккаунт создан. Проверьте почту и подтвердите email, затем войдите.' : 'Account created. Check your email to confirm it, then sign in.'), kind: 'success' })
+      } else if (authMode === 'signin') {
+        const { error } = await supabase.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword })
+        if (error) throw error
+        setAuthOpen(false)
+        setAuthPassword('')
+        setNotice({ text: lang === 'ru' ? 'Вы успешно вошли в HanziPath.' : 'You are signed in to HanziPath.', kind: 'success' })
+      } else {
+        const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim(), { redirectTo: window.location.origin })
+        if (error) throw error
+        setAuthOpen(false)
+        setNotice({ text: lang === 'ru' ? 'Если адрес зарегистрирован, на него придёт письмо для сброса пароля.' : 'If the email is registered, a password reset link will be sent.', kind: 'success' })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setNotice({ text: message, kind: 'error' })
+    } finally {
+      setAuthBusy(false)
+    }
+  }
+
+  const signOut = async () => {
+    if (!supabase) return
+    const { error } = await supabase.auth.signOut()
+    if (error) setNotice({ text: error.message, kind: 'error' })
+    else setNotice({ text: lang === 'ru' ? 'Вы вышли из аккаунта.' : 'You have signed out.', kind: 'success' })
+  }
+
   const availableWords = databaseWords ?? (reviewWords?.length ? reviewWords : words)
   const currentWords = useMemo(() => vocabularyCollection === 'course'
     ? originalLessonWords.filter(word => word.courseSystems?.includes(system))
@@ -1036,9 +1108,39 @@ export default function App() {
   // examples for the HSK dictionary view and duplicate authored lesson words.
   const lessonEntries = [...(reviewWords?.length ? reviewWords : databaseWords ?? []), ...originalLessonWords]
   const lessonAssignments = useMemo(() => lessonWordAssignments(lessonEntries), [lessonEntries])
-  const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
-  const activeLesson = lessonTemplates.find(lesson => lesson.id === activeLessonId && lesson.system === courseSystem && lesson.level === courseLevel) ?? courseLessons[0]
-  const activeLessonWords = activeLesson ? lessonAssignments[activeLesson.id] ?? [] : []
+  const expandedLessonData = useMemo(() => {
+    const display: DisplayLesson[] = []
+    const assignmentMap: Record<string, Word[]> = {}
+    for (const base of lessonTemplates) {
+      const assigned = lessonAssignments[base.id] ?? []
+      const chunks: Word[][] = []
+      for (let offset = 0; offset < assigned.length; offset += 30) chunks.push(assigned.slice(offset, offset + 30))
+      if (!chunks.length) chunks.push([])
+      chunks.forEach((chunk, index) => {
+        const id = chunks.length === 1 ? base.id : `${base.id}-set-${index + 1}`
+        display.push({ ...base, id, title: chunks.length === 1 ? base.title : `${base.title} · блок ${index + 1}`, volume: 1, volumeLesson: 0 })
+        assignmentMap[id] = chunk
+      })
+    }
+    const grouped: DisplayLesson[] = []
+    const volumeCounters: Record<string, number> = {}
+    const volumeSizes: Record<string, number> = {}
+    display.forEach(item => {
+      const key = `${item.system}-${item.level}`
+      const count = volumeCounters[key] ?? 0
+      const volume = Math.floor(count / 15) + 1
+      const volumeLesson = count % 15 + 1
+      volumeCounters[key] = count + 1
+      volumeSizes[key] = volume
+      grouped.push({ ...item, volume, volumeLesson })
+    })
+    return { lessons: grouped, assignments: assignmentMap, volumeCounts: volumeSizes }
+  }, [lessonAssignments])
+  const courseAllLessons = expandedLessonData.lessons.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
+  const courseVolumeCount = expandedLessonData.volumeCounts[`${courseSystem}-${courseLevel}`] ?? 1
+  const courseLessons = courseAllLessons.filter(lesson => lesson.volume === selectedVolume)
+  const activeLesson = courseLessons.find(lesson => lesson.id === activeLessonId) ?? (activeLessonId ? courseAllLessons.find(lesson => lesson.id === activeLessonId) : undefined) ?? courseLessons[0]
+  const activeLessonWords = activeLesson ? expandedLessonData.assignments[activeLesson.id] ?? [] : []
   const dialogueLines = activeLesson ? [
     {
       key: 'lesson-example',
@@ -1258,10 +1360,10 @@ export default function App() {
         <div className="profile">
           <div className="avatar">H</div>
           <div className="profile-name">
-            <b>{t('profile.guest')}</b>
-            <small>{t('profile.settings')}</small>
+            <b>{authUser?.email || t('profile.guest')}</b>
+            <small>{authUser ? (lang === 'ru' ? 'В аккаунте' : 'Signed in') : t('profile.settings')}</small>
           </div>
-          <button className="profile-action" title={t('profile.signIn')} aria-label={t('profile.signIn')} onClick={() => setNotice({ text: t('profile.signInUnavailable'), kind: 'info' })}>
+          <button className="profile-action" title={authUser ? 'Sign out' : t('profile.signIn')} aria-label={authUser ? 'Sign out' : t('profile.signIn')} onClick={() => authUser ? void signOut() : (setAuthMode('signin'), setAuthOpen(true))}>
             <LockKeyhole size={17}/>
           </button>
         </div>
@@ -1293,7 +1395,7 @@ export default function App() {
 
           <button className="signin" onClick={() => setNotice({ text: t('profile.signInUnavailable'), kind: 'info' })}>
             <LockKeyhole size={16}/>
-            <span>{t('profile.signIn')}</span>
+            <span>{authUser ? (lang === 'ru' ? 'Выйти' : 'Sign out') : t('profile.signIn')}</span>
           </button>
         </div>
       </header>
@@ -1403,10 +1505,11 @@ export default function App() {
 
           <div className="course-levels" role="group" aria-label={t('course.level')}>
             {(courseSystem === '2.0' ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 7, 8, 9]).map(course => {
-              const count = lessonTemplates.filter(item => item.system === courseSystem && item.level === course).length
-              const completed = lessonTemplates.filter(item => item.system === courseSystem && item.level === course && completedLessonIds.includes(item.id)).length
+              const count = expandedLessonData.lessons.filter(item => item.system === courseSystem && item.level === course).length
+              const completed = expandedLessonData.lessons.filter(item => item.system === courseSystem && item.level === course && completedLessonIds.includes(item.id)).length
               return <button key={course} className={`course-level ${courseLevel === course ? 'selected' : ''}`} onClick={() => {
                 setCourseLevel(course as CourseLevel)
+                setSelectedVolume(1)
                 setActiveLessonId(null)
                 setLessonListeningChoice(null)
                 setClosingChoice(null)
@@ -1423,11 +1526,22 @@ export default function App() {
           </div>
 
           {courseSystem === '3.0' && courseLevel >= 7 && <p className="notice-text shared-band-note">{t('course.sharedBandNote')}</p>}
+          <div className="course-volumes" role="group" aria-label={lang === 'ru' ? 'Часть учебника' : 'Book volume'}>
+            {Array.from({ length: courseVolumeCount }, (_, index) => index + 1).map(volume => {
+              const total = courseAllLessons.filter(item => item.volume === volume).length
+              const doneCount = courseAllLessons.filter(item => item.volume === volume && completedLessonIds.includes(item.id)).length
+              return <button key={volume} className={`course-volume ${selectedVolume === volume ? 'selected' : ''}`} onClick={() => { setSelectedVolume(volume); setActiveLessonId(null); setCardIndex(0); setShowAnswer(false) }}>
+                <b>{lang === 'ru' ? 'Часть' : 'Part'} {volume}</b><span>{total} {t('course.lessonCount')}</span><small>{doneCount}/{total} {t('course.progress')}</small>
+              </button>
+            })}
+          </div>
+
+
 
           {activeLessonId && activeLesson && <div className="lesson-detail">
             <button className="outline lesson-back" onClick={() => { setActiveLessonId(null); setLessonListeningChoice(null); setClosingChoice(null) }}>‹ {t('course.back')}</button>
             <div className="lesson-detail-heading">
-              <div><span className="kicker">HSK {courseSystem} · {courseLevel}{courseSystem === '3.0' && courseLevel >= 7 ? ` · ${t('course.stage')}` : ''} · {t('course.lesson')} {activeLesson.chapter}{activeLesson.part > 1 ? `.${activeLesson.part}` : ''}</span><h2>{activeLesson.title}</h2></div>
+              <div><span className="kicker">HSK {courseSystem} · {courseLevel} · {lang === 'ru' ? 'Часть' : 'Part'} {activeLesson.volume} · {t('course.lesson')} {activeLesson.volumeLesson}</span><h2>{activeLesson.title}</h2></div>
               <span className="demo-tag">{activeLesson.minutes} {t('common.minutes')}</span>
             </div>
 
@@ -1553,7 +1667,7 @@ export default function App() {
               const completed = completedLessonIds.includes(lesson.id)
               const newWordCount = lessonAssignments[lesson.id]?.length ?? 0
               return <article className={`lesson-card course-lesson-card ${completed ? 'completed' : ''}`} key={lesson.id}>
-                <span className="lesson-number">{String(lesson.chapter).padStart(2, '0')}{lesson.part > 1 ? `.${lesson.part}` : ''}</span>
+                <span className="lesson-number">{String(lesson.volumeLesson).padStart(2, '0')</span>
                 <div><h3>{lesson.title}</h3><p>{lesson.grammar.title} · {newWordsCountLabel(newWordCount, lang)}</p><code>{lesson.grammar.pattern}</code></div>
               <button className="course-open" onClick={() => {
                 setActiveLessonId(lesson.id)
@@ -1810,10 +1924,10 @@ export default function App() {
           <div className="panel-head"><div><span className="kicker">{t('grammar.kicker')}</span><h2>{t('grammar.title')}</h2></div><span className="demo-tag">HSK {courseSystem}</span></div>
           <p className="notice-text">{t('grammar.notice')}</p>
           <div className="standard-switch" role="group" aria-label={t('vocab.system')}>
-            {(['2.0', '3.0'] as const).map(standard => <button key={standard} className={`outline ${courseSystem === standard ? 'selected' : ''}`} onClick={() => { setCourseSystem(standard); setCourseLevel(1); setActiveLessonId(null) }}>HSK {standard}</button>)}
+            {(['2.0', '3.0'] as const).map(standard => <button key={standard} className={`outline ${courseSystem === standard ? 'selected' : ''}`} onClick={() => { setCourseSystem(standard); setCourseLevel(1); setSelectedVolume(1); setActiveLessonId(null) }}>HSK {standard}</button>)}
           </div>
           <div className="course-levels" role="group" aria-label={t('course.level')}>
-            {(courseSystem === '2.0' ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 7, 8, 9]).map(course => <button key={course} className={`course-level ${courseLevel === course ? 'selected' : ''}`} onClick={() => { setCourseLevel(course as CourseLevel); setActiveLessonId(null) }}><b>HSK {courseSystem} · {course}</b><span>{lessonTemplates.filter(item => item.system === courseSystem && item.level === course).length} {t('course.lessonCount')}</span></button>)}
+            {(courseSystem === '2.0' ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 7, 8, 9]).map(course => <button key={course} className={`course-level ${courseLevel === course ? 'selected' : ''}`} onClick={() => { setCourseLevel(course as CourseLevel); setActiveLessonId(null) }}><b>HSK {courseSystem} · {course}</b><span>{expandedLessonData.lessons.filter(item => item.system === courseSystem && item.level === course).length} {t('course.lessonCount')}</span></button>)}
           </div>
           {courseSystem === '3.0' && courseLevel >= 7 && <p className="notice-text shared-band-note">{t('course.sharedBandNote')}</p>}
           <div className="lesson-list">
@@ -1915,6 +2029,25 @@ export default function App() {
           <p>{supabase ? t('profile.languageSaved') : t('profile.languageLocal')}</p>
         </section>
       )}
+
+      {authOpen && <div className="auth-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setAuthOpen(false) }}>
+        <section className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+          <button className="auth-close" type="button" aria-label="Close" onClick={() => setAuthOpen(false)}>×</button>
+          <span className="kicker">HANZIPATH · 汉字之路</span>
+          <h2 id="auth-title">{authMode === 'signup' ? (lang === 'ru' ? 'Создать аккаунт' : 'Create account') : authMode === 'reset' ? (lang === 'ru' ? 'Сбросить пароль' : 'Reset password') : (lang === 'ru' ? 'Войти в аккаунт' : 'Sign in')}</h2>
+          <form onSubmit={submitAuth}>
+            <label>{lang === 'ru' ? 'Электронная почта' : 'Email'}<input type="email" autoComplete="email" required value={authEmail} onChange={event => setAuthEmail(event.target.value)} placeholder="name@example.com"/></label>
+            {authMode !== 'reset' && <label>{lang === 'ru' ? 'Пароль (минимум 8 символов)' : 'Password (at least 8 characters)'}<input type="password" autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} minLength={8} required value={authPassword} onChange={event => setAuthPassword(event.target.value)} placeholder="••••••••"/></label>}
+            <button className="primary auth-submit" disabled={authBusy} type="submit">{authBusy ? (lang === 'ru' ? 'Подождите…' : 'Please wait…') : authMode === 'signup' ? (lang === 'ru' ? 'Зарегистрироваться' : 'Create account') : authMode === 'reset' ? (lang === 'ru' ? 'Отправить ссылку' : 'Send reset link') : (lang === 'ru' ? 'Войти' : 'Sign in')}</button>
+          </form>
+          <div className="auth-switches">
+            {authMode !== 'signin' && <button type="button" onClick={() => setAuthMode('signin')}>{lang === 'ru' ? 'Уже есть аккаунт? Войти' : 'Already have an account? Sign in'}</button>}
+            {authMode !== 'signup' && <button type="button" onClick={() => setAuthMode('signup')}>{lang === 'ru' ? 'Создать аккаунт' : 'Create an account'}</button>}
+            {authMode === 'signin' && <button type="button" onClick={() => setAuthMode('reset')}>{lang === 'ru' ? 'Забыли пароль?' : 'Forgot password?'}</button>}
+          </div>
+          {!supabase && <p className="auth-error">{lang === 'ru' ? 'Подключение Supabase не настроено.' : 'Supabase is not configured.'}</p>}
+        </section>
+      </div>}
 
       <dialog
         ref={wordDialogRef}
