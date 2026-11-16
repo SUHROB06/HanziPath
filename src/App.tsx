@@ -940,7 +940,7 @@ export default function App() {
         const catalogResult = await getVocabularyCatalog({
           standardVersionId: standard.id,
           level: getLevelValue(level),
-          limit: 500,
+          limit: 3000,
         })
 
         if (catalogResult.error) {
