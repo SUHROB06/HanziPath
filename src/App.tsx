@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   BookOpen, Headphones, Layers, Target, ChartNoAxesColumnIncreasing,
   Languages, Search, Volume2, ChevronRight, Flame, Menu, X,
@@ -1042,7 +1042,7 @@ export default function App() {
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  const submitAuth = async (event: React.FormEvent<HTMLFormElement>) => {
+  const submitAuth = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!supabase) {
       setNotice({ text: lang === 'ru' ? 'Авторизация пока не настроена: проверьте подключение Supabase.' : 'Authentication is not configured. Check the Supabase connection.', kind: 'error' })
