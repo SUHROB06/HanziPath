@@ -329,7 +329,7 @@ export async function getVocabularyCatalog(
   const client = supabase
   const requestedLimit = options.limit ?? PAGE_SIZE
   const limit = Number.isFinite(requestedLimit)
-    ? Math.max(1, Math.min(Math.floor(requestedLimit), 500))
+    ? Math.max(1, Math.min(Math.floor(requestedLimit), 3000))
     : PAGE_SIZE
 
   try {
