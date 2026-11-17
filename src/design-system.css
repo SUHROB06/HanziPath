@@ -641,3 +641,45 @@ footer { color:#9a8772; }
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+
+/* Learning progress additions — keep HanziPath's established burgundy and gold palette. */
+.daily-goal-panel {
+  background: linear-gradient(125deg, #fffaf1 0%, #f8efe0 100%);
+  border: 1px solid #ead8bd;
+  border-radius: 20px;
+  padding: 22px 24px;
+  margin: 18px 0 24px;
+}
+.daily-goal-panel .section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.daily-goal-select { display: grid; gap: 6px; color: #83766b; font-size: 11px; }
+.daily-goal-select select {
+  min-width: 112px;
+  border: 1px solid #e8dac5;
+  border-radius: 10px;
+  padding: 9px 12px;
+  color: #6f2029;
+  background: #fffdf8;
+}
+.daily-goal-progress { margin-top: 18px; }
+.daily-goal-progress > div:first-child { display:flex; align-items:baseline; gap:10px; margin-bottom:10px; }
+.daily-goal-progress b { color:#7e202a; font-size:20px; font-variant-numeric:tabular-nums; }
+.daily-goal-progress span { color:#83766b; font-size:12px; }
+.daily-goal-track { height:9px; border-radius:99px; overflow:hidden; background:#eadfce; }
+.daily-goal-track i { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#8f1d27,#d8a94f); transition:width .35s ease; }
+.study-actions { display:flex; flex-wrap:wrap; gap:9px; justify-content:center; }
+.study-actions button { min-width:110px; }
+.study-actions .easy-review { background:linear-gradient(135deg,#a87a35,#c69b54); border-color:#b78b45; color:#fffaf1; }
+.study-actions .easy-review:hover { filter:brightness(1.05); }
+@media(max-width:600px) {
+  .daily-goal-panel { padding:17px; margin:14px 0 18px; }
+  .daily-goal-panel .section-heading { align-items:flex-start; }
+  .daily-goal-select select { min-width:96px; max-width:116px; }
+  .study-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .study-actions button { width:100%; min-width:0; padding-inline:8px; }
+}
