@@ -1177,13 +1177,14 @@ export default function App() {
       setProgressSyncReadyFor(null)
       return
     }
+    const client = supabase
 
     let cancelled = false
     setProgressSyncReadyFor(null)
 
     const loadProgress = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await client
           .from('user_learning_progress')
           .select('progress')
           .eq('user_id', userId)
