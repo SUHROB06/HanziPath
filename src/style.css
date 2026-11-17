@@ -2264,16 +2264,16 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline-color:#b34
 
 
 /* Dictionary micro-interactions: preserve the existing imperial-red identity. */
-.dictionary .word {
+.wordlist .word {
   transform: translateY(0);
   transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
   animation: hp-dictionary-enter .28s ease both;
 }
-.dictionary .word:nth-child(2) { animation-delay: 20ms; }
-.dictionary .word:nth-child(3) { animation-delay: 40ms; }
-.dictionary .word:nth-child(4) { animation-delay: 60ms; }
-.dictionary .word:nth-child(5) { animation-delay: 80ms; }
-.dictionary .word:hover {
+.wordlist .word:nth-child(2) { animation-delay: 20ms; }
+.wordlist .word:nth-child(3) { animation-delay: 40ms; }
+.wordlist .word:nth-child(4) { animation-delay: 60ms; }
+.wordlist .word:nth-child(5) { animation-delay: 80ms; }
+.wordlist .word:hover {
   transform: translateY(-2px);
   border-color: #d8c29f;
   box-shadow: 0 9px 22px rgba(80, 30, 30, .075);
@@ -2329,7 +2329,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline-color:#b34
   .study-actions button { width:100%; min-width:0; padding-inline:8px; }
 }
 @media(prefers-reduced-motion:reduce) {
-  .dictionary .word,.word-detail-dialog[open] .word-detail {
+  .wordlist .word,.word-detail-dialog[open] .word-detail {
     animation:none !important;
     transition:none !important;
   }
