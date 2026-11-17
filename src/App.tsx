@@ -28,7 +28,7 @@ import {
 import type { StandardLevel } from './types/vocabulary'
 import { mergeLearningProgress, type LearningProgressSnapshot } from './data/learningProgress'
 import { adaptiveDifficulty, dueReviewIds, scheduleReview, type ReviewQuality, type ReviewState } from './data/spacedRepetition'
-import { mergeDictionaryEntries } from './data/dictionaryQuality'
+import { mergeDictionaryEntries, normalizeDictionaryPinyin } from './data/dictionaryQuality'
 
 type System = '2.0' | '3.0'
 
@@ -157,7 +157,7 @@ const originalLessonWords: Word[] = (() => {
   const unique = new Map<string, Word>()
 
   lessonVocabulary.forEach((entry, index) => {
-    const key = `${entry.stage}|${entry.hanzi}|${normalizePinyin(entry.pinyin)}`
+    const key = `${entry.stage}|${entry.hanzi}|${normalizeDictionaryPinyin(entry.pinyin)}`
     const existing = unique.get(key)
 
     if (existing) {
