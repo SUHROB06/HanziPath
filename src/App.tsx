@@ -767,7 +767,7 @@ function databaseRowToWord(row: any, system: System): Word {
     level30: system === '3.0' ? level : null,
     level20Memberships: system === '2.0' ? [level] : [],
     level30Memberships: system === '3.0' ? [level] : [],
-    partOfSpeech: [...new Set(readings.map((item: any) => item.part_of_speech).filter((value: unknown): value is string => typeof value === 'string' && value.length > 0))],
+    partOfSpeech: readings.reduce<string[]>((values, item: any) => { const value = item.part_of_speech; if (typeof value === 'string' && value.length > 0 && !values.includes(value)) values.push(value); return values }, []),
     example: example?.sentence_hanzi ?? '',
     examplePinyin: example?.sentence_pinyin ?? '',
     exampleRu: exampleMeaning('ru') ?? '',
