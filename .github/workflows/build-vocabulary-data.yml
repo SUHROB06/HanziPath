@@ -6,6 +6,8 @@ on:
       - feature/complete-learning-platform
     paths:
       - scripts/build-vocabulary-catalog.py
+      - scripts/test-vocabulary-data.py
+      - public/data-attribution.html
       - .github/workflows/build-vocabulary-data.yml
   workflow_dispatch:
 
