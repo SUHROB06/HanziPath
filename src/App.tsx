@@ -762,6 +762,7 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('')
   const [authPassword, setAuthPassword] = useState('')
   const [authBusy, setAuthBusy] = useState(false)
+  const [authFeedback, setAuthFeedback] = useState<Notice | null>(null)
   const [authUser, setAuthUser] = useState<{ id: string; email: string } | null>(null)
   const [selectedVolume, setSelectedVolume] = useState(1)
 
@@ -1031,56 +1032,77 @@ export default function App() {
 
   useEffect(() => {
     if (!supabase) return
-    void supabase.auth.getSession().then(({ data }) => {
-      const user = data.session?.user
-      setAuthUser(user ? { id: user.id, email: user.email ?? '' } : null)
-    })
+    let mounted = true
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return
       const user = session?.user
       setAuthUser(user ? { id: user.id, email: user.email ?? '' } : null)
     })
-    return () => listener.subscription.unsubscribe()
+    void supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return
+      if (error) setAuthFeedback({ text: error.message, kind: 'error' })
+      const user = data.session?.user
+      setAuthUser(user ? { id: user.id, email: user.email ?? '' } : null)
+    }).catch(error => {
+      if (mounted) setAuthFeedback({ text: error instanceof Error ? error.message : String(error), kind: 'error' })
+    })
+    return () => {
+      mounted = false
+      listener.subscription.unsubscribe()
+    }
   }, [])
 
   const submitAuth = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!supabase) {
-      setNotice({ text: lang === 'ru' ? 'Авторизация пока не настроена: проверьте подключение Supabase.' : 'Authentication is not configured. Check the Supabase connection.', kind: 'error' })
+      setAuthFeedback({ text: lang === 'ru' ? 'Авторизация пока не настроена: проверьте подключение Supabase.' : 'Authentication is not configured. Check the Supabase connection.', kind: 'error' })
       return
     }
-    if (!authEmail.trim() || (authMode !== 'reset' && authPassword.length < 8)) {
-      setNotice({ text: lang === 'ru' ? 'Введите email и пароль не короче 8 символов.' : 'Enter an email and a password of at least 8 characters.', kind: 'error' })
+    const email = authEmail.trim()
+    if (!email || (authMode !== 'reset' && authPassword.length < 6)) {
+      setAuthFeedback({ text: lang === 'ru' ? 'Введите email и пароль не короче 6 символов.' : 'Enter your email and a password of at least 6 characters.', kind: 'error' })
       return
     }
     setAuthBusy(true)
+    setAuthFeedback(null)
     try {
       if (authMode === 'signup') {
         const { data, error } = await supabase.auth.signUp({
-          email: authEmail.trim(),
+          email,
           password: authPassword,
           options: { emailRedirectTo: window.location.origin },
         })
-        if (error) throw error
-        setAuthOpen(false)
-        setAuthPassword('')
-        setNotice({ text: data.session
-          ? (lang === 'ru' ? 'Аккаунт создан. Вы вошли в систему.' : 'Account created. You are signed in.')
-          : (lang === 'ru' ? 'Аккаунт создан. Проверьте почту и подтвердите email, затем войдите.' : 'Account created. Check your email to confirm it, then sign in.'), kind: 'success' })
+        if (error) {
+          setAuthFeedback({ text: error.message, kind: 'error' })
+          return
+        }
+        if (!data.session) {
+          setAuthFeedback({ text: lang === 'ru' ? 'Аккаунт создан. Проверьте почту и подтвердите email, затем войдите.' : 'Account created. Check your email to confirm it, then sign in.', kind: 'success' })
+          setAuthPassword('')
+          return
+        }
       } else if (authMode === 'signin') {
-        const { error } = await supabase.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword })
-        if (error) throw error
-        setAuthOpen(false)
-        setAuthPassword('')
-        setNotice({ text: lang === 'ru' ? 'Вы успешно вошли в HanziPath.' : 'You are signed in to HanziPath.', kind: 'success' })
+        const { error } = await supabase.auth.signInWithPassword({ email, password: authPassword })
+        if (error) {
+          setAuthFeedback({ text: error.message, kind: 'error' })
+          return
+        }
       } else {
-        const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim(), { redirectTo: window.location.origin })
-        if (error) throw error
-        setAuthOpen(false)
-        setNotice({ text: lang === 'ru' ? 'Если адрес зарегистрирован, на него придёт письмо для сброса пароля.' : 'If the email is registered, a password reset link will be sent.', kind: 'success' })
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin })
+        if (error) {
+          setAuthFeedback({ text: error.message, kind: 'error' })
+          return
+        }
+        setAuthFeedback({ text: lang === 'ru' ? 'Если адрес зарегистрирован, на него придёт письмо для сброса пароля.' : 'If the email is registered, a password reset link will be sent.', kind: 'success' })
+        return
       }
+      setAuthOpen(false)
+      setAuthPassword('')
+      setAuthFeedback(null)
+      setNotice({ text: lang === 'ru' ? 'Вы успешно вошли в HanziPath.' : 'You are signed in to HanziPath.', kind: 'success' })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      setNotice({ text: message, kind: 'error' })
+      setAuthFeedback({ text: message || 'Authentication request failed. Please try again.', kind: 'error' })
     } finally {
       setAuthBusy(false)
     }
@@ -1111,31 +1133,52 @@ export default function App() {
   const expandedLessonData = useMemo(() => {
     const display: DisplayLesson[] = []
     const assignmentMap: Record<string, Word[]> = {}
-    for (const base of lessonTemplates) {
-      const assigned = lessonAssignments[base.id] ?? []
-      const chunks: Word[][] = []
-      for (let offset = 0; offset < assigned.length; offset += 30) chunks.push(assigned.slice(offset, offset + 30))
-      if (!chunks.length) chunks.push([])
-      chunks.forEach((chunk, index) => {
-        const id = chunks.length === 1 ? base.id : `${base.id}-set-${index + 1}`
-        display.push({ ...base, id, title: chunks.length === 1 ? base.title : `${base.title} · блок ${index + 1}`, volume: 1, volumeLesson: 0 })
-        assignmentMap[id] = chunk
-      })
-    }
-    const grouped: DisplayLesson[] = []
-    const volumeCounters: Record<string, number> = {}
     const volumeSizes: Record<string, number> = {}
-    display.forEach(item => {
-      const key = `${item.system}-${item.level}`
-      const count = volumeCounters[key] ?? 0
-      const volume = Math.floor(count / 15) + 1
-      const volumeLesson = count % 15 + 1
-      volumeCounters[key] = count + 1
-      volumeSizes[key] = volume
-      grouped.push({ ...item, volume, volumeLesson })
-    })
-    return { lessons: grouped, assignments: assignmentMap, volumeCounts: volumeSizes }
-  }, [lessonAssignments])
+    const groups = [...new Set(lessonTemplates.map(lesson => `${lesson.system}:${lesson.level}`))]
+
+    for (const group of groups) {
+      const [system, levelValue] = group.split(':') as [CourseSystem, string]
+      const level = Number(levelValue) as CourseLevel
+      const baseLessons = lessonTemplates.filter(lesson => lesson.system === system && lesson.level === level)
+      const pool = wordsForCourseLevel(lessonEntries, system, level)
+      const uniquePool = [...new Map(pool.map(word => [`${word.hanzi}|${normalizePinyin(word.pinyin)}`, word])).values()]
+      if (!baseLessons.length || !uniquePool.length) continue
+
+      const poolKeys = new Set(uniquePool.map(word => `${word.hanzi}|${normalizePinyin(word.pinyin)}`))
+      const topicalOrder = baseLessons.flatMap(lesson => lessonAssignments[lesson.id] ?? [])
+      const orderedWords = [...new Map([...topicalOrder, ...uniquePool].map(word => [
+        `${word.hanzi}|${normalizePinyin(word.pinyin)}`, word,
+      ])).values()].filter(word => poolKeys.has(`${word.hanzi}|${normalizePinyin(word.pinyin)}`))
+
+      // Choose the smallest number of lessons that keeps every lesson at 15–25 words.
+      const unitCount = Math.ceil(orderedWords.length / 25)
+      const baseSize = Math.floor(orderedWords.length / unitCount)
+      const remainder = orderedWords.length % unitCount
+
+      for (let index = 0; index < unitCount; index += 1) {
+        const wordCount = baseSize + (index < remainder ? 1 : 0)
+        const start = index * baseSize + Math.min(index, remainder)
+        const chunk = orderedWords.slice(start, start + wordCount)
+        const firstTemplateIndex = Math.floor(index * baseLessons.length / unitCount)
+        const lastTemplateIndex = Math.floor((index + 1) * baseLessons.length / unitCount)
+        const groupedTemplates = unitCount <= baseLessons.length
+          ? baseLessons.slice(firstTemplateIndex, Math.max(firstTemplateIndex + 1, lastTemplateIndex))
+          : [baseLessons[index % baseLessons.length]]
+        const base = groupedTemplates[0]
+        const repeatNumber = Math.floor(index / baseLessons.length) + 1
+        const title = unitCount > baseLessons.length && repeatNumber > 1
+          ? `${base.title} · блок ${repeatNumber}`
+          : base.title
+        const id = `${base.id}-unit-${index + 1}`
+        const volume = Math.floor(index / 15) + 1
+        const volumeLesson = index % 15 + 1
+        display.push({ ...base, id, title, volume, volumeLesson })
+        assignmentMap[id] = chunk
+      }
+      volumeSizes[`${system}-${level}`] = Math.ceil(unitCount / 15)
+    }
+    return { lessons: display, assignments: assignmentMap, volumeCounts: volumeSizes }
+  }, [lessonAssignments, lessonEntries])
   const courseAllLessons = expandedLessonData.lessons.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const courseVolumeCount = expandedLessonData.volumeCounts[`${courseSystem}-${courseLevel}`] ?? 1
   const courseLessons = courseAllLessons.filter(lesson => lesson.volume === selectedVolume)
@@ -2031,20 +2074,21 @@ export default function App() {
         </section>
       )}
 
-      {authOpen && <div className="auth-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setAuthOpen(false) }}>
+      {authOpen && <div className="auth-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) { setAuthOpen(false); setAuthFeedback(null) } }}>
         <section className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-          <button className="auth-close" type="button" aria-label="Close" onClick={() => setAuthOpen(false)}>×</button>
+          <button className="auth-close" type="button" aria-label="Close" onClick={() => { setAuthOpen(false); setAuthFeedback(null) }}>×</button>
           <span className="kicker">HANZIPATH · 汉字之路</span>
           <h2 id="auth-title">{authMode === 'signup' ? (lang === 'ru' ? 'Создать аккаунт' : 'Create account') : authMode === 'reset' ? (lang === 'ru' ? 'Сбросить пароль' : 'Reset password') : (lang === 'ru' ? 'Войти в аккаунт' : 'Sign in')}</h2>
+          {authFeedback && <p className={`auth-feedback ${authFeedback.kind}`} role="status">{authFeedback.text}</p>}
           <form onSubmit={submitAuth}>
             <label>{lang === 'ru' ? 'Электронная почта' : 'Email'}<input type="email" autoComplete="email" required value={authEmail} onChange={event => setAuthEmail(event.target.value)} placeholder="name@example.com"/></label>
-            {authMode !== 'reset' && <label>{lang === 'ru' ? 'Пароль (минимум 8 символов)' : 'Password (at least 8 characters)'}<input type="password" autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} minLength={8} required value={authPassword} onChange={event => setAuthPassword(event.target.value)} placeholder="••••••••"/></label>}
+            {authMode !== 'reset' && <label>{lang === 'ru' ? 'Пароль (минимум 6 символов)' : 'Password (at least 8 characters)'}<input type="password" autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'} minLength={6} required value={authPassword} onChange={event => setAuthPassword(event.target.value)} placeholder="••••••••"/></label>}
             <button className="primary auth-submit" disabled={authBusy} type="submit">{authBusy ? (lang === 'ru' ? 'Подождите…' : 'Please wait…') : authMode === 'signup' ? (lang === 'ru' ? 'Зарегистрироваться' : 'Create account') : authMode === 'reset' ? (lang === 'ru' ? 'Отправить ссылку' : 'Send reset link') : (lang === 'ru' ? 'Войти' : 'Sign in')}</button>
           </form>
           <div className="auth-switches">
-            {authMode !== 'signin' && <button type="button" onClick={() => setAuthMode('signin')}>{lang === 'ru' ? 'Уже есть аккаунт? Войти' : 'Already have an account? Sign in'}</button>}
-            {authMode !== 'signup' && <button type="button" onClick={() => setAuthMode('signup')}>{lang === 'ru' ? 'Создать аккаунт' : 'Create an account'}</button>}
-            {authMode === 'signin' && <button type="button" onClick={() => setAuthMode('reset')}>{lang === 'ru' ? 'Забыли пароль?' : 'Forgot password?'}</button>}
+            {authMode !== 'signin' && <button type="button" onClick={() => { setAuthMode('signin'); setAuthFeedback(null); setAuthPassword('') }}>{lang === 'ru' ? 'Уже есть аккаунт? Войти' : 'Already have an account? Sign in'}</button>}
+            {authMode !== 'signup' && <button type="button" onClick={() => { setAuthMode('signup'); setAuthFeedback(null); setAuthPassword('') }}>{lang === 'ru' ? 'Создать аккаунт' : 'Create an account'}</button>}
+            {authMode === 'signin' && <button type="button" onClick={() => { setAuthMode('reset'); setAuthFeedback(null); setAuthPassword('') }}>{lang === 'ru' ? 'Забыли пароль?' : 'Forgot password?'}</button>}
           </div>
           {!supabase && <p className="auth-error">{lang === 'ru' ? 'Подключение Supabase не настроено.' : 'Supabase is not configured.'}</p>}
         </section>
