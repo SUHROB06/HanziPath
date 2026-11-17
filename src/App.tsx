@@ -881,7 +881,6 @@ export default function App() {
   const [reviewWords, setReviewWords] = useState<Word[] | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogError, setCatalogError] = useState(false)
-  const [catalogCandidateCount, setCatalogCandidateCount] = useState(0)
 
   const localeChangeRef = useRef(0)
   const dictionaryLegacyIdsRef = useRef<Map<string, string>>(new Map())
@@ -1095,7 +1094,6 @@ export default function App() {
 
     if (!supabase) {
       setDatabaseWords(null)
-      setCatalogCandidateCount(0)
       setCatalogLoading(false)
       setCatalogError(false)
       return () => { cancelled = true }
@@ -1125,7 +1123,6 @@ export default function App() {
         if (!standard) {
           if (!cancelled) {
             setDatabaseWords(null)
-            setCatalogCandidateCount(0)
           }
           return
         }
@@ -1140,7 +1137,6 @@ export default function App() {
         }
 
         if (cancelled) return
-        setCatalogCandidateCount(catalogStatus.data.totalMemberships)
 
         // Candidate rows stay out of the public dictionary until membership,
         // readings, translations, and source rights have been reviewed.
