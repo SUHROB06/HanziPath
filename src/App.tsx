@@ -2672,6 +2672,16 @@ export default function App() {
         <section className="panel learning-page exam-page">
           <div className="panel-head"><div><span className="kicker">{t('exam.kicker')}</span><h2>{t('exam.title')}</h2></div><span className="demo-tag">HSK {examSystem}</span></div>
           <p className="notice-text">{t('exam.intro')}</p>
+          <p className="notice-text exam-provenance-note">
+            {examSystem === '3.0' && examLevel >= 7
+              ? (lang === 'ru' ? 'Формат соответствует пяти разделам HSK 7–9. Автоматически оцениваются только объективные задания; письмо, перевод и устная речь требуют самостоятельной или преподавательской проверки. Официальный экзамен использует отдельные баллы по пяти навыкам и модель IRT.'
+                : lang === 'uz' ? 'Format HSK 7–9 ning besh bo‘limiga mos. Faqat test savollari avtomatik baholanadi; yozish, tarjima va nutq mustaqil yoki o‘qituvchi tomonidan tekshiriladi. Rasmiy imtihon besh ko‘nikma bo‘yicha alohida IRT ballarini beradi.'
+                  : 'The format follows the five HSK 7–9 sections. Only objective questions are auto-graded; writing, translation and speaking need self- or teacher review. The official test reports five skill scores using IRT.')
+              : (lang === 'ru' ? 'Это тренировочная симуляция по структуре экзамена, а не официальный вариант прошлых лет. Открытые письменные задания могут требовать ручной проверки.'
+                : lang === 'uz' ? 'Bu imtihon tuzilishiga asoslangan mashq simulyatsiyasi, rasmiy oldingi imtihon varianti emas. Ochiq yozma topshiriqlar qo‘lda tekshirilishi mumkin.'
+                  : 'This is a practice simulation aligned to the test structure, not an official past paper. Open-ended writing tasks may require manual review.')}
+            {' · '}<a href="https://www.chinesetest.cn/HSK" target="_blank" rel="noreferrer">{lang === 'ru' ? 'Официальная структура HSK' : lang === 'uz' ? 'HSK rasmiy tuzilishi' : 'Official HSK structure'}</a>
+          </p>
           {examHistory.length > 0 && <section className="exam-history">
             <div className="section-heading">
               <h3>{lang === 'ru' ? 'История экзаменов' : lang === 'uz' ? 'Imtihonlar tarixi' : 'Exam history'}</h3>
@@ -2680,7 +2690,11 @@ export default function App() {
             {examHistory.slice(0, 5).map((attempt, index) => <div className="exam-history-row" key={`${attempt.date}-${attempt.system}-${attempt.level}-${index}`}>
               <span>HSK {attempt.system} · {attempt.system === '3.0' && attempt.level === 7 ? '7–9' : attempt.level}</span>
               <b>{attempt.score}/{attempt.total} · {attempt.total ? Math.round(attempt.score / attempt.total * 100) : 0}%</b>
-              <small>{new Date(attempt.date).toLocaleDateString(lang)}</small>
+              <small>
+                {new Date(attempt.date).toLocaleDateString(lang)}
+                {attempt.durationSeconds != null && ` · ${formatExamTime(attempt.durationSeconds)}`}
+                {attempt.manualTotal ? ` · ${attempt.manualAnswered ?? 0}/${attempt.manualTotal} ${lang === 'ru' ? 'ручных' : lang === 'uz' ? 'qo‘lda' : 'manual'}` : ''}
+              </small>
             </div>)}
           </section>}
 
@@ -2711,15 +2725,28 @@ export default function App() {
                 </>
               })()}
             </div>
-            <button className="primary exam-start" onClick={startExam}>{t('exam.start')}<ChevronRight size={17}/></button>
+            <button className="primary exam-start" onClick={startExam} disabled={catalogLoading || (!reviewWords?.length && !databaseWords?.length)}>
+              {catalogLoading ? (lang === 'ru' ? 'Загружаем словарь…' : lang === 'uz' ? 'Lug‘at yuklanmoqda…' : 'Loading vocabulary…') : t('exam.start')}
+              <ChevronRight size={17}/>
+            </button>
           </>}
 
           {examStarted && examFinished && <div className="exam-result">
             <div className="review-icon"><CheckCircle2/></div>
             <span className="kicker">{examSystem === '3.0' && examLevel >= 7 ? 'HSK 3.0 · 7–9' : `HSK ${examSystem} · ${examLevel}`} · {t('exam.result')}</span>
             <strong>{examCorrectCount} / {examScoredCount}</strong>
-            <p>{examCorrectCount >= Math.ceil(examScoredCount * .6) ? t('exam.pass') : t('exam.notPass')}</p>
+            {examSystem === '3.0' && examLevel >= 7
+              ? <p className="notice-text">{lang === 'ru' ? 'Результат автоматической части. Это не официальный балл HSK 7–9.' : lang === 'uz' ? 'Avtomatik baholangan qism natijasi. Bu rasmiy HSK 7–9 bali emas.' : 'Auto-graded practice result. This is not an official HSK 7–9 score.'}</p>
+              : <p>{examCorrectCount >= Math.ceil(examScoredCount * .6) ? t('exam.pass') : t('exam.notPass')} · {lang === 'ru' ? 'ориентир 60% по автоматически оцениваемым заданиям' : lang === 'uz' ? 'avtomatik baholanadigan savollarda 60% mezon' : '60% practice benchmark on auto-graded questions'}</p>}
+            <p className="exam-time-used">{lang === 'ru' ? 'Время' : lang === 'uz' ? 'Sarflangan vaqt' : 'Time used'} · {formatExamTime(examElapsedSeconds)}</p>
             {examManualTotal > 0 && <p className="notice-text">{examManualCount} / {examManualTotal} · {t('exam.manualTasks')}</p>}
+            <section className="exam-section-results" aria-label={lang === 'ru' ? 'Результаты по разделам' : lang === 'uz' ? 'Bo‘limlar bo‘yicha natijalar' : 'Section results'}>
+              {examSectionStats.map(stat => <div className="exam-section-result" key={stat.section}>
+                <span>{t(`exam.${stat.section}` as TranslationKey)}</span>
+                <b>{stat.scored > 0 ? `${stat.correct}/${stat.scored}` : `${stat.manualAnswered}/${stat.manual}`}</b>
+                {stat.manual > 0 && <small>{lang === 'ru' ? 'ручная проверка' : lang === 'uz' ? 'qo‘lda tekshirish' : 'manual review'}</small>}
+              </div>)}
+            </section>
             <section className="exam-answer-review">
               <h3>{lang === 'ru' ? 'Разбор ответов' : lang === 'uz' ? 'Javoblar tahlili' : 'Answer review'}</h3>
               {examQuestionsState.map((question, index) => {
@@ -2741,6 +2768,7 @@ export default function App() {
                   <p>{question.prompt}</p>
                   <small>{lang === 'ru' ? 'Твой ответ' : lang === 'uz' ? 'Sizning javobingiz' : 'Your answer'}: {response || '—'}</small>
                   {!question.manualReview && !correct && <small>{lang === 'ru' ? 'Правильный ответ' : lang === 'uz' ? 'To‘g‘ri javob' : 'Correct answer'}: {question.answer}</small>}
+                  {question.explanation && <small className="exam-explanation">{question.explanation}</small>}
                 </article>
               })}
             </section>
@@ -2761,7 +2789,7 @@ export default function App() {
                   const selected = (examAnswers[examIndex] ?? '') === option
                   const answered = Boolean(examAnswers[examIndex])
                   const correct = option === selectedExamQuestion.answer
-                  return <button key={`${option}-${index}`} className={`answer-option ${answered && correct ? 'correct' : ''} ${selected && !correct ? 'incorrect' : ''}`} disabled={answered} onClick={() => selectExamAnswer(option)}><span>{option}</span></button>
+                  return <button key={`${option}-${index}`} className={`answer-option ${selected ? 'selected' : ''}`} disabled={answered} onClick={() => selectExamAnswer(option)}><span>{option}</span></button>
                 })}
               </div>}
               {selectedExamQuestion.section === 'listening' && examAnswers[examIndex] && <p className="exam-reveal">{selectedExamQuestion.audio} · {selectedExamQuestion.pinyin}</p>}
