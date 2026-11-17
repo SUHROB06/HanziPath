@@ -1862,6 +1862,14 @@ export default function App() {
     })
     .filter((item): item is NonNullable<typeof item> => item !== null)
 
+  const profileWords = reviewWords ?? availableWords
+  const profileKnownCount = profileWords.filter(word => knownWords.includes(wordId(word))).length
+  const profileFavoriteCount = profileWords.filter(word => favoriteWordIds.includes(wordId(word))).length
+  const profileExamAverage = examHistory.length
+    ? Math.round(examHistory.reduce((sum, attempt) => sum + (attempt.total ? attempt.score / attempt.total * 100 : 0), 0) / examHistory.length)
+    : 0
+  const profileDueReviews = dueReviewIds(reviewSchedule).length
+
   useEffect(() => {
     if (!examStarted || !examFinished || examSavedRef.current) return
     examSavedRef.current = true
