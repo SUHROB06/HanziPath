@@ -1231,7 +1231,8 @@ export default function App() {
                 : 'Could not load cloud progress. Your local progress is preserved.',
             kind: 'error',
           })
-          setProgressSyncReadyFor(userId)
+          // Do not enable cloud writes after a failed read: that could
+          // overwrite a returning learner's remote progress with local state.
         }
       }
     }
