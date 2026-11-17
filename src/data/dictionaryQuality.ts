@@ -68,7 +68,7 @@ export function mergeDictionaryEntries<T extends DictionaryQualityEntry>(entries
   for (const entry of entries) {
     const legacyDictionaryKey = `dictionary:${entry.hanzi.trim()}|${normalizeDictionaryPinyin(entry.pinyin)}`
     const pronunciationKey = entry.pinyinNum
-      ? entry.pinyinNum.toLowerCase().replace(/[\\s'’]+/g, '')
+      ? entry.pinyinNum.toLowerCase().replaceAll(' ', '').replaceAll("'", '').replaceAll('’', '')
       : normalizeDictionaryPinyin(entry.pinyin)
     const key = `${entry.hanzi.trim()}|${pronunciationKey}`
     const previous = merged.get(key)
