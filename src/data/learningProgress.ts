@@ -17,7 +17,8 @@ export type LearningProgressSnapshot = {
   examHistory: ExamAttemptSummary[]
   reviewSchedule: Record<string, ReviewState>
   dailyTasks: { date: string; done: boolean[] }
-  dailyGoalMinutes: number
+  dailyGoalWords: number
+  dailyReviewCount: { date: string; count: number }
 }
 
 export const emptyLearningProgress = (today: string): LearningProgressSnapshot => ({
@@ -29,7 +30,8 @@ export const emptyLearningProgress = (today: string): LearningProgressSnapshot =
   examHistory: [],
   reviewSchedule: {},
   dailyTasks: { date: today, done: [false, false, false] },
-  dailyGoalMinutes: 20,
+  dailyGoalWords: 15,
+  dailyReviewCount: { date: today, count: 0 },
 })
 
 function union<T>(...lists: T[][]): T[] {
@@ -95,8 +97,15 @@ export function mergeLearningProgress(
     examHistory: uniqueAttempts,
     reviewSchedule: mergeReviewSchedule(local.reviewSchedule ?? {}, remote.reviewSchedule ?? {}),
     dailyTasks,
-    dailyGoalMinutes: Number.isFinite(remote.dailyGoalMinutes)
-      ? Math.max(5, Math.min(180, Number(remote.dailyGoalMinutes)))
-      : local.dailyGoalMinutes,
+    dailyGoalWords: Number.isFinite(remote.dailyGoalWords)
+      ? Math.max(5, Math.min(100, Number(remote.dailyGoalWords)))
+      : local.dailyGoalWords,
+    dailyReviewCount: {
+      date: today,
+      count: Math.max(
+        remote.dailyReviewCount?.date === today ? Number(remote.dailyReviewCount.count) || 0 : 0,
+        local.dailyReviewCount?.date === today ? Number(local.dailyReviewCount.count) || 0 : 0,
+      ),
+    },
   }
 }
