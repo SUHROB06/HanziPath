@@ -1862,7 +1862,7 @@ export default function App() {
     })
     .filter((item): item is NonNullable<typeof item> => item !== null)
 
-  const profileWords = reviewWords ?? availableWords
+  const profileWords = reviewWords ?? databaseWords ?? []
   const profileKnownCount = profileWords.filter(word => knownWords.includes(wordId(word))).length
   const profileFavoriteCount = profileWords.filter(word => favoriteWordIds.includes(wordId(word))).length
   const profileExamAverage = examHistory.length
@@ -2796,7 +2796,6 @@ export default function App() {
                 {selectedExamQuestion.options.map((option, index) => {
                   const selected = (examAnswers[examIndex] ?? '') === option
                   const answered = Boolean(examAnswers[examIndex])
-                  const correct = option === selectedExamQuestion.answer
                   return <button key={`${option}-${index}`} className={`answer-option ${selected ? 'selected' : ''}`} disabled={answered} onClick={() => selectExamAnswer(option)}><span>{option}</span></button>
                 })}
               </div>}
