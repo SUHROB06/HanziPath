@@ -1256,9 +1256,6 @@ export default function App() {
     const unique = [...new Map([listeningWord, ...listeningStudyWords.filter(word => wordId(word) !== wordId(listeningWord))].map(word => [wordId(word), word] as const)).values()]
     return shuffleWithSeed(unique.slice(0, 4), listeningIndex + 101)
   }, [listeningStudyWords, listeningIndex, listeningWord])
-  useEffect(() => { setCardIndex(0); setShowAnswer(false) }, [cardsSystem, cardsLevel, cardsLessonId])
-  useEffect(() => { setListeningIndex(0); setListeningChoice(null) }, [listeningSystem, listeningLevel, listeningLessonId])
-
   const recordActivity = () => {
     const today = localDateKey()
     setActivityDays(days => days.includes(today) ? days : [...days, today].slice(-400))
@@ -2008,17 +2005,17 @@ export default function App() {
           <p className="notice-text">{t('flashcards.notice')}</p>
           <div className="filters study-filters">
             <label>{lang === 'ru' ? 'Стандарт' : lang === 'uz' ? 'Standart' : 'Standard'}
-              <select value={cardsSystem} onChange={event => { setCardsSystem(event.target.value as CourseSystem); setCardsLevel(1); setCardsLessonId('') }}>
+              <select value={cardsSystem} onChange={event => { setCardsSystem(event.target.value as CourseSystem); setCardsLevel(1); setCardsLessonId(''); setCardIndex(0); setShowAnswer(false) }}>
                 <option value="2.0">HSK 2.0</option><option value="3.0">HSK 3.0</option>
               </select>
             </label>
             <label>{lang === 'ru' ? 'Уровень' : lang === 'uz' ? 'Daraja' : 'Level'}
-              <select value={cardsLevel} onChange={event => { setCardsLevel(Number(event.target.value) as CourseLevel); setCardsLessonId('') }}>
+              <select value={cardsLevel} onChange={event => { setCardsLevel(Number(event.target.value) as CourseLevel); setCardsLessonId(''); setCardIndex(0); setShowAnswer(false) }}>
                 {(cardsSystem === '2.0' ? [1,2,3,4,5,6] : [1,2,3,4,5,6,7,8,9]).map(value => <option key={value} value={value}>{cardsSystem === '3.0' && value >= 7 ? 'HSK 3.0 · ' + value + ' (7–9)' : 'HSK ' + cardsSystem + ' · ' + value}</option>)}
               </select>
             </label>
             <label>{lang === 'ru' ? 'Урок' : lang === 'uz' ? 'Dars' : 'Lesson'}
-              <select value={selectedCardsLesson?.id ?? ''} onChange={event => setCardsLessonId(event.target.value)}>
+              <select value={selectedCardsLesson?.id ?? ''} onChange={event => { setCardsLessonId(event.target.value); setCardIndex(0); setShowAnswer(false) }}>
                 {cardsLessons.map(lesson => <option key={lesson.id} value={lesson.id}>{(lang === 'ru' ? 'Урок ' : 'Lesson ') + lesson.volumeLesson + ' · ' + lesson.title}</option>)}
               </select>
             </label>
@@ -2050,17 +2047,17 @@ export default function App() {
           <p className="notice-text">{t('listening.notice')}</p>
           <div className="filters study-filters">
             <label>{lang === 'ru' ? 'Стандарт' : lang === 'uz' ? 'Standart' : 'Standard'}
-              <select value={listeningSystem} onChange={event => { setListeningSystem(event.target.value as CourseSystem); setListeningLevel(1); setListeningLessonId('') }}>
+              <select value={listeningSystem} onChange={event => { setListeningSystem(event.target.value as CourseSystem); setListeningLevel(1); setListeningLessonId(''); setListeningIndex(0); setListeningChoice(null) }}>
                 <option value="2.0">HSK 2.0</option><option value="3.0">HSK 3.0</option>
               </select>
             </label>
             <label>{lang === 'ru' ? 'Уровень' : lang === 'uz' ? 'Daraja' : 'Level'}
-              <select value={listeningLevel} onChange={event => { setListeningLevel(Number(event.target.value) as CourseLevel); setListeningLessonId('') }}>
+              <select value={listeningLevel} onChange={event => { setListeningLevel(Number(event.target.value) as CourseLevel); setListeningLessonId(''); setListeningIndex(0); setListeningChoice(null) }}>
                 {(listeningSystem === '2.0' ? [1,2,3,4,5,6] : [1,2,3,4,5,6,7,8,9]).map(value => <option key={value} value={value}>{listeningSystem === '3.0' && value >= 7 ? 'HSK 3.0 · ' + value + ' (7–9)' : 'HSK ' + listeningSystem + ' · ' + value}</option>)}
               </select>
             </label>
             <label>{lang === 'ru' ? 'Урок' : lang === 'uz' ? 'Dars' : 'Lesson'}
-              <select value={selectedListeningLesson?.id ?? ''} onChange={event => setListeningLessonId(event.target.value)}>
+              <select value={selectedListeningLesson?.id ?? ''} onChange={event => { setListeningLessonId(event.target.value); setListeningIndex(0); setListeningChoice(null) }}>
                 {listeningLessons.map(lesson => <option key={lesson.id} value={lesson.id}>{(lang === 'ru' ? 'Урок ' : 'Lesson ') + lesson.volumeLesson + ' · ' + lesson.title}</option>)}
               </select>
             </label>
