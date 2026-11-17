@@ -14,10 +14,13 @@ def load(name):
 hsk30 = load("vocabulary-catalog-hsk30.json")
 hsk20 = load("vocabulary-catalog-hsk20.json")
 translations = load("vocabulary-translations-ru-uz.json")
+hsk20_examples = load("vocabulary-examples-hsk20.json")
 
 assert hsk30["license"] == "CC BY-SA 4.0"
 assert hsk20["license"] == "CC BY 4.0"
-assert translations["license"] == "CC BY 4.0"
+assert translations["license"] == "CC BY-SA 4.0"
+assert hsk20_examples["license"] == "CC BY-SA 4.0"
+assert "reviewFallback" in translations["sources"]
 
 def validate_entries(name, entries, required_level):
     keys = [entry.get("wordKey") for entry in entries]
@@ -40,6 +43,7 @@ validate_entries("HSK 2.0", hsk20["entries"], "level20")
 hsk30_entries = hsk30["entries"]
 hsk20_entries = hsk20["entries"]
 translation_entries = translations["entries"]
+hsk20_example_entries = hsk20_examples["entries"]
 
 assert len(hsk30_entries) == hsk30["stats"]["uniqueWordReadings"]
 assert len(hsk20_entries) == hsk20["stats"]["uniqueWordReadings"]
@@ -74,8 +78,24 @@ for entry in hsk20_entries:
     if entry.get("en"):
         assert entry.get("definitionAttribution"), f"HSK 2.0 gloss missing attribution: {entry['hanzi']}"
 
+hsk20_keys = {entry["wordKey"] for entry in hsk20_entries}
+hsk30_keys = {entry["wordKey"] for entry in hsk30_entries}
+example_keys = [entry.get("wordKey") for entry in hsk20_example_entries]
+assert all(example_keys), "HSK 2.0 example row is missing wordKey"
+assert len(example_keys) == len(set(example_keys)), "Duplicate HSK 2.0 example wordKey"
+assert set(example_keys).issubset(hsk20_keys), "HSK 2.0 example points to an unknown wordKey"
+for entry in hsk20_example_entries:
+    assert entry.get("example") and entry.get("examplePinyin") and entry.get("exampleEn")
+    assert entry.get("exampleSourceId") and entry.get("exampleLicense") == "CC BY-SA 4.0"
+
+translation_key_set = set(translation_keys)
+hsk20_translation_coverage = len(hsk20_keys & translation_key_set) / len(hsk20_keys)
+hsk30_translation_coverage = len(hsk30_keys & translation_key_set) / len(hsk30_keys)
 assert hsk30["stats"]["entriesWithExamples"] / len(hsk30_entries) >= 0.99
-assert len(translation_entries) / len(catalog_keys) >= 0.65
+assert len(hsk20_example_entries) / len(hsk20_entries) >= 0.85
+assert len(translation_entries) / len(catalog_keys) >= 0.90
+assert hsk20_translation_coverage >= 0.95
+assert hsk30_translation_coverage >= 0.65
 
 for relative in [
     "data-attribution.html",
@@ -88,6 +108,6 @@ for relative in [
 
 print("Dictionary asset checks passed.")
 print(f"HSK 3.0: {len(hsk30_entries):,} unique readings; {hsk30['stats']['entriesWithExamples']:,} examples.")
-print(f"HSK 2.0: {len(hsk20_entries):,} unique readings.")
+print(f"HSK 2.0: {len(hsk20_entries):,} unique readings; {len(hsk20_example_entries):,} examples ({len(hsk20_example_entries)/len(hsk20_entries)*100:.1f}%).")
 print(f"Combined: {len(catalog_keys):,} unique readings.")
-print(f"RU/UZ translations: {len(translation_entries):,} ({len(translation_entries)/len(catalog_keys)*100:.1f}% coverage).")
+print(f"RU/UZ translations: {len(translation_entries):,} ({len(translation_entries)/len(catalog_keys)*100:.1f}% overall; {hsk20_translation_coverage*100:.1f}% HSK 2.0; {hsk30_translation_coverage*100:.1f}% HSK 3.0).")
