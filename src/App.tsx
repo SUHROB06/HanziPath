@@ -2387,7 +2387,7 @@ export default function App() {
                   <span className="level-pill">
                     {vocabularyCollection === 'course'
                       ? `${t('vocab.courseStageShort')} ${word.courseStage}`
-                      : `HSK ${String(system === '2.0' ? word.level20 : word.level30).replace('7-9', '7–9')}`}
+                      : dictionaryLevelLabel(word, system) ?? ''}
                   </span>
 
                   <button
@@ -2411,6 +2411,10 @@ export default function App() {
                     <Volume2 size={18}/>
                   </button>
                 </div>
+
+                {word.partOfSpeech && word.partOfSpeech.length > 0 && <div className="word-category-tags">
+                  {word.partOfSpeech.map(category => <span className="word-category-tag" key={category}>{partOfSpeechLabel(category, lang)}</span>)}
+                </div>}
 
                 <div className="word-meanings">
                   <div><b>RU</b><span>{word.ru || t('vocab.translationUnavailable')}</span>{word.ruStatus && <small>{translationStatusLabel(word.ruStatus)}</small>}</div>
@@ -2736,7 +2740,10 @@ export default function App() {
             {dictionaryLevelLabel(selectedDictionaryWord, '2.0') && <span>{t('vocab.hsk20')} · {dictionaryLevelLabel(selectedDictionaryWord, '2.0')}</span>}
             {dictionaryLevelLabel(selectedDictionaryWord, '3.0') && <span>{t('vocab.hsk30')} · {dictionaryLevelLabel(selectedDictionaryWord, '3.0')}</span>}
             {selectedDictionaryWord.courseStage && <span>{t('vocab.courseStage')} {selectedDictionaryWord.courseStage}</span>}
-            {selectedDictionaryWord.membershipStatus && <small>{t('vocab.membershipUnverified')}</small>}
+            {selectedDictionaryWord.partOfSpeech && selectedDictionaryWord.partOfSpeech.length > 0 && <span>{selectedDictionaryWord.partOfSpeech.map(value => partOfSpeechLabel(value, lang)).join(' · ')}</span>}
+            {selectedDictionaryWord.membershipStatus && <small>{selectedDictionaryWord.membershipStatus === 'source_verified'
+              ? (lang === 'ru' ? 'Уровень подтверждён источником' : lang === 'uz' ? 'Daraja manba bilan tasdiqlangan' : 'Level verified against source')
+              : t('vocab.membershipUnverified')}</small>}
           </div>
 
           <button className={`outline dictionary-known-action ${knownWords.includes(wordId(selectedDictionaryWord)) ? 'selected' : ''}`} type="button" onClick={() => toggleKnownWord(selectedDictionaryWord)}>
@@ -2761,7 +2768,8 @@ export default function App() {
               ? <div className="word-detail-example">
                 <span>{selectedDictionaryWord.example}</span>
                 {selectedDictionaryWord.examplePinyin && <small>{selectedDictionaryWord.examplePinyin}</small>}
-                <p>{exampleMeaning(selectedDictionaryWord) || t('vocab.exampleUnavailable')}</p>
+                <p>{(lang !== 'en' && !selectedDictionaryWord.exampleRu && !selectedDictionaryWord.exampleUzVerified && selectedDictionaryWord.exampleEn ? 'EN · ' : '')}{exampleMeaning(selectedDictionaryWord) || t('vocab.exampleUnavailable')}</p>
+                {selectedDictionaryWord.exampleSource && <small>{selectedDictionaryWord.exampleSource} · {selectedDictionaryWord.exampleLicense || 'CC BY-SA 4.0'} · {lang === 'ru' ? 'пример из источника, без индивидуальной проверки' : lang === 'uz' ? 'manba namunasi, alohida tekshirilmagan' : 'source example, not individually reviewed'}</small>}
                 <button className="sound" type="button" onClick={() => speak(selectedDictionaryWord.example)} aria-label={`${t('vocab.listen')}: ${selectedDictionaryWord.example}`}><Volume2 size={17}/></button>
               </div>
               : <p className="word-detail-missing">{t('vocab.exampleUnavailable')}</p>}
