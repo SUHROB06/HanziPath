@@ -1162,9 +1162,15 @@ export default function App() {
   }, [lessonEntries, lessonAssignments])
   const courseUnits = courseUnitCatalog[`${courseSystem}:${courseLevel}`] ?? []
   const practiceUnits = courseUnitCatalog[`${practiceSystem}:${practiceLevel}`] ?? []
-  const practiceUnit = practiceUnits.find(unit => unit.id === practiceUnitId) ?? practiceUnits[0]
-  const practiceWords = practiceUnit?.words ?? []
-  const practiceLessonLabel = practiceUnit?.lessons.map(lesson => `${lesson.chapter}${lesson.part > 1 ? `.${lesson.part}` : ''} ${lesson.title}`).join(' · ') ?? ''
+  const practiceLessons = practiceUnits.flatMap(unit => unit.lessons)
+  const practiceSelectedLesson = practiceLessons.find(lesson => lesson.id === practiceUnitId) ?? practiceLessons[0]
+  const practiceUnit = practiceUnits.find(unit => unit.lessons.some(lesson => lesson.id === practiceSelectedLesson?.id))
+  const practiceWords = practiceSelectedLesson
+    ? (lessonAssignments[practiceSelectedLesson.id] ?? practiceUnit?.words ?? [])
+    : []
+  const practiceLessonLabel = practiceSelectedLesson
+    ? `${practiceSelectedLesson.chapter}${practiceSelectedLesson.part > 1 ? `.${practiceSelectedLesson.part}` : ''} ${practiceSelectedLesson.title}`
+    : ''
   const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const activeUnit = courseUnits.find(unit => unit.id === activeLessonId)
   const activeLesson = activeUnit?.lessons[0]
@@ -1995,7 +2001,7 @@ export default function App() {
           <div className="practice-filters">
             <label><span>{lang === 'ru' ? 'Стандарт' : lang === 'uz' ? 'Standart' : 'Standard'}</span><select value={practiceSystem} onChange={event => { const next = event.target.value as CourseSystem; setPracticeSystem(next); setPracticeLevel(1); setPracticeUnitId(null); setCardIndex(0); setShowAnswer(false); setListeningIndex(0); setListeningChoice(null) }}><option value="2.0">HSK 2.0</option><option value="3.0">HSK 3.0</option></select></label>
             <label><span>HSK {lang === 'ru' ? 'уровень' : lang === 'uz' ? 'daraja' : 'level'}</span><select value={practiceLevel} onChange={event => { setPracticeLevel(Number(event.target.value) as CourseLevel); setPracticeUnitId(null); setCardIndex(0); setShowAnswer(false); setListeningIndex(0); setListeningChoice(null) }}>{(practiceSystem === '2.0' ? [1,2,3,4,5,6] : [1,2,3,4,5,6,7,8,9]).map(level => <option key={level} value={level}>{practiceSystem === '3.0' && level >= 7 ? `HSK 3.0 · ${level}` : `HSK ${practiceSystem} · ${level}`}</option>)}</select></label>
-            <label><span>{lang === 'ru' ? 'Урок' : lang === 'uz' ? 'Dars' : 'Lesson'}</span><select value={practiceUnit?.id ?? ''} onChange={event => { setPracticeUnitId(event.target.value || null); setCardIndex(0); setShowAnswer(false); setListeningIndex(0); setListeningChoice(null) }}>{practiceUnits.map(unit => <option key={unit.id} value={unit.id}>{unit.lessons.map(lesson => `${lesson.chapter}${lesson.part > 1 ? `.${lesson.part}` : ''} ${lesson.title}`).join(' · ')}</option>)}</select></label>
+            <label><span>{lang === 'ru' ? 'Урок' : lang === 'uz' ? 'Dars' : 'Lesson'}</span><select value={practiceSelectedLesson?.id ?? ''} onChange={event => { setPracticeUnitId(event.target.value || null); setCardIndex(0); setShowAnswer(false); setListeningIndex(0); setListeningChoice(null) }}>{practiceLessons.map(lesson => <option key={lesson.id} value={lesson.id}>{`${lesson.chapter}${lesson.part > 1 ? `.${lesson.part}` : ''} ${lesson.title}`}</option>)}</select></label>
           </div>
           <p className="practice-count">{practiceLessonLabel} · {practiceWords.length} {lang === 'ru' ? 'слов' : lang === 'uz' ? 'so‘z' : 'words'}</p>
           <article className="study-card">
