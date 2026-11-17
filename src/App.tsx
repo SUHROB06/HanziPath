@@ -1606,6 +1606,7 @@ export default function App() {
         (!favoritesOnly || favoriteWordIds.includes(wordId(word))) &&
         (!knownOnly || knownWords.includes(wordId(word))) &&
         (!dictionaryLessonId || dictionaryLessonMembership.get(wordId(word))?.has(dictionaryLessonId)) &&
+        (!dictionaryPosFilter || word.partOfSpeech?.includes(dictionaryPosFilter)) &&
         (
           searchable.toLocaleLowerCase().includes(query.toLocaleLowerCase()) ||
           (
@@ -1625,10 +1626,13 @@ export default function App() {
         const levelB = Number(vocabularyCollection === 'course' ? b.courseStage : system === '2.0' ? b.level20 : b.level30)
         return levelA - levelB || a.hanzi.localeCompare(b.hanzi)
       }
+      if (dictionarySort === 'frequency') {
+        return (a.frequencyRank ?? Number.MAX_SAFE_INTEGER) - (b.frequencyRank ?? Number.MAX_SAFE_INTEGER) || a.hanzi.localeCompare(b.hanzi)
+      }
       return a.hanzi.localeCompare(b.hanzi)
     })
-  }, [currentWords, dictionaryLessonId, dictionaryLessonMembership, dictionarySort, favoriteWordIds, favoritesOnly, knownOnly, knownWords, level, query, system, vocabularyCollection])
-  useEffect(() => setDictionaryPage(0), [system, level, query, vocabularyCollection, favoritesOnly, knownOnly, dictionarySort, dictionaryLessonId])
+  }, [currentWords, dictionaryLessonId, dictionaryLessonMembership, dictionaryPosFilter, dictionarySort, favoriteWordIds, favoritesOnly, knownOnly, knownWords, level, query, system, vocabularyCollection])
+  useEffect(() => setDictionaryPage(0), [system, level, query, vocabularyCollection, favoritesOnly, knownOnly, dictionarySort, dictionaryLessonId, dictionaryPosFilter])
 
   const pageSize = 60
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
@@ -1670,6 +1674,13 @@ export default function App() {
     .map(lesson => ({
       value: lesson.id,
       label: `${lesson.title} · ${currentWords.filter(word => dictionaryLessonMembership.get(wordId(word))?.has(lesson.id)).length.toLocaleString(lang)}`,
+    }))
+
+  const dictionaryPosOptions = [...new Set(currentWords.flatMap(word => word.partOfSpeech ?? []))]
+    .sort()
+    .map(value => ({
+      value,
+      label: `${partOfSpeechLabel(value)} · ${currentWords.filter(word => word.partOfSpeech?.includes(value)).length.toLocaleString(lang)}`,
     }))
 
   const activeSectionName = section < 7
@@ -2303,13 +2314,13 @@ export default function App() {
             </label>
 
             <label className="sr-only" htmlFor="system-filter">{t('vocab.system')}</label>
-            <select id="system-filter" value={system} onChange={e => { setSystem(e.target.value as System); setLevel('all'); setDictionaryLessonId('') }}>
+            <select id="system-filter" value={system} onChange={e => { setSystem(e.target.value as System); setLevel('all'); setDictionaryLessonId(''); setDictionaryPosFilter('') }}>
               <option value="3.0">{t('vocab.hsk30')}</option>
               <option value="2.0">{t('vocab.hsk20')}</option>
             </select>
 
             <label className="sr-only" htmlFor="level-filter">{t('vocab.level')}</label>
-            <select id="level-filter" value={level} onChange={e => { setLevel(e.target.value); setDictionaryLessonId('') }}>
+            <select id="level-filter" value={level} onChange={e => { setLevel(e.target.value); setDictionaryLessonId(''); setDictionaryPosFilter('') }}>
               <option value="all">{t('vocab.allLevels')}</option>
               {levelFilterOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}
             </select>
@@ -2325,6 +2336,13 @@ export default function App() {
               <option value="hanzi">{lang === 'ru' ? 'По иероглифам' : lang === 'uz' ? 'Ieroglif bo‘yicha' : 'By characters'}</option>
               <option value="pinyin">{lang === 'ru' ? 'По пиньиню' : lang === 'uz' ? 'Pinyin bo‘yicha' : 'By pinyin'}</option>
               <option value="level">{lang === 'ru' ? 'По уровню HSK' : lang === 'uz' ? 'HSK darajasi bo‘yicha' : 'By HSK level'}</option>
+              <option value="frequency">{lang === 'ru' ? 'По частоте' : lang === 'uz' ? 'Chastota bo‘yicha' : 'By frequency'}</option>
+            </select>
+
+            <label className="sr-only" htmlFor="dictionary-pos">{lang === 'ru' ? 'Часть речи' : lang === 'uz' ? 'So‘z turkumi' : 'Part of speech'}</label>
+            <select id="dictionary-pos" value={dictionaryPosFilter} onChange={e => setDictionaryPosFilter(e.target.value)}>
+              <option value="">{lang === 'ru' ? 'Все категории' : lang === 'uz' ? 'Barcha turkumlar' : 'All categories'}</option>
+              {dictionaryPosOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
 
             <button className={`outline favorites-filter ${favoritesOnly ? 'selected' : ''}`} type="button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(value => !value)}>
