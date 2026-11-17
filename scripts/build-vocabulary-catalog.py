@@ -174,6 +174,7 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
     exact_zitou, zitou_by_word = load_zitou_translations(zitou_csv)
 
     examples_by_id = collections.defaultdict(list)
+    examples_by_reading = collections.defaultdict(list)
     sentence_path = zhongdex_root/"data"/"sentences.jsonl"
     sentence_count = 0
     for line in sentence_path.open(encoding="utf-8"):
@@ -186,6 +187,9 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
         for headword in sentence.get("headwords", []):
             if headword.get("wordId"):
                 examples_by_id[headword["wordId"]].append((headword, sentence))
+                identity = str(headword["wordId"]).split(":")
+                if len(identity) >= 4 and headword.get("simplified"):
+                    examples_by_reading[(headword["simplified"], norm_pinyin_num(identity[2]))].append((headword, sentence))
 
     # HSK 3.0 (2026) with CC-CEDICT definitions and graded examples: CC BY-SA.
     hsk3_rows = json.loads((zhongdex_root/"data"/"hsk_bands.json").read_text(encoding="utf-8"))
@@ -309,6 +313,24 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
                         current["level20Memberships"]=sorted(set(current["level20Memberships"]+[level]))
                         current["level20"]=min(current["level20Memberships"])
 
+    # HSK 2.0 examples are a separate CC BY-SA overlay. Keeping them separate
+    # prevents the HSK 2.0 CC BY 4.0 word-list asset from inheriting CC BY-SA.
+    hsk20_examples=[]
+    for entry in hsk20.values():
+        candidates=examples_by_reading.get((entry["hanzi"], norm_pinyin_num(entry.get("pinyinNum",""))), [])
+        example=best_example(candidates)
+        if example:
+            hsk20_examples.append({
+                "wordKey":entry["wordKey"],
+                "example":example.get("hanzi",""),
+                "examplePinyin":example.get("pinyin",""),
+                "exampleEn":example.get("english",""),
+                "exampleSource":"Zhongdex / SayMei",
+                "exampleSourceId":example.get("id",""),
+                "exampleLicense":"CC BY-SA 4.0",
+                "exampleStatus":"source_curated_unverified",
+            })
+
     # RU/UZ translations are a separate CC BY 4.0 asset, never folded into
     # the CC BY-SA vocabulary/example corpus.
     translations=[]
@@ -380,6 +402,8 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
         "hsk20UniqueWordReadings":len(hsk20_entries),
         "combinedUniqueWordReadings":total_keys,
         "entriesWithZitouTranslations":entries_with_zitou,
+        "hsk20EntriesWithExamples":len(hsk20_examples),
+        "hsk20ExampleCoveragePercent":round(len(hsk20_examples)/max(1,len(hsk20_entries))*100,2),
         "entriesWithOldCandidateFallback":entries_with_old_fallback,
         "entriesWithRussianOrUzbek":len(translation_keys),
         "missingTranslations":total_keys-len(translation_keys),
@@ -424,10 +448,17 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
         "stats":{"entries":len(translations),"fromZitouCsv":entries_with_zitou,"fromCandidateFallback":entries_with_old_fallback,"missingFromCombinedCatalog":total_keys-len(translation_keys)},
         "entries":translations,
     }
+    hsk20_examples_document={
+        "schema":"hanzipath/hsk20-examples/v1","license":"CC BY-SA 4.0",
+        "sources":{"examples":sources_hsk30},
+        "stats":{"entries":len(hsk20_examples),"sourceWordReadings":len(hsk20_entries),"coveragePercent":round(len(hsk20_examples)/max(1,len(hsk20_entries))*100,2)},
+        "entries":sorted(hsk20_examples,key=lambda e:(e["wordKey"])),
+    }
 
     write_json(hsk30_output,hsk30_document)
     write_json(hsk20_output,hsk20_document)
     write_json(translations_output,translations_document)
+    write_json(root/"public"/"vocabulary-examples-hsk20.json",hsk20_examples_document)
     copy_source_licenses(marpalo_root,zhongdex_root,hsk30_output.parent/"data-licenses")
     return stats
 
