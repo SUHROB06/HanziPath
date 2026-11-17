@@ -1495,11 +1495,49 @@ export default function App() {
           </div>
 
           <div className="hero-art" aria-hidden="true">
-            <div className="orbit orbit1"/>
-            <div className="orbit orbit2"/>
-            <div className="big-hanzi">汉</div>
+            <svg className="hero-landscape" viewBox="0 0 560 320" role="presentation">
+              <defs>
+                <linearGradient id="hp-sky" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#f7d8c7"/>
+                  <stop offset="100%" stopColor="#e9a7a0"/>
+                </linearGradient>
+                <linearGradient id="hp-water" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#b7c8b8"/>
+                  <stop offset="100%" stopColor="#789b8b"/>
+                </linearGradient>
+              </defs>
+              <circle cx="390" cy="105" r="57" fill="#f6dcae" opacity=".9"/>
+              <path d="M0 207 Q88 130 173 185 T345 174 T560 150 V320 H0Z" fill="#b6c4a9"/>
+              <path d="M0 232 Q115 166 218 218 T420 200 T560 190 V320 H0Z" fill="#7f9c83"/>
+              <path d="M0 250 Q140 220 260 244 T560 228 V320 H0Z" fill="url(#hp-water)" opacity=".92"/>
+              <path d="M0 272 Q140 252 260 268 T560 257" fill="none" stroke="#f8e5ca" strokeWidth="3" opacity=".55"/>
+              <g transform="translate(310 72)" fill="#783348" stroke="#783348" strokeLinejoin="round">
+                <path d="M55 46 L55 138 M94 46 L94 138 M37 138 H112" strokeWidth="6" fill="none"/>
+                <path d="M27 48 L74 16 L121 48 L111 48 L74 30 L37 48Z" />
+                <path d="M15 53 Q74 34 133 53 L126 61 Q74 49 22 61Z"/>
+                <path d="M43 17 L74 0 L105 17 L98 18 L74 9 L50 18Z"/>
+                <path d="M47 61 H101 V69 H47Z" fill="#e7b76f" stroke="none"/>
+                <path d="M61 70 V135 M88 70 V135" stroke="#e7b76f" strokeWidth="4"/>
+                <path d="M7 142 H141" strokeWidth="5"/>
+              </g>
+              <g fill="#b94f5e" opacity=".92">
+                <circle cx="100" cy="90" r="7"/><circle cx="117" cy="78" r="5"/><circle cx="132" cy="99" r="6"/>
+                <circle cx="79" cy="110" r="5"/><circle cx="143" cy="72" r="4"/><circle cx="91" cy="67" r="4"/>
+              </g>
+              <g stroke="#704b42" strokeWidth="5" strokeLinecap="round" fill="none">
+                <path d="M112 168 Q102 121 133 93 M112 147 Q82 128 74 108 M119 132 Q148 118 158 94"/>
+              </g>
+              <g fill="#e9a0a0">
+                <circle cx="74" cy="108" r="8"/><circle cx="84" cy="101" r="7"/><circle cx="91" cy="113" r="8"/>
+                <circle cx="133" cy="93" r="8"/><circle cx="143" cy="86" r="7"/><circle cx="151" cy="98" r="8"/>
+              </g>
+              <g fill="#fff4e6" opacity=".6">
+                <path d="M210 238 Q265 230 306 238" stroke="#fff4e6" strokeWidth="2" fill="none"/>
+                <path d="M380 270 Q440 260 500 270" stroke="#fff4e6" strokeWidth="2" fill="none"/>
+              </g>
+            </svg>
+            <div className="hero-seal">汉</div>
             <div className="float-card"><span>你好</span><small>nǐ hǎo</small></div>
-            <div className="mini-dot"/>
           </div>
         </section>
 
@@ -1518,6 +1556,21 @@ export default function App() {
             <div><strong>{currentWords.length ? Math.round(knownInCurrentWords / currentWords.length * 100) : 0}%</strong><small>{t('dashboard.progress')}</small></div>
           </div>
         </div>
+
+        <section className="quick-launch" aria-label={lang === 'ru' ? 'Быстрый доступ' : lang === 'uz' ? 'Tezkor kirish' : 'Quick access'}>
+          <div className="quick-heading">
+            <div><span className="kicker">{lang === 'ru' ? 'ТВОЯ УЧЕБНАЯ ПАНЕЛЬ' : lang === 'uz' ? 'O‘QUV PANELI' : 'YOUR STUDY SPACE'}</span><h2>{lang === 'ru' ? 'Куда отправимся сегодня?' : lang === 'uz' ? 'Bugun nimani o‘rganamiz?' : 'Where shall we go today?'}</h2></div>
+            <span className="quick-heading-mark">学习 · 探索 · 成长</span>
+          </div>
+          <div className="quick-grid">
+            <button className="quick-card quick-vocab" onClick={() => setSection(2)}><span className="quick-icon"><BookOpen/></span><b>{t('nav.vocabulary')}</b><small>{lang === 'ru' ? 'Новые слова и значения' : lang === 'uz' ? 'Yangi so‘zlar va ma’nolar' : 'New words and meanings'}</small><ChevronRight className="quick-arrow"/></button>
+            <button className="quick-card quick-grammar" onClick={() => setSection(5)}><span className="quick-icon"><GraduationCap/></span><b>{t('nav.grammar')}</b><small>{lang === 'ru' ? 'Правила и примеры' : lang === 'uz' ? 'Qoidalar va misollar' : 'Rules and examples'}</small><ChevronRight className="quick-arrow"/></button>
+            <button className="quick-card quick-listen" onClick={() => setSection(4)}><span className="quick-icon"><Headphones/></span><b>{t('nav.listening')}</b><small>{lang === 'ru' ? 'Тренируй понимание речи' : lang === 'uz' ? 'Tinglab tushunishni mashq qil' : 'Train your listening'}</small><ChevronRight className="quick-arrow"/></button>
+            <button className="quick-card quick-cards" onClick={() => setSection(3)}><span className="quick-icon"><Layers/></span><b>{t('nav.flashcards')}</b><small>{lang === 'ru' ? 'Повторяй и запоминай' : lang === 'uz' ? 'Takrorla va eslab qol' : 'Review and remember'}</small><ChevronRight className="quick-arrow"/></button>
+            <button className="quick-card quick-tests" onClick={() => setSection(6)}><span className="quick-icon"><CheckCircle2/></span><b>{t('nav.tests')}</b><small>{lang === 'ru' ? 'Проверь свои знания' : lang === 'uz' ? 'Bilimingni tekshir' : 'Check your knowledge'}</small><ChevronRight className="quick-arrow"/></button>
+            <button className="quick-card quick-course" onClick={() => setSection(1)}><span className="quick-icon"><Target/></span><b>{t('nav.lessons')}</b><small>{lang === 'ru' ? 'Продолжи свой курс HSK' : lang === 'uz' ? 'HSK kursingni davom ettir' : 'Continue your HSK course'}</small><ChevronRight className="quick-arrow"/></button>
+          </div>
+        </section>
 
         <div className="content-grid">
           <section className="panel daily">
