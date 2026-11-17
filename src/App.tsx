@@ -4,9 +4,10 @@ import {
   BookOpen, Headphones, Layers, Target, ChartNoAxesColumnIncreasing,
   Languages, Search, Volume2, ChevronRight, Flame, Menu, X,
   GraduationCap, CheckCircle2, LockKeyhole, Settings, Star,
-  PanelLeftClose, PanelLeftOpen, Palette,
+  PanelLeftClose, PanelLeftOpen, Palette, Bell, Play, BarChart3, Bookmark, CalendarCheck, Sparkles,
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './supabase'
+import heroImage from './assets/heroImage'
 import {
   GUEST_LOCALE_KEY, isLocale, localeLabels, translate,
   type Locale, type TranslationKey,
@@ -1495,120 +1496,90 @@ export default function App() {
           </div>
 
           <div className="hero-art" aria-hidden="true">
-            <svg className="hero-landscape" viewBox="0 0 560 320" role="presentation">
-              <defs>
-                <linearGradient id="hp-sky" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#f7d8c7"/>
-                  <stop offset="100%" stopColor="#e9a7a0"/>
-                </linearGradient>
-                <linearGradient id="hp-water" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#b7c8b8"/>
-                  <stop offset="100%" stopColor="#789b8b"/>
-                </linearGradient>
-              </defs>
-              <circle cx="390" cy="105" r="57" fill="#f6dcae" opacity=".9"/>
-              <path d="M0 207 Q88 130 173 185 T345 174 T560 150 V320 H0Z" fill="#b6c4a9"/>
-              <path d="M0 232 Q115 166 218 218 T420 200 T560 190 V320 H0Z" fill="#7f9c83"/>
-              <path d="M0 250 Q140 220 260 244 T560 228 V320 H0Z" fill="url(#hp-water)" opacity=".92"/>
-              <path d="M0 272 Q140 252 260 268 T560 257" fill="none" stroke="#f8e5ca" strokeWidth="3" opacity=".55"/>
-              <g transform="translate(310 72)" fill="#783348" stroke="#783348" strokeLinejoin="round">
-                <path d="M55 46 L55 138 M94 46 L94 138 M37 138 H112" strokeWidth="6" fill="none"/>
-                <path d="M27 48 L74 16 L121 48 L111 48 L74 30 L37 48Z" />
-                <path d="M15 53 Q74 34 133 53 L126 61 Q74 49 22 61Z"/>
-                <path d="M43 17 L74 0 L105 17 L98 18 L74 9 L50 18Z"/>
-                <path d="M47 61 H101 V69 H47Z" fill="#e7b76f" stroke="none"/>
-                <path d="M61 70 V135 M88 70 V135" stroke="#e7b76f" strokeWidth="4"/>
-                <path d="M7 142 H141" strokeWidth="5"/>
-              </g>
-              <g fill="#b94f5e" opacity=".92">
-                <circle cx="100" cy="90" r="7"/><circle cx="117" cy="78" r="5"/><circle cx="132" cy="99" r="6"/>
-                <circle cx="79" cy="110" r="5"/><circle cx="143" cy="72" r="4"/><circle cx="91" cy="67" r="4"/>
-              </g>
-              <g stroke="#704b42" strokeWidth="5" strokeLinecap="round" fill="none">
-                <path d="M112 168 Q102 121 133 93 M112 147 Q82 128 74 108 M119 132 Q148 118 158 94"/>
-              </g>
-              <g fill="#e9a0a0">
-                <circle cx="74" cy="108" r="8"/><circle cx="84" cy="101" r="7"/><circle cx="91" cy="113" r="8"/>
-                <circle cx="133" cy="93" r="8"/><circle cx="143" cy="86" r="7"/><circle cx="151" cy="98" r="8"/>
-              </g>
-              <g fill="#fff4e6" opacity=".6">
-                <path d="M210 238 Q265 230 306 238" stroke="#fff4e6" strokeWidth="2" fill="none"/>
-                <path d="M380 270 Q440 260 500 270" stroke="#fff4e6" strokeWidth="2" fill="none"/>
-              </g>
-            </svg>
+            <img className="hero-photo" src={heroImage} alt="" />
+            <div className="hero-photo-shade"/>
             <div className="hero-seal">汉</div>
-            <div className="float-card"><span>你好</span><small>nǐ hǎo</small></div>
           </div>
         </section>
 
-        <div className="stats">
-          <div className="stat">
-            <div className="stat-icon blue"><BookOpen/></div>
-            <div><strong>{knownInCurrentWords}</strong><small>{t('dashboard.wordsLearned')}</small></div>
-            <span className="stat-note">/ {currentWords.length}</span>
-          </div>
-          <div className="stat">
-            <div className="stat-icon orange"><Flame/></div>
-            <div><strong>{getStreak(activityDays)}</strong><small>{t('dashboard.streak')}</small></div>
-          </div>
-          <div className="stat">
-            <div className="stat-icon green"><ChartNoAxesColumnIncreasing/></div>
-            <div><strong>{currentWords.length ? Math.round(knownInCurrentWords / currentWords.length * 100) : 0}%</strong><small>{t('dashboard.progress')}</small></div>
-          </div>
-        </div>
 
-        <section className="quick-launch" aria-label={lang === 'ru' ? 'Быстрый доступ' : lang === 'uz' ? 'Tezkor kirish' : 'Quick access'}>
-          <div className="quick-heading">
-            <div><span className="kicker">{lang === 'ru' ? 'ТВОЯ УЧЕБНАЯ ПАНЕЛЬ' : lang === 'uz' ? 'O‘QUV PANELI' : 'YOUR STUDY SPACE'}</span><h2>{lang === 'ru' ? 'Куда отправимся сегодня?' : lang === 'uz' ? 'Bugun nimani o‘rganamiz?' : 'Where shall we go today?'}</h2></div>
-            <span className="quick-heading-mark">学习 · 探索 · 成长</span>
-          </div>
-          <div className="quick-grid">
-            <button className="quick-card quick-vocab" onClick={() => setSection(2)}><span className="quick-icon"><BookOpen/></span><b>{t('nav.vocabulary')}</b><small>{lang === 'ru' ? 'Новые слова и значения' : lang === 'uz' ? 'Yangi so‘zlar va ma’nolar' : 'New words and meanings'}</small><ChevronRight className="quick-arrow"/></button>
-            <button className="quick-card quick-grammar" onClick={() => setSection(5)}><span className="quick-icon"><GraduationCap/></span><b>{t('nav.grammar')}</b><small>{lang === 'ru' ? 'Правила и примеры' : lang === 'uz' ? 'Qoidalar va misollar' : 'Rules and examples'}</small><ChevronRight className="quick-arrow"/></button>
-            <button className="quick-card quick-listen" onClick={() => setSection(4)}><span className="quick-icon"><Headphones/></span><b>{t('nav.listening')}</b><small>{lang === 'ru' ? 'Тренируй понимание речи' : lang === 'uz' ? 'Tinglab tushunishni mashq qil' : 'Train your listening'}</small><ChevronRight className="quick-arrow"/></button>
-            <button className="quick-card quick-cards" onClick={() => setSection(3)}><span className="quick-icon"><Layers/></span><b>{t('nav.flashcards')}</b><small>{lang === 'ru' ? 'Повторяй и запоминай' : lang === 'uz' ? 'Takrorla va eslab qol' : 'Review and remember'}</small><ChevronRight className="quick-arrow"/></button>
-            <button className="quick-card quick-tests" onClick={() => setSection(6)}><span className="quick-icon"><CheckCircle2/></span><b>{t('nav.tests')}</b><small>{lang === 'ru' ? 'Проверь свои знания' : lang === 'uz' ? 'Bilimingni tekshir' : 'Check your knowledge'}</small><ChevronRight className="quick-arrow"/></button>
-            <button className="quick-card quick-course" onClick={() => setSection(1)}><span className="quick-icon"><Target/></span><b>{t('nav.lessons')}</b><small>{lang === 'ru' ? 'Продолжи свой курс HSK' : lang === 'uz' ? 'HSK kursingni davom ettir' : 'Continue your HSK course'}</small><ChevronRight className="quick-arrow"/></button>
-          </div>
+        <section className="shortcut-strip" aria-label={lang === 'ru' ? 'Быстрые разделы' : 'Quick study sections'}>
+          {[
+            {label: lang === 'ru' ? 'Уроки' : 'Lessons', icon: <BookOpen/>, section: 1},
+            {label: lang === 'ru' ? 'Словарь' : 'Dictionary', icon: <Search/>, section: 2},
+            {label: lang === 'ru' ? 'Грамматика' : 'Grammar', icon: <GraduationCap/>, section: 5},
+            {label: lang === 'ru' ? 'Аудирование' : 'Listening', icon: <Headphones/>, section: 4},
+            {label: lang === 'ru' ? 'Практика' : 'Practice', icon: <Target/>, section: 6},
+            {label: lang === 'ru' ? 'Флешкарты' : 'Flashcards', icon: <Layers/>, section: 3},
+            {label: lang === 'ru' ? 'Тесты' : 'Tests', icon: <CheckCircle2/>, section: 6},
+            {label: lang === 'ru' ? 'Прогресс' : 'Progress', icon: <ChartNoAxesColumnIncreasing/>, section: 7},
+          ].map(item => <button className="shortcut" key={item.label} onClick={() => setSection(item.section)}><span>{item.icon}</span><b>{item.label}</b></button>)}
         </section>
 
-        <div className="content-grid">
-          <section className="panel daily">
-            <div className="panel-head">
-              <div><span className="kicker">{t('dashboard.due')}</span><h2>{t('dashboard.today')}</h2></div>
-              <span className="date-chip">{t('dashboard.todayTag')}</span>
-            </div>
+        <div className="dashboard-grid">
+          <div className="dashboard-main-column">
+            <section className="dashboard-panel continue-panel">
+              <div className="section-heading">
+                <div><span className="kicker">{lang === 'ru' ? 'ТВОЙ СЛЕДУЮЩИЙ ШАГ' : 'YOUR NEXT STEP'}</span><h2>{lang === 'ru' ? 'Продолжить обучение' : 'Continue learning'}</h2></div>
+                <button className="text-link" onClick={() => setSection(1)}>{lang === 'ru' ? 'Все уроки' : 'All lessons'} <ChevronRight size={14}/></button>
+              </div>
+              <div className="continue-card">
+                <div className="continue-illustration"><span className="continue-lantern">灯</span><span className="continue-book">书</span><i/></div>
+                <div className="continue-copy">
+                  <span className="course-chip">HSK {courseSystem} · {lang === 'ru' ? 'Уровень' : 'Level'} {courseLevel}</span>
+                  <h3>{activeLesson?.title ?? (lang === 'ru' ? 'Первый урок' : 'First lesson')}</h3>
+                  <p>{lang === 'ru' ? 'Продолжай изучать новые слова и китайские выражения.' : 'Keep learning new words and useful Chinese expressions.'}</p>
+                  <div className="continue-progress"><i style={{width: (courseAllLessons.length ? Math.round(completedLessonIds.filter(id => courseAllLessons.some(lesson => lesson.id === id)).length / courseAllLessons.length * 100) : 0) + '%'}}/></div>
+                  <div className="continue-meta"><small>{completedLessonIds.filter(id => courseAllLessons.some(lesson => lesson.id === id)).length} / {courseAllLessons.length} {lang === 'ru' ? 'уроков пройдено' : 'lessons completed'}</small><button className="continue-play" onClick={() => setSection(1)} aria-label={lang === 'ru' ? 'Открыть урок' : 'Open lesson'}><Play size={17} fill="currentColor"/></button></div>
+                </div>
+              </div>
+            </section>
 
-            {(['dashboard.task1', 'dashboard.task2', 'dashboard.task3'] as TranslationKey[]).map((key, i) => (
-              <label className={`task ${done[i] ? 'checked' : ''}`} key={key}>
-                <input
-                  type="checkbox"
-                  checked={done[i]}
-                  onChange={() => {
-                    setDone(items => items.map((value, index) => index === i ? !value : value))
-                    if (!done[i]) recordActivity()
-                  }}
-                />
-                <span className="fakecheck">{done[i] ? '✓' : ''}</span>
-                <span className="task-copy">{t(key)}<small>{[10, 5, 8][i]} {t('common.minutes')}</small></span>
-              </label>
-            ))}
+            <section className="dashboard-panel course-panel">
+              <div className="section-heading">
+                <div><span className="kicker">{lang === 'ru' ? 'ВЫБЕРИ СВОЙ МАРШРУТ' : 'CHOOSE YOUR PATH'}</span><h2>{lang === 'ru' ? 'Выберите курс' : 'Choose your course'}</h2></div>
+                <div className="standard-switch"><button className={courseSystem === '2.0' ? 'selected' : ''} onClick={() => {setCourseSystem('2.0');setCourseLevel(1);setActiveLessonId(null)}}>HSK 2.0</button><button className={courseSystem === '3.0' ? 'selected' : ''} onClick={() => {setCourseSystem('3.0');setCourseLevel(1);setActiveLessonId(null)}}>HSK 3.0</button></div>
+              </div>
+              <div className="level-grid">
+                {[1,2,3,4,5,6].map(value => {
+                  const levelValue=value as CourseLevel;
+                  const count=wordsForCourseLevel(lessonEntries,courseSystem,levelValue).length;
+                  const lessons=expandedLessonData.lessons.filter(lesson=>lesson.system===courseSystem&&lesson.level===levelValue).length;
+                  return <button key={value} className={'level-card level-card-' + value + (courseLevel===levelValue?' selected':'')} onClick={()=>{setCourseLevel(levelValue);setActiveLessonId(null);setSection(1)}}>
+                    <span className="level-art">{['春','学','花','山','龙','云'][value-1]}</span><b>HSK {value}</b><small>{count.toLocaleString(lang)} {lang==='ru'?'слов':'words'}</small><em>{lessons} {lang==='ru'?'уроков':'lessons'}</em>
+                  </button>
+                })}
+                {courseSystem==='3.0'&&<button className={'level-card level-advanced' + (courseLevel===7?' selected':'')} onClick={()=>{setCourseLevel(7);setActiveLessonId(null);setSection(1)}}><span className="level-art">龙</span><b>HSK 7–9</b><small>{wordsForCourseLevel(lessonEntries,'3.0',7).length.toLocaleString(lang)} {lang==='ru'?'слов':'words'}</small><em>{expandedLessonData.lessons.filter(lesson=>lesson.system==='3.0'&&lesson.level===7).length} {lang==='ru'?'уроков':'lessons'}</em></button>}
+              </div>
+            </section>
 
-            <div className="daily-foot">
-              <span>{done.filter(Boolean).length}/3 {t('dashboard.completed')}</span>
-              <div className="progress"><i style={{width: `${done.filter(Boolean).length / 3 * 100}%`}}/></div>
-            </div>
-          </section>
+            <section className="dashboard-bottom-panels">
+              <div className="dashboard-panel mini-panel"><span className="kicker">学习 · 每日积累</span><h3>{lang==='ru'?'Повторение слов':'Word review'}</h3><p>{lang==='ru'?'Закрепляй изученное с помощью карточек.':'Strengthen what you have learned with flashcards.'}</p><button className="mini-action" onClick={()=>setSection(3)}><Layers size={15}/>{lang==='ru'?'Открыть карточки':'Open flashcards'}<ChevronRight size={14}/></button></div>
+              <div className="dashboard-panel mini-panel"><span className="kicker">听力 · 开口练习</span><h3>{lang==='ru'?'Практика аудирования':'Listening practice'}</h3><p>{lang==='ru'?'Слушай произношение и проверяй понимание.':'Listen to pronunciation and test comprehension.'}</p><button className="mini-action" onClick={()=>setSection(4)}><Headphones size={15}/>{lang==='ru'?'Начать практику':'Start practice'}<ChevronRight size={14}/></button></div>
+            </section>
+          </div>
 
-          <section className="panel review">
-            <div className="review-icon"><Layers/></div>
-            <span className="kicker">{t('dashboard.reviewTitle')}</span>
-            <h2>{t('dashboard.review')}</h2>
-            <p>{t('dashboard.reviewText')}</p>
-            <button className="outline" onClick={() => setSection(3)}>
-              {t('dashboard.openFlashcards')}<ChevronRight size={16}/>
-            </button>
-          </section>
+          <aside className="dashboard-side-column">
+            <section className="dashboard-panel today-panel">
+              <div className="section-heading"><div><span className="kicker">{t('dashboard.due')}</span><h2>{t('dashboard.today')}</h2></div><CalendarCheck size={19}/></div>
+              {(['dashboard.task1','dashboard.task2','dashboard.task3'] as TranslationKey[]).map((key,i)=><label className={'task ' + (done[i]?'checked':'')} key={key}><input type="checkbox" checked={done[i]} onChange={()=>{setDone(items=>items.map((value,index)=>index===i?!value:value));if(!done[i])recordActivity()}}/><span className="fakecheck">{done[i]?'✓':''}</span><span className="task-copy">{t(key)}<small>{[10,5,8][i]} {t('common.minutes')}</small></span></label>)}
+              <div className="daily-foot"><span>{done.filter(Boolean).length}/3 {t('dashboard.completed')}</span><div className="progress"><i style={{width:(done.filter(Boolean).length/3*100)+'%'}}/></div></div>
+            </section>
+            <section className="dashboard-panel learning-stats">
+              <div className="section-heading"><div><span className="kicker">{lang==='ru'?'ТВОЯ АКТИВНОСТЬ':'YOUR ACTIVITY'}</span><h2>{lang==='ru'?'Статистика обучения':'Learning statistics'}</h2></div><BarChart3 size={18}/></div>
+              <div className="stats-summary"><strong>{getStreak(activityDays)}</strong><span>{lang==='ru'?'дней подряд':'day streak'}</span><b>{knownInCurrentWords}</b><span>{lang==='ru'?'слов изучено':'words learned'}</span></div>
+              <div className="activity-chart" aria-label={lang==='ru'?'Активность за семь дней':'Seven day activity'}>
+                {Array.from({length:7},(_,i)=>{const date=new Date();date.setDate(date.getDate()-(6-i));const key=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');const active=activityDays.includes(key);return <span key={key} className={active?'active':''} style={{height:active?'70%':(18+(i%3)*9)+'%'}}/>})}
+              </div>
+              <div className="chart-labels"><small>{lang==='ru'?'7 дней назад':'7 days ago'}</small><small>{lang==='ru'?'Сегодня':'Today'}</small></div>
+            </section>
+            <section className="dashboard-panel fast-actions">
+              <div className="section-heading"><div><span className="kicker">{lang==='ru'?'БЫСТРЫЙ ДОСТУП':'QUICK ACTIONS'}</span><h2>{lang==='ru'?'Быстрые действия':'Quick actions'}</h2></div><Sparkles size={18}/></div>
+              <button onClick={()=>setSection(1)}><Play size={15}/>{lang==='ru'?'Продолжить урок':'Continue lesson'}<ChevronRight size={14}/></button>
+              <button onClick={()=>setSection(2)}><Search size={15}/>{lang==='ru'?'Найти слово':'Find a word'}<ChevronRight size={14}/></button>
+              <button onClick={()=>setSection(3)}><Bookmark size={15}/>{lang==='ru'?'Повторить слова':'Review words'}<ChevronRight size={14}/></button>
+            </section>
+          </aside>
         </div>
       </>}
 
