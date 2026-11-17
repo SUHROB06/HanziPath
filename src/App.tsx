@@ -4,7 +4,7 @@ import {
   BookOpen, Headphones, Layers, Target, ChartNoAxesColumnIncreasing,
   Languages, Search, Volume2, ChevronRight, Flame, Menu, X,
   GraduationCap, CheckCircle2, LockKeyhole, Settings, Star,
-  PanelLeftClose, PanelLeftOpen, Palette, Bell, Play, BarChart3, Bookmark, CalendarCheck, Sparkles,
+  PanelLeftClose, PanelLeftOpen, Palette, Play, BarChart3, Bookmark, CalendarCheck, Sparkles,
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './supabase'
 import heroImage from './assets/heroImage'
