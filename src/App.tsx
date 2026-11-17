@@ -443,7 +443,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
   const standardValue = (word: Word) => system === '2.0' ? word.level20 : word.level30
   const uniqueWords = (items: Word[]) => [...new Map(items
     .filter(word => word.hanzi && word.pinyin && (localeMeaning(word, locale) || word.en || word.ru))
-    .map(word => [word.hanzi + '|' + normalizePinyin(word.pinyin), word])).values()]
+    .map(word => [word.hanzi + '|' + normalizePinyin(word.pinyin), word] as const)).values()]
   const wordPool = system === '3.0' && level >= 7
     ? words.filter(word => String(word.level30 ?? '') === '7-9')
     : words.filter(word => Number(standardValue(word)) > 0 && Number(standardValue(word)) <= level)
@@ -453,7 +453,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
   ))
   const uniqueLessons = [...new Map(lessonPool
     .filter(lesson => lesson.grammar.example && lesson.grammar.meaning)
-    .map(lesson => [lesson.grammar.example + '|' + lesson.grammar.meaning, lesson])).values()]
+    .map(lesson => [lesson.grammar.example + '|' + lesson.grammar.meaning, lesson] as const)).values()]
   const lessons = shuffleWithSeed(uniqueLessons, attemptSeed + 71)
   const questions: ExamQuestion[] = []
   if (!lessons.length || !safeWords.length) return questions
@@ -742,16 +742,16 @@ export default function App() {
   const [knownWords, setKnownWords] = useState<string[]>(() => readStored(KNOWN_WORDS_KEY, []))
   const [favoriteWordIds, setFavoriteWordIds] = useState<string[]>(() => readStored(FAVORITE_WORDS_KEY, []))
   const [activityDays, setActivityDays] = useState<string[]>(() => readStored(ACTIVITY_DAYS_KEY, []))
-  const [cardsSystem, setCardsSystem] = useState<CourseSystem>(() => readStored('hanzipath.cards.system', '2.0'))
-  const [cardsLevel, setCardsLevel] = useState<CourseLevel>(() => readStored('hanzipath.cards.level', 1))
-  const [cardsLessonId, setCardsLessonId] = useState<string>(() => readStored('hanzipath.cards.lesson', ''))
-  const [cardIndex, setCardIndex] = useState<number>(() => readStored('hanzipath.cards.index', 0))
+  const [cardsSystem, setCardsSystem] = useState<CourseSystem>(() => readStored<CourseSystem>('hanzipath.cards.system', '2.0'))
+  const [cardsLevel, setCardsLevel] = useState<CourseLevel>(() => readStored<CourseLevel>('hanzipath.cards.level', 1))
+  const [cardsLessonId, setCardsLessonId] = useState<string>(() => readStored<string>('hanzipath.cards.lesson', ''))
+  const [cardIndex, setCardIndex] = useState<number>(() => readStored<number>('hanzipath.cards.index', 0))
   const [showAnswer, setShowAnswer] = useState(false)
-  const [listeningSystem, setListeningSystem] = useState<CourseSystem>(() => readStored('hanzipath.listening.system', '2.0'))
-  const [listeningLevel, setListeningLevel] = useState<CourseLevel>(() => readStored('hanzipath.listening.level', 1))
-  const [listeningLessonId, setListeningLessonId] = useState<string>(() => readStored('hanzipath.listening.lesson', ''))
-  const [listeningIndex, setListeningIndex] = useState<number>(() => readStored('hanzipath.listening.index', 0))
-  const [listeningCompletedIds, setListeningCompletedIds] = useState<string[]>(() => readStored('hanzipath.listening.completed', []))
+  const [listeningSystem, setListeningSystem] = useState<CourseSystem>(() => readStored<CourseSystem>('hanzipath.listening.system', '2.0'))
+  const [listeningLevel, setListeningLevel] = useState<CourseLevel>(() => readStored<CourseLevel>('hanzipath.listening.level', 1))
+  const [listeningLessonId, setListeningLessonId] = useState<string>(() => readStored<string>('hanzipath.listening.lesson', ''))
+  const [listeningIndex, setListeningIndex] = useState<number>(() => readStored<number>('hanzipath.listening.index', 0))
+  const [listeningCompletedIds, setListeningCompletedIds] = useState<string[]>(() => readStored<string[]>('hanzipath.listening.completed', []))
   const [listeningChoice, setListeningChoice] = useState<string | null>(null)
   const [grammarSystem, setGrammarSystem] = useState<CourseSystem>('2.0')
   const [grammarLevel, setGrammarLevel] = useState<CourseLevel>(1)
@@ -766,7 +766,7 @@ export default function App() {
   const [examSecondsLeft, setExamSecondsLeft] = useState(0)
   const [examStarted, setExamStarted] = useState(false)
   const [examFinished, setExamFinished] = useState(false)
-  const [examHistory, setExamHistory] = useState<Array<{ system: CourseSystem; level: number; score: number; total: number; date: string }>>(() => readStored('hanzipath.exam.history', []))
+  const [examHistory, setExamHistory] = useState<Array<{ system: CourseSystem; level: number; score: number; total: number; date: string }>>(() => readStored<Array<{ system: CourseSystem; level: number; score: number; total: number; date: string }>>('hanzipath.exam.history', []))
   const examSavedRef = useRef(false)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [authOpen, setAuthOpen] = useState(false)
@@ -817,12 +817,6 @@ export default function App() {
   useEffect(() => {
     try { window.localStorage.setItem('hanzipath.exam.history', JSON.stringify(examHistory)) } catch { /* Exam history remains available for this session. */ }
   }, [examHistory])
-
-  useEffect(() => {
-    if (!examStarted || !examFinished || examSavedRef.current) return
-    examSavedRef.current = true
-    setExamHistory(items => [{ system: examSystem, level: examLevel, score: examCorrectCount, total: examScoredCount, date: new Date().toISOString() }, ...items].slice(0, 30))
-  }, [examStarted, examFinished, examSystem, examLevel, examCorrectCount, examScoredCount])
 
   useEffect(() => {
     let cancelled = false
@@ -1259,7 +1253,7 @@ export default function App() {
   const listeningWord = listeningStudyWords.length ? listeningStudyWords[((listeningIndex % listeningStudyWords.length) + listeningStudyWords.length) % listeningStudyWords.length] : undefined
   const listeningOptions = useMemo(() => {
     if (!listeningWord) return []
-    const unique = [...new Map([listeningWord, ...listeningStudyWords.filter(word => wordId(word) !== wordId(listeningWord))].map(word => [wordId(word), word])).values()]
+    const unique = [...new Map([listeningWord, ...listeningStudyWords.filter(word => wordId(word) !== wordId(listeningWord))].map(word => [wordId(word), word] as const)).values()]
     return shuffleWithSeed(unique.slice(0, 4), listeningIndex + 101)
   }, [listeningStudyWords, listeningIndex, listeningWord])
   useEffect(() => { setCardIndex(0); setShowAnswer(false) }, [cardsSystem, cardsLevel, cardsLessonId])
@@ -1397,6 +1391,13 @@ export default function App() {
     question.manualReview && Boolean(examAnswers[index]?.trim()) ? 1 : 0
   ), 0)
   const examManualTotal = examQuestionsState.filter(question => question.manualReview).length
+
+  useEffect(() => {
+    if (!examStarted || !examFinished || examSavedRef.current) return
+    examSavedRef.current = true
+    setExamHistory(items => [{ system: examSystem, level: examLevel, score: examCorrectCount, total: examScoredCount, date: new Date().toISOString() }, ...items].slice(0, 30))
+  }, [examStarted, examFinished, examSystem, examLevel, examCorrectCount, examScoredCount])
+
 
   const startExam = () => {
     examSavedRef.current = false
