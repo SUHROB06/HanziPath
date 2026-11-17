@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HanziPath — Dictionary data sources and licences</title>
+  <style>
+    :root{color-scheme:light;--red:#7d1d29;--gold:#b68a43;--ink:#2c211d;--muted:#766b62;--paper:#fbf7ef;--line:#e8dac5}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
+    main{max-width:850px;margin:0 auto;padding:40px 22px 64px}h1,h2{color:var(--red);line-height:1.25}
+    h1{font-size:30px;margin:0 0 12px}h2{font-size:20px;margin:28px 0 8px}
+    p,li{max-width:78ch}a{color:var(--red);text-underline-offset:3px}
+    .lead{color:var(--muted);margin-bottom:28px}.source{padding:18px 20px;border:1px solid var(--line);border-radius:14px;background:#fffaf2;margin:14px 0}
+    .source h2{margin:0 0 8px}.tag{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:#765b37}
+    code{background:#f1e8d9;padding:2px 5px;border-radius:5px;overflow-wrap:anywhere}
+    footer{border-top:1px solid var(--line);margin-top:32px;padding-top:18px;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+<main>
+  <h1>HanziPath dictionary data sources</h1>
+  <p class="lead">HanziPath combines separate, attributed data assets for HSK 2.0, HSK 3.0, examples and RU/UZ translations. Each asset keeps its own licence. This page records the sources and the changes made when preparing them for the app.</p>
+
+  <section class="source">
+    <span class="tag">CC BY-SA 4.0</span>
+    <h2>HSK 3.0 (2026) vocabulary and example sentences</h2>
+    <p><strong>Zhongdex by SayMei</strong> — <a href="https://zhongdex.org">zhongdex.org</a> · <a href="https://github.com/saymei/zhongdex">source repository</a>.</p>
+    <p><strong>Required attribution:</strong> Zhongdex by SayMei — https://zhongdex.org — CC BY-SA 4.0. Contains data from CC-CEDICT (CC BY-SA 4.0) and the HSK 3.0 (2026) word list.</p>
+    <p>The HSK 3.0 word list, pinyin, POS information, English glosses and graded example sentences are derived from this dataset. HanziPath merged duplicate word/readings, retained source IDs and per-gloss attribution, normalized the data into HanziPath word keys, and attached the best available level-matched example to each reading.</p>
+    <p>Example sentences are source-curated but have not been individually reviewed by HanziPath. The source corpus reports 29,619 sentence records; 11,001 of 11,021 merged HSK 3.0 word/readings have an attached example in this build.</p>
+    <p><strong>CC-CEDICT attribution:</strong> This work uses data from CC-CEDICT, made available by MDBG under the Creative Commons Attribution-ShareAlike 4.0 International licence (<a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>). Changes were made: entries were selected against the HSK 3.0 (2026) word list, merged with band metadata, re-keyed to HanziPath word-reading IDs, and reformatted.</p>
+    <p>Asset: <code>/vocabulary-catalog-hsk30.json</code>. Licence: <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.</p>
+    <p>Full source notices: <a href="/data-licenses/zhongdex-data-LICENSE.txt">Zhongdex data licence</a> · <a href="/data-licenses/zhongdex-NOTICE.txt">Zhongdex NOTICE</a>.</p>
+  </section>
+
+  <section class="source">
+    <span class="tag">CC BY 4.0</span>
+    <h2>HSK 2.0 (2009) vocabulary and official glosses</h2>
+    <p><strong>Marpalo — HSK Vocabulary Dataset</strong> — <a href="https://github.com/marpalo/hsk-vocabulary-dataset">source repository</a>.</p>
+    <p>HanziPath uses the HSK 2.0 word-list fields and official glosses from this dataset. Duplicate POS rows for the same simplified word and reading are merged while the POS labels and level membership are retained. The separate <code>full_definitions</code> CC-CEDICT field is not included in this HSK 2.0 asset.</p>
+    <p>Asset: <code>/vocabulary-catalog-hsk20.json</code>. Licence: <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</p>
+    <p>Source notices: <a href="/data-licenses/marpalo-LICENSE.txt">Marpalo licence</a> · <a href="/data-licenses/marpalo-NOTICE.md">Marpalo NOTICE</a>.</p>
+  </section>
+
+  <section class="source">
+    <span class="tag">CC BY 4.0</span>
+    <h2>Russian and Uzbek translations</h2>
+    <p><strong>Maqsudjonpolatov — HSK Chinese–Uzbek–Russian vocabulary</strong> — <a href="https://huggingface.co/datasets/Maqsudjonpolatov/hsk-chinese-uzbek-russian">Hugging Face dataset</a>.</p>
+    <p>The dataset provides Russian and Uzbek glosses and is published under CC BY 4.0. The publisher describes the translations as AI-assisted and progressively reviewed. HanziPath keeps these translations marked as unverified; they should not be treated as a substitute for native-speaker review.</p>
+    <p>Additional rows from the same publisher-declared candidate bundle are used only as a clearly marked fallback where the CSV snapshot has no matching word/reading.</p>
+    <p>Asset: <code>/vocabulary-translations-ru-uz.json</code>. Licence: <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</p>
+  </section>
+
+  <h2>How the data is used</h2>
+  <ul>
+    <li>The HSK 3.0 corpus and its examples remain a separate CC BY-SA 4.0 asset.</li>
+    <li>The HSK 2.0 word list and RU/UZ translation overlay remain separate CC BY 4.0 assets.</li>
+    <li>The app combines matching word/readings at runtime; it does not publish a single merged downloadable vocabulary database.</li>
+    <li>Membership, translation and example quality are tracked separately. RU/UZ glosses and source examples are not silently marked as human-verified.</li>
+    <li>These licences apply to the referenced data assets, not to the HanziPath application code.</li>
+  </ul>
+
+  <footer>
+    HanziPath is an independent learning project and is not affiliated with SayMei, Zhongdex, MDBG, Marpalo, Maqsudjonpolatov or the HSK test authorities.
+  </footer>
+</main>
+</body>
+</html>
