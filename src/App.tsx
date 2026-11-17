@@ -28,6 +28,7 @@ import {
 import type { StandardLevel } from './types/vocabulary'
 import { mergeLearningProgress, type LearningProgressSnapshot } from './data/learningProgress'
 import { adaptiveDifficulty, dueReviewIds, scheduleReview, type ReviewQuality, type ReviewState } from './data/spacedRepetition'
+import { mergeDictionaryEntries } from './data/dictionaryQuality'
 
 type System = '2.0' | '3.0'
 
@@ -48,6 +49,9 @@ type Word = {
   courseSystems?: CourseSystem[]
   level20: number | string | null
   level30: number | string | null
+  level20Memberships?: Array<number | string>
+  level30Memberships?: Array<number | string>
+  legacyIds?: string[]
   example: string
   examplePinyin: string
   exampleRu: string
@@ -706,6 +710,8 @@ function databaseRowToWord(row: any, system: System): Word {
     uzStatus: meaning('uz') ? undefined : 'source_unverified',
     level20: system === '2.0' ? level : null,
     level30: system === '3.0' ? level : null,
+    level20Memberships: system === '2.0' ? [level] : [],
+    level30Memberships: system === '3.0' ? [level] : [],
     example: example?.sentence_hanzi ?? '',
     examplePinyin: example?.sentence_pinyin ?? '',
     exampleRu: exampleMeaning('ru') ?? '',
@@ -868,7 +874,30 @@ export default function App() {
         const entries = Array.isArray(payload.entries) ? payload.entries : []
 
         if (!cancelled && entries.length > 0) {
-          setReviewWords(entries.map((entry, index) => reviewRowToWord(entry, index)))
+          const mergedEntries = mergeDictionaryEntries(
+            entries.map((entry, index) => reviewRowToWord(entry, index)),
+          )
+          const legacyToCanonical = new Map<string, string>()
+          for (const word of mergedEntries) {
+            for (const legacyId of word.legacyIds ?? []) {
+              legacyToCanonical.set(legacyId, wordId(word))
+            }
+          }
+
+          setKnownWords(current => [...new Set(current.map(id => legacyToCanonical.get(id) ?? id))])
+          setFavoriteWordIds(current => [...new Set(current.map(id => legacyToCanonical.get(id) ?? id))])
+          setReviewSchedule(current => {
+            const migrated: Record<string, ReviewState> = {}
+            for (const [id, review] of Object.entries(current)) {
+              const canonicalId = legacyToCanonical.get(id) ?? id
+              const existing = migrated[canonicalId]
+              if (!existing || Date.parse(review.updatedAt) > Date.parse(existing.updatedAt)) {
+                migrated[canonicalId] = review
+              }
+            }
+            return migrated
+          })
+          setReviewWords(mergedEntries)
         }
       } catch {
         if (!cancelled) setReviewWords([])
@@ -1072,10 +1101,9 @@ export default function App() {
           throw new Error(catalogResult.error.message)
         }
 
-        const converted = [...new Map(catalogResult.data
+        const converted = mergeDictionaryEntries(catalogResult.data
           .map(row => databaseRowToWord(row, system))
-          .filter(word => word.hanzi && word.pinyin)
-          .map(word => [`${word.hanzi}|${normalizePinyin(word.pinyin)}`, word] as const)).values()]
+          .filter(word => word.hanzi && word.pinyin))
 
         if (!cancelled) {
           setDatabaseWords(converted.length > 0 ? converted : null)
@@ -1361,8 +1389,10 @@ export default function App() {
   const currentWords = useMemo(() => vocabularyCollection === 'course'
     ? originalLessonWords.filter(word => word.courseSystems?.includes(system))
     : availableWords.filter(word => {
-      const membership = system === '2.0' ? word.level20 : word.level30
-      return membership !== null && membership !== undefined && membership !== ''
+      const memberships = system === '2.0'
+        ? word.level20Memberships ?? (word.level20 == null ? [] : [word.level20])
+        : word.level30Memberships ?? (word.level30 == null ? [] : [word.level30])
+      return memberships.length > 0
     }), [availableWords, system, vocabularyCollection])
   const currentFavoriteCount = useMemo(
     () => currentWords.filter(word => favoriteWordIds.includes(wordId(word))).length,
@@ -1508,12 +1538,14 @@ export default function App() {
       ].filter(Boolean).join(' ')
 
       const normalizedQuery = normalizePinyin(query)
-      const activeLevel = vocabularyCollection === 'course'
-        ? word.courseStage
-        : system === '2.0' ? word.level20 : word.level30
+      const memberships = vocabularyCollection === 'course'
+        ? (word.courseStage == null ? [] : [word.courseStage])
+        : system === '2.0'
+          ? word.level20Memberships ?? (word.level20 == null ? [] : [word.level20])
+          : word.level30Memberships ?? (word.level30 == null ? [] : [word.level30])
 
       return (
-        (level === 'all' || String(activeLevel).replace('7-9', '7') === level) &&
+        (level === 'all' || memberships.some(value => String(value).replace('7-9', '7') === level)) &&
         (!favoritesOnly || favoriteWordIds.includes(wordId(word))) &&
         (!knownOnly || knownWords.includes(wordId(word))) &&
         (
@@ -1566,7 +1598,12 @@ export default function App() {
     }))
     : (system === '2.0' ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 7]).map((levelValue, index) => ({
       value: String(levelValue),
-      label: `${levelNames[index]} · ${currentWords.filter(word => String(system === '2.0' ? word.level20 : word.level30).replace('7-9', '7') === String(levelValue)).length.toLocaleString(lang)}`,
+      label: `${levelNames[index]} · ${currentWords.filter(word => {
+        const memberships = system === '2.0'
+          ? word.level20Memberships ?? (word.level20 == null ? [] : [word.level20])
+          : word.level30Memberships ?? (word.level30 == null ? [] : [word.level30])
+        return memberships.some(value => String(value).replace('7-9', '7') === String(levelValue))
+      }).length.toLocaleString(lang)}`,
     }))
   const activeSectionName = section < 7
     ? t(navKeys[section])
@@ -1614,9 +1651,11 @@ export default function App() {
   }
 
   const dictionaryLevelLabel = (word: Word, standard: System) => {
-    const value = standard === '2.0' ? word.level20 : word.level30
-    if (value === null || value === undefined || value === '') return null
-    return `HSK ${String(value).replace('7-9', '7–9')}`
+    const memberships = standard === '2.0'
+      ? word.level20Memberships ?? (word.level20 == null ? [] : [word.level20])
+      : word.level30Memberships ?? (word.level30 == null ? [] : [word.level30])
+    if (memberships.length === 0) return null
+    return memberships.map(value => `HSK ${String(value).replace('7-9', '7–9')}`).join(' · ')
   }
 
   const selectedExamQuestion = examQuestionsState[examIndex]
