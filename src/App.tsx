@@ -293,6 +293,7 @@ type ExamQuestion = {
   answer: string
   audio?: string
   pinyin?: string
+  explanation?: string
   manualReview?: boolean
 }
 
@@ -868,7 +869,25 @@ export default function App() {
   const [examSecondsLeft, setExamSecondsLeft] = useState(0)
   const [examStarted, setExamStarted] = useState(false)
   const [examFinished, setExamFinished] = useState(false)
-  const [examHistory, setExamHistory] = useState<Array<{ system: CourseSystem; level: number; score: number; total: number; date: string }>>(() => readStored<Array<{ system: CourseSystem; level: number; score: number; total: number; date: string }>>('hanzipath.exam.history', []))
+  const [examHistory, setExamHistory] = useState<Array<{
+    system: CourseSystem
+    level: number
+    score: number
+    total: number
+    date: string
+    manualAnswered?: number
+    manualTotal?: number
+    durationSeconds?: number
+  }>>(() => readStored<Array<{
+    system: CourseSystem
+    level: number
+    score: number
+    total: number
+    date: string
+    manualAnswered?: number
+    manualTotal?: number
+    durationSeconds?: number
+  }>>('hanzipath.exam.history', []))
   const examSavedRef = useRef(false)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [authOpen, setAuthOpen] = useState(false)
