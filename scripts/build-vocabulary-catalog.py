@@ -193,7 +193,7 @@ def build_catalog(marpalo_root: Path, zhongdex_root: Path, old_path: Path, outpu
             continue
         key = (word, norm_pinyin(pinyin))
         band30 = row.get("hsk", {}).get("band2026")
-        band20 = row.get("hsk", {}).get("band2_0")
+        # HSK 2.0 membership is supplied separately by the 5,000-row legacy list.
         definitions = unique_text([definition.get("text", "") for definition in row.get("definitions", [])])
         pos = normalize_pos(row.get("pos", []))
         example = best_example(examples_by_id.get(row.get("id", ""), []))
@@ -212,9 +212,9 @@ def build_catalog(marpalo_root: Path, zhongdex_root: Path, old_path: Path, outpu
                 "enStatus": "source_verified",
                 "uzStatus": "missing_translation",
                 "membershipStatus": "source_verified",
-                "level20": band20,
+                "level20": None,
                 "level30": band30,
-                "level20Memberships": [band20] if band20 is not None else [],
+                "level20Memberships": [],
                 "level30Memberships": [band30] if band30 is not None else [],
                 "partOfSpeech": pos,
                 "example": example.get("hanzi", "") if example else "",
@@ -228,7 +228,7 @@ def build_catalog(marpalo_root: Path, zhongdex_root: Path, old_path: Path, outpu
                 "exampleStatus": "source_curated_unverified" if example else "missing",
                 "legacyIds": [],
                 "sourceIds": [],
-                "membershipSource": "HSK 3.0 (2026) official word list",
+                "membershipSource": "HSK 3.0 (2026) word list, Zhongdex transcription",
                 "definitionSource": "CC-CEDICT",
                 "dataLicense": "CC BY-SA 4.0",
             }
@@ -239,9 +239,6 @@ def build_catalog(marpalo_root: Path, zhongdex_root: Path, old_path: Path, outpu
             if band30 is not None:
                 current["level30Memberships"] = sorted(set(current["level30Memberships"] + [band30]))
                 current["level30"] = min(current["level30Memberships"])
-            if band20 is not None:
-                current["level20Memberships"] = sorted(set(current["level20Memberships"] + [band20]))
-                current["level20"] = min(current["level20Memberships"])
             if not current["example"] and example:
                 current["example"] = example.get("hanzi", "")
                 current["examplePinyin"] = example.get("pinyin", "")
