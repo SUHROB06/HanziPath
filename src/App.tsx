@@ -1248,6 +1248,7 @@ export default function App() {
   const selectedListeningLesson = listeningLessons.find(lesson => lesson.id === listeningLessonId) ?? listeningLessons[0]
   const listeningStudyWords = selectedListeningLesson ? expandedLessonData.assignments[selectedListeningLesson.id] ?? [] : []
   const grammarLessonsForLevel = expandedLessonData.lessons.filter(lesson => lesson.system === grammarSystem && lesson.level === grammarLevel)
+  const grammarTopicsForLevel = grammarLessonsForLevel.flatMap(lesson => (lesson.mergedLessons?.length ? lesson.mergedLessons : [lesson]).map((topic, index) => ({ id: lesson.id + '::' + topic.id, lesson, topic, index })))
   const knownInCurrentWords = knownWords.filter(id => currentWords.some(word => wordId(word) === id)).length
   const activeCard = cardStudyWords.length ? cardStudyWords[((cardIndex % cardStudyWords.length) + cardStudyWords.length) % cardStudyWords.length] : undefined
   const listeningWord = listeningStudyWords.length ? listeningStudyWords[((listeningIndex % listeningStudyWords.length) + listeningStudyWords.length) % listeningStudyWords.length] : undefined
@@ -2095,16 +2096,16 @@ export default function App() {
           </div>
           {grammarSystem === '3.0' && grammarLevel >= 7 && <p className="notice-text shared-band-note">{t('course.sharedBandNote')}</p>}
           <div className="lesson-list">
-            {grammarLessonsForLevel.map(lesson => {
-              const expanded = expandedGrammarId === lesson.id
-              return <article className={'lesson-card grammar-lesson-card ' + (expanded ? 'expanded' : '')} key={lesson.id}>
-                <span className="lesson-number">{String(lesson.volumeLesson).padStart(2, '0')}</span>
+            {grammarTopicsForLevel.map(({ id, lesson, topic, index }) => {
+              const expanded = expandedGrammarId === id
+              return <article className={'lesson-card grammar-lesson-card ' + (expanded ? 'expanded' : '')} key={id}>
+                <span className="lesson-number">{String(lesson.volumeLesson).padStart(2, '0')}{index ? '.' + (index + 1) : ''}</span>
                 <div>
-                  <h3>{lesson.grammar.title}</h3><p>{lesson.title}</p><code>{lesson.grammar.pattern}</code>
-                  {expanded && <div className="grammar-detail"><p>{lesson.grammar.explanation}</p><div className="lesson-example"><b>{lesson.grammar.example}</b><span>{lesson.grammar.pinyin}</span><small>{lesson.grammar.meaning}</small></div></div>}
+                  <h3>{topic.grammar.title}</h3><p>{(lang === 'ru' ? 'Урок ' : 'Lesson ') + lesson.volumeLesson + ' · ' + lesson.title}</p><code>{topic.grammar.pattern}</code>
+                  {expanded && <div className="grammar-detail"><p>{topic.grammar.explanation}</p><div className="lesson-example"><b>{topic.grammar.example}</b><span>{topic.grammar.pinyin}</span><small>{topic.grammar.meaning}</small></div></div>}
                 </div>
-                <button className="sound" aria-label={t('vocab.listen')} onClick={() => speak(lesson.grammar.example)}><Volume2 size={18}/></button>
-                <button className="outline grammar-open" aria-expanded={expanded} onClick={() => setExpandedGrammarId(expanded ? null : lesson.id)}>{expanded ? (lang === 'ru' ? 'Свернуть' : lang === 'uz' ? 'Yopish' : 'Collapse') : (lang === 'ru' ? 'Открыть тему' : lang === 'uz' ? 'Mavzuni ochish' : 'Open topic')}</button>
+                <button className="sound" aria-label={t('vocab.listen')} onClick={() => speak(topic.grammar.example)}><Volume2 size={18}/></button>
+                <button className="outline grammar-open" aria-expanded={expanded} onClick={() => setExpandedGrammarId(expanded ? null : id)}>{expanded ? (lang === 'ru' ? 'Свернуть' : lang === 'uz' ? 'Yopish' : 'Collapse') : (lang === 'ru' ? 'Открыть тему' : lang === 'uz' ? 'Mavzuni ochish' : 'Open topic')}</button>
               </article>
             })}
           </div>
