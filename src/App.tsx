@@ -759,6 +759,7 @@ export default function App() {
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [knownOnly, setKnownOnly] = useState(false)
   const [dictionarySort, setDictionarySort] = useState<'hanzi' | 'pinyin' | 'level'>('hanzi')
+  const [dictionaryLessonId, setDictionaryLessonId] = useState('')
   const [selectedDictionaryWord, setSelectedDictionaryWord] = useState<Word | null>(null)
   const [menu, setMenu] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -1427,14 +1428,14 @@ export default function App() {
       const level = Number(levelValue) as CourseLevel
       const baseLessons = lessonTemplates.filter(lesson => lesson.system === system && lesson.level === level)
       const pool = wordsForCourseLevel(lessonEntries, system, level)
-      const uniquePool = [...new Map(pool.map(word => [`${word.hanzi}|${normalizePinyin(word.pinyin)}`, word])).values()]
+      const uniquePool = [...new Map(pool.map(word => [`${word.hanzi}|${normalizeDictionaryPinyin(word.pinyin)}`, word])).values()]
       if (!baseLessons.length || !uniquePool.length) continue
 
-      const poolKeys = new Set(uniquePool.map(word => `${word.hanzi}|${normalizePinyin(word.pinyin)}`))
+      const poolKeys = new Set(uniquePool.map(word => `${word.hanzi}|${normalizeDictionaryPinyin(word.pinyin)}`))
       const topicalOrder = baseLessons.flatMap(lesson => lessonAssignments[lesson.id] ?? [])
       const orderedWords = [...new Map([...topicalOrder, ...uniquePool].map(word => [
-        `${word.hanzi}|${normalizePinyin(word.pinyin)}`, word,
-      ])).values()].filter(word => poolKeys.has(`${word.hanzi}|${normalizePinyin(word.pinyin)}`))
+        `${word.hanzi}|${normalizeDictionaryPinyin(word.pinyin)}`, word,
+      ])).values()].filter(word => poolKeys.has(`${word.hanzi}|${normalizeDictionaryPinyin(word.pinyin)}`))
 
       // Choose the smallest number of lessons that keeps every lesson at 15–25 words.
       const unitCount = Math.ceil(orderedWords.length / 25)
@@ -1465,6 +1466,20 @@ export default function App() {
     }
     return { lessons: display, assignments: assignmentMap, volumeCounts: volumeSizes }
   }, [lessonAssignments, lessonEntries])
+
+  const dictionaryLessonMembership = useMemo(() => {
+    const memberships = new Map<string, Set<string>>()
+    for (const [lessonId, assignedWords] of Object.entries(expandedLessonData.assignments)) {
+      for (const word of assignedWords) {
+        const id = wordId(word)
+        const lessons = memberships.get(id) ?? new Set<string>()
+        lessons.add(lessonId)
+        memberships.set(id, lessons)
+      }
+    }
+    return memberships
+  }, [expandedLessonData.assignments])
+
   const courseAllLessons = expandedLessonData.lessons.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const courseVolumeCount = expandedLessonData.volumeCounts[`${courseSystem}-${courseLevel}`] ?? 1
   const courseLessons = courseAllLessons.filter(lesson => lesson.volume === selectedVolume)
@@ -1562,6 +1577,7 @@ export default function App() {
         (level === 'all' || memberships.some(value => String(value).replace('7-9', '7') === level)) &&
         (!favoritesOnly || favoriteWordIds.includes(wordId(word))) &&
         (!knownOnly || knownWords.includes(wordId(word))) &&
+        (!dictionaryLessonId || dictionaryLessonMembership.get(wordId(word))?.has(dictionaryLessonId)) &&
         (
           searchable.toLocaleLowerCase().includes(query.toLocaleLowerCase()) ||
           (
@@ -1583,8 +1599,8 @@ export default function App() {
       }
       return a.hanzi.localeCompare(b.hanzi)
     })
-  }, [currentWords, dictionarySort, favoriteWordIds, favoritesOnly, knownOnly, knownWords, level, query, system, vocabularyCollection])
-  useEffect(() => setDictionaryPage(0), [system, level, query, vocabularyCollection, favoritesOnly, knownOnly, dictionarySort])
+  }, [currentWords, dictionaryLessonId, dictionaryLessonMembership, dictionarySort, favoriteWordIds, favoritesOnly, knownOnly, knownWords, level, query, system, vocabularyCollection])
+  useEffect(() => setDictionaryPage(0), [system, level, query, vocabularyCollection, favoritesOnly, knownOnly, dictionarySort, dictionaryLessonId])
 
   const pageSize = 60
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
@@ -1619,6 +1635,15 @@ export default function App() {
         return memberships.some(value => String(value).replace('7-9', '7') === String(levelValue))
       }).length.toLocaleString(lang)}`,
     }))
+  const dictionaryLessonOptions = expandedLessonData.lessons
+    .filter(lesson => lesson.system === system && (
+      level === 'all' || String(lesson.level) === level
+    ))
+    .map(lesson => ({
+      value: lesson.id,
+      label: `${lesson.title} · ${currentWords.filter(word => dictionaryLessonMembership.get(wordId(word))?.has(lesson.id)).length.toLocaleString(lang)}`,
+    }))
+
   const activeSectionName = section < 7
     ? t(navKeys[section])
     : t('page.profile')
@@ -2221,15 +2246,21 @@ export default function App() {
             </label>
 
             <label className="sr-only" htmlFor="system-filter">{t('vocab.system')}</label>
-            <select id="system-filter" value={system} onChange={e => { setSystem(e.target.value as System); setLevel('all') }}>
+            <select id="system-filter" value={system} onChange={e => { setSystem(e.target.value as System); setLevel('all'); setDictionaryLessonId('') }}>
               <option value="3.0">{t('vocab.hsk30')}</option>
               <option value="2.0">{t('vocab.hsk20')}</option>
             </select>
 
             <label className="sr-only" htmlFor="level-filter">{t('vocab.level')}</label>
-            <select id="level-filter" value={level} onChange={e => setLevel(e.target.value)}>
+            <select id="level-filter" value={level} onChange={e => { setLevel(e.target.value); setDictionaryLessonId('') }}>
               <option value="all">{t('vocab.allLevels')}</option>
               {levelFilterOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}
+            </select>
+
+            <label className="sr-only" htmlFor="dictionary-lesson">{lang === 'ru' ? 'Тема и урок' : lang === 'uz' ? 'Mavzu va dars' : 'Topic and lesson'}</label>
+            <select id="dictionary-lesson" value={dictionaryLessonId} onChange={e => setDictionaryLessonId(e.target.value)}>
+              <option value="">{lang === 'ru' ? 'Все темы и уроки' : lang === 'uz' ? 'Barcha mavzular va darslar' : 'All topics and lessons'}</option>
+              {dictionaryLessonOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
 
             <label className="sr-only" htmlFor="dictionary-sort">{lang === 'ru' ? 'Сортировка' : lang === 'uz' ? 'Saralash' : 'Sort order'}</label>
