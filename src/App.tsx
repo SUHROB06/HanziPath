@@ -472,7 +472,6 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
   const shuffledLessons = shuffleWithSeed([...lessons], attemptSeed ^ 0x51f15e)
   const shuffledWords = shuffleWithSeed([...new Map(safeWords.map(word => [wordId(word), word])).values()], attemptSeed ^ 0x2a91c3)
   const shuffledAudioWords = shuffleWithSeed([...new Map(safeWords.map(word => [word.example || word.hanzi, word])).values()], attemptSeed ^ 0x71b42d)
-  const uniqueListeningLessons = [...new Map(shuffledLessons.map(lesson => [lesson.grammar.example, lesson])).values()]
   const questions: ExamQuestion[] = []
   if (!lessons.length || !safeWords.length) return questions
   const writingEnd = format.listening + format.reading + format.writing
@@ -1151,9 +1150,8 @@ export default function App() {
   const practiceLessons = practiceUnits.flatMap(unit => unit.lessons)
   const practiceSelectedLesson = practiceLessons.find(lesson => lesson.id === practiceUnitId) ?? practiceLessons[0]
   const practiceUnit = practiceUnits.find(unit => unit.lessons.some(lesson => lesson.id === practiceSelectedLesson?.id))
-  const practiceWords = practiceSelectedLesson
-    ? (lessonAssignments[practiceSelectedLesson.id] ?? practiceUnit?.words ?? [])
-    : []
+  const assignedPracticeWords = practiceSelectedLesson ? lessonAssignments[practiceSelectedLesson.id] : []
+  const practiceWords = [...new Map((assignedPracticeWords?.length ? assignedPracticeWords : practiceUnit?.words ?? []).map(word => [wordId(word), word])).values()]
   const practiceLessonLabel = practiceSelectedLesson
     ? `${practiceSelectedLesson.chapter}${practiceSelectedLesson.part > 1 ? `.${practiceSelectedLesson.part}` : ''} ${practiceSelectedLesson.title}`
     : ''
