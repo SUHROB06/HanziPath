@@ -4,6 +4,7 @@ import {
   BookOpen, Headphones, Layers, Target, ChartNoAxesColumnIncreasing,
   Languages, Search, Volume2, ChevronRight, Flame, Menu, X,
   GraduationCap, CheckCircle2, LockKeyhole, Settings, Star,
+  PanelLeftClose, PanelLeftOpen, Palette,
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './supabase'
 import {
@@ -733,6 +734,15 @@ export default function App() {
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [selectedDictionaryWord, setSelectedDictionaryWord] = useState<Word | null>(null)
   const [menu, setMenu] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return window.localStorage.getItem('hanzipath.sidebarCollapsed') === 'true' } catch { return false }
+  })
+  const [theme, setTheme] = useState<'light' | 'dark' | 'burgundy'>(() => {
+    try {
+      const saved = window.localStorage.getItem('hanzipath.theme')
+      return saved === 'dark' || saved === 'burgundy' ? saved : 'light'
+    } catch { return 'light' }
+  })
   const [done, setDone] = useState<boolean[]>(() => {
     const saved = readStored<{ date: string; done: boolean[] } | null>(DAILY_TASKS_KEY, null)
     return saved?.date === localDateKey() && Array.isArray(saved.done) && saved.done.length === 3
@@ -774,6 +784,14 @@ export default function App() {
   const localeChangeRef = useRef(0)
   const wordDialogRef = useRef<HTMLDialogElement>(null)
   const t = (key: TranslationKey) => translate(lang, key)
+
+  useEffect(() => {
+    try { window.localStorage.setItem('hanzipath.theme', theme) } catch { /* Storage may be disabled. */ }
+  }, [theme])
+
+  useEffect(() => {
+    try { window.localStorage.setItem('hanzipath.sidebarCollapsed', String(sidebarCollapsed)) } catch { /* Storage may be disabled. */ }
+  }, [sidebarCollapsed])
 
   useEffect(() => {
     let cancelled = false
@@ -1361,11 +1379,12 @@ export default function App() {
     else setExamIndex(index => index + 1)
   }
 
-  return <div className="app">
+  return <div className={`app ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`} data-theme={theme}>
     <aside className={`sidebar ${menu ? 'show' : ''}`} aria-label={t('nav.group')}>
       <div className="brand">
         <div className="brandmark" aria-hidden="true">汉</div>
         <div><b>HanziPath</b><small>汉字之路</small></div>
+        <button className="sidebar-collapse" type="button" aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} onClick={() => setSidebarCollapsed(value => !value)}>{sidebarCollapsed ? <PanelLeftOpen size={18}/> : <PanelLeftClose size={18}/>}</button>
         <button className="mobile-close" aria-label={t('common.closeMenu')} onClick={() => setMenu(false)}><X/></button>
       </div>
 
@@ -1422,6 +1441,16 @@ export default function App() {
         <div className="crumb">HanziPath <span>/</span> {activeSectionName}</div>
 
         <div className="top-actions">
+          <label className="theme-select" title={lang === 'ru' ? 'Тема оформления' : lang === 'uz' ? 'Mavzu' : 'Appearance theme'}>
+            <Palette size={16}/>
+            <span className="sr-only">{lang === 'ru' ? 'Тема оформления' : lang === 'uz' ? 'Mavzu' : 'Appearance theme'}</span>
+            <select aria-label={lang === 'ru' ? 'Тема оформления' : lang === 'uz' ? 'Mavzu' : 'Appearance theme'} value={theme} onChange={event => setTheme(event.target.value as 'light' | 'dark' | 'burgundy')}>
+              <option value="light">{lang === 'ru' ? 'Светлая' : lang === 'uz' ? 'Yorug‘' : 'Light'}</option>
+              <option value="dark">{lang === 'ru' ? 'Тёмная' : lang === 'uz' ? 'Qorong‘i' : 'Dark'}</option>
+              <option value="burgundy">{lang === 'ru' ? 'Бордовая' : lang === 'uz' ? 'Bordo' : 'Burgundy'}</option>
+            </select>
+          </label>
+
           <label className="language-select">
             <Languages size={17}/>
             <span className="sr-only">{t('language.label')}</span>
