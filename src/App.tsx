@@ -1868,7 +1868,7 @@ export default function App() {
     })
     .filter((item): item is NonNullable<typeof item> => item !== null)
 
-  const profileWords = reviewWords ?? databaseWords ?? []
+  const profileWords = databaseWords ?? (reviewWords?.length ? reviewWords : [])
   const profileKnownCount = profileWords.filter(word => knownWords.includes(wordId(word))).length
   const profileFavoriteCount = profileWords.filter(word => favoriteWordIds.includes(wordId(word))).length
   const profileExamAverage = examHistory.length
@@ -1893,10 +1893,10 @@ export default function App() {
 
 
   const startExam = () => {
-    const sourceWords = reviewWords?.length
-      ? reviewWords
-      : databaseWords?.length
-        ? databaseWords
+    const sourceWords = databaseWords?.length
+      ? databaseWords
+      : reviewWords?.length
+        ? reviewWords
         : null
     if (!sourceWords) {
       setNotice({
