@@ -69,19 +69,35 @@ assert.deepEqual(merged.dailyTasks.done, [true, true, false])
 assert.equal(merged.dailyReviewCount.count, 5)
 assert.equal(merged.examHistory.length, 1)
 
+const quality = await loadTypeScriptModule('../src/data/dictionaryQuality.ts')
 const dataset = JSON.parse(await readFile(new URL('../public/vocabulary-review.json', import.meta.url), 'utf8'))
 const entries = Array.isArray(dataset.entries) ? dataset.entries : []
+const audit = quality.auditDictionaryEntries(entries)
+assert.equal(audit.rows, 11147)
+assert.equal(audit.uniqueEntries, 11059)
+assert.equal(audit.duplicateRowsCollapsed, 88)
+assert.equal(audit.pinyinWithoutTone, 18)
+assert.equal(audit.missingExamples, 11147)
+
+const duplicateMerge = quality.mergeDictionaryEntries([
+  { sourceEntryKey: 'legacy-a', hanzi: '好', pinyin: 'hǎo', ru: 'хороший', en: 'good', uz: 'yaxshi', level20: 1, level30: 1 },
+  { sourceEntryKey: 'legacy-b', hanzi: '好', pinyin: 'hao3', ru: 'хорошо', en: 'well', uz: 'yaxshi', level20: null, level30: 5 },
+])
+assert.equal(duplicateMerge.length, 1)
+assert.deepEqual(duplicateMerge[0].level20Memberships, [1])
+assert.deepEqual(duplicateMerge[0].level30Memberships, [1, 5])
+assert.match(duplicateMerge[0].ru, /хороший \/ хорошо/)
+assert.deepEqual(duplicateMerge[0].legacyIds.sort(), ['legacy-a', 'legacy-b'])
+
 const missing = Object.fromEntries(['hanzi', 'pinyin', 'ru', 'en', 'uz'].map(key => [
   key,
   entries.filter(entry => !String(entry[key] ?? '').trim()).length,
 ]))
-const missingExamples = entries.filter(entry => !String(entry.example ?? '').trim()).length
 const unverified = entries.filter(entry => entry.membershipStatus !== 'verified').length
 
-console.log('Learning logic tests passed.')
+console.log('Learning logic and dictionary deduplication tests passed.')
 console.log(JSON.stringify({
-  dictionaryCandidateRows: entries.length,
+  dictionaryAudit: audit,
   missingCoreFields: missing,
-  missingExamples,
   unverifiedMemberships: unverified,
 }, null, 2))
