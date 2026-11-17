@@ -23,6 +23,7 @@ import { lessonVocabulary } from './data/lessonVocabulary'
 import {
   getStandardVersions,
   getVocabularyCatalog,
+  getVocabularyCatalogStatus,
 } from './data/vocabularyRepository'
 import type { StandardLevel } from './types/vocabulary'
 
@@ -1020,6 +1021,25 @@ export default function App() {
           return
         }
 
+        const catalogStatus = await getVocabularyCatalogStatus(
+          standard.id,
+          getLevelValue(level),
+        )
+
+        if (catalogStatus.error) {
+          throw new Error(catalogStatus.error.message)
+        }
+
+        if (cancelled) return
+        setCatalogCandidateCount(catalogStatus.data.totalMemberships)
+
+        // Candidate rows stay out of the public dictionary until membership,
+        // readings, translations, and source rights have been reviewed.
+        if (catalogStatus.data.verifiedMemberships === 0) {
+          setDatabaseWords(null)
+          return
+        }
+
         const catalogResult = await getVocabularyCatalog({
           standardVersionId: standard.id,
           level: getLevelValue(level),
@@ -1036,7 +1056,6 @@ export default function App() {
           .map(word => [`${word.hanzi}|${normalizePinyin(word.pinyin)}`, word] as const)).values()]
 
         if (!cancelled) {
-          setCatalogCandidateCount(catalogResult.data.length)
           setDatabaseWords(converted.length > 0 ? converted : null)
         }
       } catch (error) {
