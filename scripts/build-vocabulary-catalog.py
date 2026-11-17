@@ -459,8 +459,14 @@ def build_catalog(marpalo_root: Path, zhongdex_root: Path, zitou_csv: Path, old_
             "hsk20": {
                 "repository": MARPALO_REPO,
                 "commit": MARPALO_SHA,
-                "description": "Official HSK 2.0 (2009) word list",
+                "description": "HSK 2.0 (2009) word list",
                 "license": "CC BY 4.0; CC-CEDICT definitions CC BY-SA 4.0",
+            },
+            "translations": {
+                "repository": ZITOU_REPO,
+                "commit": ZITOU_SHA,
+                "description": "HSK Chinese–Uzbek–Russian vocabulary; AI-assisted translations",
+                "license": "CC BY 4.0",
             },
         },
         "stats": stats,
