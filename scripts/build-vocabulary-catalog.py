@@ -21,6 +21,8 @@ POS_MAP = {
     "m":"measure word","M":"measure word","measure":"measure word","int":"interjection","Int":"interjection","interjection":"interjection",
     "aux":"auxiliary","Aux":"auxiliary","auxiliary":"auxiliary","det":"determiner","Det":"determiner","determiner":"determiner",
     "onom":"onomatopoeia","Onomat":"onomatopoeia","phrase":"phrase","idiom":"idiom","character":"character",
+    "suffix":"suffix","prefix":"prefix","phonetic":"phonetic","intj":"interjection",
+    "abbr":"abbreviation","abbreviation":"abbreviation","excl":"interjection","exclamation":"interjection",
 }
 
 def norm_pinyin(value):
@@ -214,7 +216,7 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
         fallback_meanings = cedict_fallback.get((word, norm_pinyin_num(pinyin_num)), [])
         if not meanings and fallback_meanings:
             meanings = fallback_meanings
-        pos = normalize_pos(row.get("pos",[]))
+        pos = normalize_pos(list(row.get("pos",[])) + [definition.get("pos","") for definition in row.get("definitions",[])])
         attribution = [
             {"source":d.get("source",""),"sourceKey":d.get("sourceKey",""),"license":d.get("license","")}
             for d in row.get("definitions",[]) if d.get("source") or d.get("license")
