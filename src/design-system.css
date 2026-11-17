@@ -583,3 +583,61 @@ footer { color:#9a8772; }
   .hp-resume-copy h2 { font-size:19px; }
   .hp-resume { min-height:190px; }
 }
+
+
+/* Dictionary micro-interactions: preserve the existing imperial-red palette. */
+.dictionary .word {
+  transform: translateY(0);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  animation: hp-dictionary-enter .28s ease both;
+}
+.dictionary .word:nth-child(2) { animation-delay: 20ms; }
+.dictionary .word:nth-child(3) { animation-delay: 40ms; }
+.dictionary .word:nth-child(4) { animation-delay: 60ms; }
+.dictionary .word:nth-child(5) { animation-delay: 80ms; }
+.dictionary .word:hover {
+  transform: translateY(-2px);
+  border-color: #d8c29f;
+  box-shadow: 0 9px 22px rgba(80, 30, 30, .075);
+}
+.dictionary .word-open svg,
+.dictionary .sound svg,
+.dictionary .dictionary-clear-search svg {
+  transition: transform .18s ease, color .18s ease;
+}
+.dictionary .word-open:hover svg { transform: translateX(2px); }
+.dictionary .sound:hover svg { transform: scale(1.08); }
+.dictionary-clear-search {
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: #f5eadb;
+  color: #8f1d27;
+}
+.dictionary-clear-search:hover { background: #efdfca; }
+.dictionary-filters select { transition: border-color .18s ease, box-shadow .18s ease; }
+.dictionary-filters select:focus-visible {
+  border-color: #b47d46;
+  box-shadow: 0 0 0 3px rgba(216,169,79,.16);
+}
+.dictionary-known-action { width: 100%; margin: 12px 0 4px; }
+.dictionary-known-action.selected { background: #f5e3df; border-color: #a73a3f; color: #7e202a; }
+.catalog-review-notice { border-left-color: #b47d46; }
+.word-detail-dialog[open] .word-detail { animation: hp-word-detail-in .2s ease both; }
+.word-detail-dialog[open]::backdrop { animation: hp-dialog-backdrop-in .18s ease both; }
+@keyframes hp-dictionary-enter {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes hp-word-detail-in {
+  from { opacity: 0; transform: translateY(8px) scale(.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes hp-dialog-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
