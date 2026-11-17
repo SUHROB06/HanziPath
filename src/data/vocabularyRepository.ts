@@ -21,7 +21,7 @@ const EMPTY_CATALOG_ERROR: RepositoryError = {
   message: 'Vocabulary catalog is unavailable because Supabase is not configured.',
 }
 
-const PAGE_SIZE = 100
+const PAGE_SIZE = 500
 const DEFAULT_SEARCH_LIMIT = 50
 const MAX_SEARCH_LIMIT = 100
 
@@ -76,6 +76,7 @@ function unique<T extends { id: string }>(rows: T[]): T[] {
  */
 async function fetchAllPages<T extends { id: string }>(
   queryPage: (cursor: string | null, limit: number) => any,
+  pageSize = PAGE_SIZE,
 ): Promise<RepositoryResult<T[]>> {
   const rows: T[] = []
   let cursor: string | null = null
@@ -83,7 +84,7 @@ async function fetchAllPages<T extends { id: string }>(
 
   try {
     while (true) {
-      const { data, error, count } = await queryPage(cursor, PAGE_SIZE)
+      const { data, error, count } = await queryPage(cursor, pageSize)
 
       if (error) return failed([], error)
 
@@ -102,7 +103,7 @@ async function fetchAllPages<T extends { id: string }>(
 
       const page = (data ?? []) as T[]
       const expectedPageSize = Math.min(
-        PAGE_SIZE,
+        pageSize,
         Math.max(0, expectedTotal - rows.length),
       )
 
@@ -329,7 +330,7 @@ export async function getVocabularyCatalog(
   const client = supabase
   const requestedLimit = options.limit ?? PAGE_SIZE
   const limit = Number.isFinite(requestedLimit)
-    ? Math.max(1, Math.min(Math.floor(requestedLimit), 3000))
+    ? Math.max(1, Math.min(Math.floor(requestedLimit), 12000))
     : PAGE_SIZE
 
   try {
@@ -337,43 +338,46 @@ export async function getVocabularyCatalog(
     const levelByItem = new Map<string, StandardLevel>()
 
     if (options.standardVersionId) {
-      let membershipQuery = client.from('standard_memberships')
-        .select('vocabulary_item_id, level_category')
-        .eq('standard_version_id', options.standardVersionId)
-        .order('level_order', { ascending: true })
+      const memberships = await fetchAllPages<{
+        id: string
+        vocabulary_item_id: string
+        level_category: StandardLevel
+      }>((cursor, pageSize) => {
+        let query = client.from('standard_memberships')
+          .select('id, vocabulary_item_id, level_category', { count: 'exact' })
+          .eq('standard_version_id', options.standardVersionId)
 
-      if (options.level) {
-        membershipQuery = membershipQuery.eq(
-          'level_category',
-          options.level,
-        )
-      }
+        if (options.level) query = query.eq('level_category', options.level)
+        return keysetPage(query, cursor, pageSize)
+      }, 500)
 
-      const { data, error } = await membershipQuery.limit(limit)
+      if (memberships.error) return failed([], memberships.error)
 
-      if (error) return failed([], error)
-
-      for (const membership of data ?? []) {
-        const itemId = membership.vocabulary_item_id as string
-        itemIds.push(itemId)
-        levelByItem.set(
-          itemId,
-          membership.level_category as StandardLevel,
-        )
+      for (const membership of memberships.data) {
+        itemIds.push(membership.vocabulary_item_id)
+        levelByItem.set(membership.vocabulary_item_id, membership.level_category)
       }
     } else {
-      const { data, error } = await client.from('vocabulary_items')
-        .select('id')
-        .order('simplified', { ascending: true })
-        .limit(limit)
+      const items = await fetchAllPages<{ id: string }>((cursor, pageSize) =>
+        keysetPage(
+          client.from('vocabulary_items').select('id', { count: 'exact' }),
+          cursor,
+          pageSize,
+        ),
+      , 500)
 
-      if (error) return failed([], error)
-
-      itemIds = (data ?? []).map(row => row.id as string)
+      if (items.error) return failed([], items.error)
+      itemIds = items.data.map(row => row.id)
     }
 
     itemIds = [...new Set(itemIds)]
 
+    if (itemIds.length > limit) {
+      return failed([], {
+        code: 'CATALOG_LIMIT_EXCEEDED',
+        message: `The vocabulary catalog contains ${itemIds.length} items, above the requested limit of ${limit}. Increase the catalog limit instead of displaying a partial list.`,
+      })
+    }
     if (itemIds.length === 0) {
       return { data: [], error: null }
     }
