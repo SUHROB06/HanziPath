@@ -94,6 +94,10 @@ function partOfSpeechLabel(value: string, lang: Locale): string {
     phrase: { ru: 'Выражение', en: 'Phrase', uz: 'Ibora' },
     idiom: { ru: 'Идиома', en: 'Idiom', uz: 'Iboraviy birlik' },
     character: { ru: 'Иероглиф', en: 'Character', uz: 'Iyeroglif' },
+    suffix: { ru: 'Суффикс', en: 'Suffix', uz: 'Qo‘shimcha' },
+    prefix: { ru: 'Префикс', en: 'Prefix', uz: 'Old qo‘shimcha' },
+    phonetic: { ru: 'Фонетический компонент', en: 'Phonetic component', uz: 'Fonetik komponent' },
+    abbreviation: { ru: 'Сокращение', en: 'Abbreviation', uz: 'Qisqartma' },
   }
   return labels[value]?.[lang] ?? value
 }
