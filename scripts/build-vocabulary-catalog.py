@@ -357,7 +357,8 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
             traditional_values=unique_text([row.get("traditional","") for row in zitou_rows])
             source="Maqsudjonpolatov / Zitou HSK Chinese–Uzbek–Russian"
             license_name="CC BY 4.0"
-            status="ai_assisted_unverified"
+            ru_status="ai_assisted_unverified"
+            uz_status="ai_assisted_unverified"
             ranks=[int(row["frequency_rank"]) for row in zitou_rows if str(row.get("frequency_rank","")).isdigit()]
             frequency_rank=min(ranks) if ranks else None
             entries_with_zitou+=1
@@ -365,9 +366,10 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
             ru_values=unique_text([row.get("ru","") for row in old_rows])
             uz_values=unique_text([row.get("uz","") for row in old_rows])
             traditional_values=unique_text([row.get("traditional","") for row in old_rows])
-            source="Zitou HSK Chinese–Uzbek–Russian candidate bundle"
-            license_name="CC BY 4.0 (publisher-declared)"
-            status="source_unverified"
+            source="HanziPath HSK vocabulary review dataset"
+            license_name="CC BY-SA 4.0"
+            ru_status=" / ".join(unique_text([row.get("ruStatus","") for row in old_rows])) or "source_unverified"
+            uz_status=" / ".join(unique_text([row.get("uzStatus","") for row in old_rows])) or "source_unverified"
             frequency_rank=None
             entries_with_old_fallback+=1
         else:
@@ -380,8 +382,8 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
             "wordKey":primary["wordKey"],"hanzi":word,"pinyinNum":primary.get("pinyinNum",""),
             "traditional":traditional_values[0] if traditional_values else primary.get("traditional",word),
             "ru":ru,"uz":uz,
-            "ruStatus":status if ru else "missing_translation",
-            "uzStatus":status if uz else "missing_translation",
+            "ruStatus":ru_status if ru else "missing_translation",
+            "uzStatus":uz_status if uz else "missing_translation",
             "translationSource":source,"translationLicense":license_name,
             "frequencyRank":frequency_rank,
         })
@@ -425,6 +427,17 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
         "repository":ZITOU_REPO,"commit":ZITOU_SHA,
         "description":"HSK Chinese–Uzbek–Russian vocabulary; AI-assisted translations","license":"CC BY 4.0",
     }
+    sources_review={
+        "source":"HanziPath HSK vocabulary review dataset",
+        "path":"public/vocabulary-review.json",
+        "description":"Existing 11,147-entry review bundle; includes source-backed and AI-draft Russian/Uzbek translations with per-field review status.",
+        "license":"CC BY-SA 4.0",
+        "attribution":[
+            {"name":"HearMandarin","url":"https://hearmandarin.com/datasets/","license":"CC BY 4.0"},
+            {"name":"Zitou","url":"https://huggingface.co/datasets/Maqsudjonpolatov/hsk-chinese-uzbek-russian","license":"CC BY 4.0"},
+            {"name":"HanziBook / CC-CEDICT","url":"https://hanzibook.com/ru/hsk-3-0","license":"CC BY-SA 4.0"},
+        ],
+    }
 
     hsk30_document={
         "schema":"hanzipath/hsk30-catalog/v1","license":"CC BY-SA 4.0",
@@ -443,8 +456,8 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
         "entries":hsk20_entries,
     }
     translations_document={
-        "schema":"hanzipath/ru-uz-translations/v1","license":"CC BY 4.0",
-        "sources":{"translations":sources_translations},
+        "schema":"hanzipath/ru-uz-translations/v1","license":"CC BY-SA 4.0",
+        "sources":{"translations":sources_translations,"reviewFallback":sources_review},
         "stats":{"entries":len(translations),"fromZitouCsv":entries_with_zitou,"fromCandidateFallback":entries_with_old_fallback,"missingFromCombinedCatalog":total_keys-len(translation_keys)},
         "entries":translations,
     }
