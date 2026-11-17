@@ -26,6 +26,9 @@ import {
   getVocabularyCatalogStatus,
 } from './data/vocabularyRepository'
 import type { StandardLevel } from './types/vocabulary'
+import { mergeLearningProgress, type LearningProgressSnapshot } from './data/learningProgress'
+import { adaptiveDifficulty, dueReviewIds, scheduleReview, type ReviewQuality, type ReviewState } from './data/spacedRepetition'
+import { mergeDictionaryEntries, normalizeDictionaryPinyin } from './data/dictionaryQuality'
 
 type System = '2.0' | '3.0'
 
@@ -46,6 +49,21 @@ type Word = {
   courseSystems?: CourseSystem[]
   level20: number | string | null
   level30: number | string | null
+  level20Memberships?: Array<number | string>
+  level30Memberships?: Array<number | string>
+  legacyIds?: string[]
+  partOfSpeech?: string[]
+  frequencyRank?: number | null
+  pinyinNum?: string
+  translationSource?: string
+  translationLicense?: string
+  membershipSource?: string
+  definitionSource?: string
+  dataLicense?: string
+  exampleSource?: string
+  exampleSourceId?: string
+  exampleLicense?: string
+  exampleStatus?: string
   example: string
   examplePinyin: string
   exampleRu: string
@@ -56,6 +74,33 @@ type Word = {
 
 type Notice = { text: string; kind: 'success' | 'error' | 'info' }
 type DisplayLesson = LessonTemplate & { volume: number; volumeLesson: number; mergedLessons?: LessonTemplate[] }
+
+function partOfSpeechLabel(value: string, lang: Locale): string {
+  const labels: Record<string, Record<Locale, string>> = {
+    noun: { ru: 'Существительное', en: 'Noun', uz: 'Ot' },
+    verb: { ru: 'Глагол', en: 'Verb', uz: 'Fe’l' },
+    adjective: { ru: 'Прилагательное', en: 'Adjective', uz: 'Sifat' },
+    adverb: { ru: 'Наречие', en: 'Adverb', uz: 'Ravish' },
+    pronoun: { ru: 'Местоимение', en: 'Pronoun', uz: 'Olmosh' },
+    numeral: { ru: 'Числительное', en: 'Numeral', uz: 'Son' },
+    preposition: { ru: 'Предлог', en: 'Preposition', uz: 'Ko‘makchi' },
+    conjunction: { ru: 'Союз', en: 'Conjunction', uz: 'Bog‘lovchi' },
+    particle: { ru: 'Частица', en: 'Particle', uz: 'Yuklama' },
+    classifier: { ru: 'Счётное слово', en: 'Classifier', uz: 'Hisob so‘zi' },
+    'measure word': { ru: 'Счётное слово', en: 'Measure word', uz: 'Hisob so‘zi' },
+    interjection: { ru: 'Междометие', en: 'Interjection', uz: 'Undov' },
+    auxiliary: { ru: 'Вспомогательный глагол', en: 'Auxiliary', uz: 'Yordamchi fe’l' },
+    determiner: { ru: 'Определитель', en: 'Determiner', uz: 'Aniqlovchi' },
+    phrase: { ru: 'Выражение', en: 'Phrase', uz: 'Ibora' },
+    idiom: { ru: 'Идиома', en: 'Idiom', uz: 'Iboraviy birlik' },
+    character: { ru: 'Иероглиф', en: 'Character', uz: 'Iyeroglif' },
+    suffix: { ru: 'Суффикс', en: 'Suffix', uz: 'Qo‘shimcha' },
+    prefix: { ru: 'Префикс', en: 'Prefix', uz: 'Old qo‘shimcha' },
+    phonetic: { ru: 'Фонетический компонент', en: 'Phonetic component', uz: 'Fonetik komponent' },
+    abbreviation: { ru: 'Сокращение', en: 'Abbreviation', uz: 'Qisqartma' },
+  }
+  return labels[value]?.[lang] ?? value
+}
 
 function normalizePinyin(value: string): string {
   return value.toLowerCase()
@@ -142,13 +187,16 @@ const FAVORITE_WORDS_KEY = 'hanzipath.favoriteWords'
 const DAILY_TASKS_KEY = 'hanzipath.dailyTasks'
 const ACTIVITY_DAYS_KEY = 'hanzipath.activityDays'
 const COMPLETED_LESSONS_KEY = 'hanzipath.completedLessons'
+const REVIEW_SCHEDULE_KEY = 'hanzipath.reviewSchedule'
+const DAILY_REVIEW_COUNT_KEY = 'hanzipath.dailyReviewCount'
+const DAILY_GOAL_WORDS_KEY = 'hanzipath.dailyGoalWords'
 
 const lessonTemplates = [...hsk20LessonTemplates, ...hsk30LessonTemplates]
 const originalLessonWords: Word[] = (() => {
   const unique = new Map<string, Word>()
 
   lessonVocabulary.forEach((entry, index) => {
-    const key = `${entry.stage}|${entry.hanzi}|${normalizePinyin(entry.pinyin)}`
+    const key = `${entry.stage}|${entry.hanzi}|${normalizeDictionaryPinyin(entry.pinyin)}`
     const existing = unique.get(key)
 
     if (existing) {
@@ -245,6 +293,7 @@ type ExamQuestion = {
   answer: string
   audio?: string
   pinyin?: string
+  explanation?: string
   manualReview?: boolean
 }
 
@@ -463,11 +512,16 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
   const standardValue = (word: Word) => system === '2.0' ? word.level20 : word.level30
   const uniqueWords = (items: Word[]) => [...new Map(items
     .filter(word => word.hanzi && word.pinyin && (localeMeaning(word, locale) || word.en || word.ru))
-    .map(word => [word.hanzi + '|' + normalizePinyin(word.pinyin), word] as const)).values()]
+    .map(word => {
+      const pronunciation = word.pinyinNum
+        ? word.pinyinNum.toLowerCase().split(' ').join('').split("'").join('').split('’').join('')
+        : normalizePinyin(word.pinyin)
+      return [word.hanzi + '|' + pronunciation, word] as const
+    })).values()]
   const wordPool = system === '3.0' && level >= 7
-    ? words.filter(word => String(word.level30 ?? '') === '7-9')
+    ? words.filter(word => ['7', '7-9'].includes(String(word.level30 ?? '')))
     : words.filter(word => Number(standardValue(word)) > 0 && Number(standardValue(word)) <= level)
-  const safeWords = shuffleWithSeed(uniqueWords(wordPool.length ? wordPool : words), attemptSeed + 31)
+  const safeWords = shuffleWithSeed(uniqueWords(wordPool), attemptSeed + 31)
   const lessonPool = lessonTemplates.filter(lesson => lesson.system === system && (
     system === '3.0' && level >= 7 ? lesson.level >= 7 : lesson.level <= level
   ))
@@ -506,6 +560,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
           answer,
           audio: lesson.grammar.example,
           pinyin: lesson.grammar.pinyin,
+          explanation: `${lesson.grammar.example} · ${lesson.grammar.pinyin} · ${lesson.grammar.meaning}`,
         })
       } else {
         const word = safeWords[(index - lessons.length) % safeWords.length]
@@ -518,6 +573,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
           answer,
           audio: word.hanzi,
           pinyin: word.pinyin,
+          explanation: `${word.hanzi} · ${word.pinyin} · ${meaningOf(word)}`,
         })
       }
       continue
@@ -534,6 +590,8 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
           prompt: locale === 'ru' ? 'Выбери значение слова ' + word.hanzi + ' (' + word.pinyin + ').' : locale === 'uz' ? word.hanzi + ' (' + word.pinyin + ') so‘zining ma’nosini tanlang.' : 'Choose the meaning of ' + word.hanzi + ' (' + word.pinyin + ').',
           options: makeOptions(answer, safeWords.filter(item => wordId(item) !== wordId(word)).map(meaningOf), seed),
           answer,
+          pinyin: word.pinyin,
+          explanation: `${word.hanzi} · ${word.pinyin} · ${answer}`,
         })
       } else {
         const lesson = lessons[readingLessonIndex++]
@@ -544,6 +602,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
           prompt: locale === 'ru' ? 'Прочитай фразу ' + lesson.grammar.example + ' и выбери её значение.' : locale === 'uz' ? lesson.grammar.example + ' gapini o‘qing va ma’nosini tanlang.' : 'Read ' + lesson.grammar.example + ' and choose its meaning.',
           options: makeOptions(answer, lessons.filter(item => item.id !== lesson.id).map(item => item.grammar.meaning), seed),
           answer,
+          explanation: `${lesson.grammar.example} · ${lesson.grammar.pinyin} · ${answer}`,
         })
       }
       continue
@@ -560,6 +619,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
           prompt: locale === 'ru' ? 'Запиши иероглифами слово: ' + word.pinyin + ' (' + meaning + ')' : locale === 'uz' ? word.pinyin + ' (' + meaning + ') so‘zini ierogliflar bilan yozing.' : 'Write the Chinese characters for ' + word.pinyin + ' (' + meaning + ').',
           options: [],
           answer: word.hanzi,
+          explanation: `${word.hanzi} · ${word.pinyin} · ${meaning}`,
         })
         continue
       }
@@ -570,6 +630,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
           prompt: locale === 'ru' ? 'Напиши короткий связный текст по теме «' + lesson.title + '». Используй фразу ' + lesson.grammar.example + ' как опору.' : locale === 'uz' ? '«' + lesson.title + '» mavzusida qisqa matn yozing. ' + lesson.grammar.example + ' gapidan foydalaning.' : 'Write a short text about “' + lesson.title + '”. Use ' + lesson.grammar.example + ' as a starting point.',
           options: [],
           answer: '',
+          explanation: locale === 'ru' ? 'Самопроверка: тема раскрыта, структура связная, грамматика и целевая конструкция использованы правильно.' : locale === 'uz' ? 'O‘zini tekshirish: mavzu yoritilgan, matn izchil, grammatika va kerakli tuzilma to‘g‘ri ishlatilgan.' : 'Self-check: address the topic, keep a clear structure, and use the target grammar accurately.',
           manualReview: true,
         })
         continue
@@ -583,6 +644,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
         prompt: locale === 'ru' ? 'Составь фразу из частей: ' + shuffledPieces.join(' / ') : locale === 'uz' ? 'Berilgan bo‘laklardan gap tuzing: ' + shuffledPieces.join(' / ') : 'Rebuild the sentence from these parts: ' + shuffledPieces.join(' / '),
         options: [],
         answer: lesson.grammar.example,
+        explanation: `${lesson.grammar.example} · ${lesson.grammar.pinyin} · ${lesson.grammar.meaning}`,
       })
       continue
     }
@@ -598,7 +660,8 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
             ? translateToChinese ? 'Quyidagi ma’noni xitoy tilida ifodalang: «' + lesson.grammar.meaning + '»' : 'Gapni o‘zbekchaga tarjima qiling: ' + lesson.grammar.example
             : translateToChinese ? 'Express this meaning in Chinese: “' + lesson.grammar.meaning + '”' : 'Translate into English: ' + lesson.grammar.example,
         options: [],
-        answer: '',
+        answer: translateToChinese ? lesson.grammar.example : lesson.grammar.meaning,
+        explanation: locale === 'ru' ? `Ориентир для самопроверки: ${translateToChinese ? lesson.grammar.example : lesson.grammar.meaning}` : locale === 'uz' ? `O‘zini tekshirish uchun namuna: ${translateToChinese ? lesson.grammar.example : lesson.grammar.meaning}` : `Reference for self-review: ${translateToChinese ? lesson.grammar.example : lesson.grammar.meaning}`,
         manualReview: true,
       })
       continue
@@ -609,7 +672,8 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       part: partNumber(index - translationEnd, format.speakingParts),
       prompt: locale === 'ru' ? 'Ответь вслух, затем запиши ключевые мысли: ' + lesson.grammar.meaning : locale === 'uz' ? 'Javobni ovoz chiqarib ayting, so‘ng asosiy fikrlarni yozing: ' + lesson.grammar.meaning : 'Answer aloud, then write your key points: ' + lesson.grammar.meaning,
       options: [],
-      answer: '',
+      answer: lesson.grammar.example,
+      explanation: locale === 'ru' ? `Самопроверка: ответ по теме, понятная структура и корректное произношение. Пример: ${lesson.grammar.example} (${lesson.grammar.pinyin}).` : locale === 'uz' ? `O‘zini tekshirish: mavzuga mos javob, aniq tuzilma va to‘g‘ri talaffuz. Namuna: ${lesson.grammar.example} (${lesson.grammar.pinyin}).` : `Self-check: stay on topic, speak clearly, and use accurate pronunciation. Example: ${lesson.grammar.example} (${lesson.grammar.pinyin}).`,
       manualReview: true,
     })
   }
@@ -686,6 +750,13 @@ function databaseRowToWord(row: any, system: System): Word {
   const level = row.level_category === '7-9'
     ? 7
     : Number(row.level_category ?? 1)
+  const partOfSpeech: string[] = []
+  for (const reading of readings as any[]) {
+    const value = reading.part_of_speech
+    if (typeof value === 'string' && value.length > 0 && !partOfSpeech.includes(value)) {
+      partOfSpeech.push(value)
+    }
+  }
 
   return {
     sourceEntryKey: row.id ? `vocabulary-db-${row.id}` : undefined,
@@ -701,6 +772,9 @@ function databaseRowToWord(row: any, system: System): Word {
     uzStatus: meaning('uz') ? undefined : 'source_unverified',
     level20: system === '2.0' ? level : null,
     level30: system === '3.0' ? level : null,
+    level20Memberships: system === '2.0' ? [level] : [],
+    level30Memberships: system === '3.0' ? [level] : [],
+    partOfSpeech,
     example: example?.sentence_hanzi ?? '',
     examplePinyin: example?.sentence_pinyin ?? '',
     exampleRu: exampleMeaning('ru') ?? '',
@@ -716,6 +790,7 @@ function reviewRowToWord(row: any, index: number): Word {
     hanzi: row.hanzi ?? '',
     traditional: row.traditional ?? '',
     pinyin: row.pinyin ?? '',
+    pinyinNum: row.pinyinNum ?? '',
     ru: row.ru ?? '',
     en: row.en ?? '',
     uz: row.uz ?? null,
@@ -726,10 +801,26 @@ function reviewRowToWord(row: any, index: number): Word {
     membershipStatus: row.membershipStatus,
     level20: row.level20 ?? null,
     level30: row.level30 ?? null,
-    example: sample?.example ?? '',
-    examplePinyin: sample?.examplePinyin ?? '',
-    exampleRu: sample?.exampleRu ?? '',
-    exampleEn: sample?.exampleEn ?? '',
+    level20Memberships: Array.isArray(row.level20Memberships) ? row.level20Memberships : undefined,
+    level30Memberships: Array.isArray(row.level30Memberships) ? row.level30Memberships : undefined,
+    legacyIds: Array.isArray(row.legacyIds) ? row.legacyIds : [],
+    partOfSpeech: Array.isArray(row.partOfSpeech) ? row.partOfSpeech : [],
+    frequencyRank: Number.isFinite(Number(row.frequencyRank)) ? Number(row.frequencyRank) : null,
+    translationSource: row.translationSource,
+    translationLicense: row.translationLicense,
+    membershipSource: row.membershipSource,
+    definitionSource: row.definitionSource,
+    dataLicense: row.dataLicense,
+    example: row.example || sample?.example || '',
+    examplePinyin: row.examplePinyin || sample?.examplePinyin || '',
+    exampleRu: row.exampleRu || sample?.exampleRu || '',
+    exampleEn: row.exampleEn || sample?.exampleEn || '',
+    exampleUz: row.exampleUz ?? null,
+    exampleUzVerified: Boolean(row.exampleUzVerified),
+    exampleSource: row.exampleSource,
+    exampleSourceId: row.exampleSourceId,
+    exampleLicense: row.exampleLicense,
+    exampleStatus: row.exampleStatus,
   }
 }
 
@@ -747,7 +838,9 @@ export default function App() {
   const [dictionaryPage, setDictionaryPage] = useState(0)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [knownOnly, setKnownOnly] = useState(false)
-  const [dictionarySort, setDictionarySort] = useState<'hanzi' | 'pinyin' | 'level'>('hanzi')
+  const [dictionarySort, setDictionarySort] = useState<'hanzi' | 'pinyin' | 'level' | 'frequency'>('hanzi')
+  const [dictionaryLessonId, setDictionaryLessonId] = useState('')
+  const [dictionaryPosFilter, setDictionaryPosFilter] = useState('')
   const [selectedDictionaryWord, setSelectedDictionaryWord] = useState<Word | null>(null)
   const [menu, setMenu] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -768,6 +861,12 @@ export default function App() {
   const [knownWords, setKnownWords] = useState<string[]>(() => readStored(KNOWN_WORDS_KEY, []))
   const [favoriteWordIds, setFavoriteWordIds] = useState<string[]>(() => readStored(FAVORITE_WORDS_KEY, []))
   const [activityDays, setActivityDays] = useState<string[]>(() => readStored(ACTIVITY_DAYS_KEY, []))
+  const [reviewSchedule, setReviewSchedule] = useState<Record<string, ReviewState>>(() => readStored(REVIEW_SCHEDULE_KEY, {}))
+  const [dailyGoalWords, setDailyGoalWords] = useState<number>(() => readStored(DAILY_GOAL_WORDS_KEY, 15))
+  const [dailyReviewCount, setDailyReviewCount] = useState<{ date: string; count: number }>(() => {
+    const saved = readStored<{ date: string; count: number }>(DAILY_REVIEW_COUNT_KEY, { date: '', count: 0 })
+    return saved.date === localDateKey() ? saved : { date: localDateKey(), count: 0 }
+  })
   const [cardsSystem, setCardsSystem] = useState<CourseSystem>(() => readStored<CourseSystem>('hanzipath.cards.system', '2.0'))
   const [cardsLevel, setCardsLevel] = useState<CourseLevel>(() => readStored<CourseLevel>('hanzipath.cards.level', 1))
   const [cardsLessonId, setCardsLessonId] = useState<string>(() => readStored<string>('hanzipath.cards.lesson', ''))
@@ -792,7 +891,25 @@ export default function App() {
   const [examSecondsLeft, setExamSecondsLeft] = useState(0)
   const [examStarted, setExamStarted] = useState(false)
   const [examFinished, setExamFinished] = useState(false)
-  const [examHistory, setExamHistory] = useState<Array<{ system: CourseSystem; level: number; score: number; total: number; date: string }>>(() => readStored<Array<{ system: CourseSystem; level: number; score: number; total: number; date: string }>>('hanzipath.exam.history', []))
+  const [examHistory, setExamHistory] = useState<Array<{
+    system: CourseSystem
+    level: number
+    score: number
+    total: number
+    date: string
+    manualAnswered?: number
+    manualTotal?: number
+    durationSeconds?: number
+  }>>(() => readStored<Array<{
+    system: CourseSystem
+    level: number
+    score: number
+    total: number
+    date: string
+    manualAnswered?: number
+    manualTotal?: number
+    durationSeconds?: number
+  }>>('hanzipath.exam.history', []))
   const examSavedRef = useRef(false)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [authOpen, setAuthOpen] = useState(false)
@@ -802,15 +919,16 @@ export default function App() {
   const [authBusy, setAuthBusy] = useState(false)
   const [authFeedback, setAuthFeedback] = useState<Notice | null>(null)
   const [authUser, setAuthUser] = useState<{ id: string; email: string } | null>(null)
+  const [progressSyncReadyFor, setProgressSyncReadyFor] = useState<string | null>(null)
   const [selectedVolume, setSelectedVolume] = useState(1)
 
   const [databaseWords, setDatabaseWords] = useState<Word[] | null>(null)
   const [reviewWords, setReviewWords] = useState<Word[] | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogError, setCatalogError] = useState(false)
-  const [catalogCandidateCount, setCatalogCandidateCount] = useState(0)
 
   const localeChangeRef = useRef(0)
+  const dictionaryLegacyIdsRef = useRef<Map<string, string>>(new Map())
   const wordDialogRef = useRef<HTMLDialogElement>(null)
   const t = (key: TranslationKey) => translate(lang, key)
 
@@ -850,13 +968,69 @@ export default function App() {
 
     const loadReviewDataset = async () => {
       try {
-        const response = await fetch('/vocabulary-review.json')
-        if (!response.ok) throw new Error('Vocabulary review dataset not found.')
-        const payload = await response.json() as { entries?: unknown[] }
-        const entries = Array.isArray(payload.entries) ? payload.entries : []
+        const [hsk30Response, hsk20Response, translationsResponse, hsk20ExamplesResponse] = await Promise.all([
+          fetch('/vocabulary-catalog-hsk30.json'),
+          fetch('/vocabulary-catalog-hsk20.json'),
+          fetch('/vocabulary-translations-ru-uz.json'),
+          fetch('/vocabulary-examples-hsk20.json'),
+        ])
+
+        let entries: unknown[] = []
+        if (hsk30Response.ok && hsk20Response.ok) {
+          const [hsk30Payload, hsk20Payload, translationsPayload, hsk20ExamplesPayload] = await Promise.all([
+            hsk30Response.json() as Promise<{ entries?: unknown[] }>,
+            hsk20Response.json() as Promise<{ entries?: unknown[] }>,
+            translationsResponse.ok
+              ? translationsResponse.json() as Promise<{ entries?: unknown[] }>
+              : Promise.resolve({ entries: [] as unknown[] }),
+            hsk20ExamplesResponse.ok
+              ? hsk20ExamplesResponse.json() as Promise<{ entries?: unknown[] }>
+              : Promise.resolve({ entries: [] as unknown[] }),
+          ])
+          const translationsByWordKey = new Map(
+            (translationsPayload.entries ?? []).map((entry: any) => [entry.wordKey, entry]),
+          )
+          const hsk20ExamplesByWordKey = new Map(
+            (hsk20ExamplesPayload.entries ?? []).map((entry: any) => [entry.wordKey, entry]),
+          )
+          entries = [...(hsk30Payload.entries ?? []), ...(hsk20Payload.entries ?? [])].map((entry: any) => ({
+            ...(hsk20ExamplesByWordKey.get(entry.wordKey) ?? {}),
+            ...entry,
+            ...(translationsByWordKey.get(entry.wordKey) ?? {}),
+          }))
+        } else {
+          const fallbackResponse = await fetch('/vocabulary-review.json')
+          if (!fallbackResponse.ok) throw new Error('Vocabulary catalogue could not be loaded.')
+          const fallbackPayload = await fallbackResponse.json() as { entries?: unknown[] }
+          entries = Array.isArray(fallbackPayload.entries) ? fallbackPayload.entries : []
+        }
 
         if (!cancelled && entries.length > 0) {
-          setReviewWords(entries.map((entry, index) => reviewRowToWord(entry, index)))
+          const mergedEntries = mergeDictionaryEntries(
+            entries.map((entry, index) => reviewRowToWord(entry, index)),
+          )
+          const legacyToCanonical = new Map<string, string>()
+          for (const word of mergedEntries) {
+            for (const legacyId of word.legacyIds ?? []) {
+              legacyToCanonical.set(legacyId, wordId(word))
+            }
+          }
+          dictionaryLegacyIdsRef.current = legacyToCanonical
+
+          setKnownWords(current => [...new Set(current.map(id => legacyToCanonical.get(id) ?? id))])
+          setFavoriteWordIds(current => [...new Set(current.map(id => legacyToCanonical.get(id) ?? id))])
+          setReviewSchedule(current => {
+            const migrated: Record<string, ReviewState> = {}
+            for (const [id, review] of Object.entries(current)) {
+              const canonicalId = legacyToCanonical.get(id) ?? id
+              const existing = migrated[canonicalId]
+              if (!existing || Date.parse(review.updatedAt) > Date.parse(existing.updatedAt)) {
+                migrated[canonicalId] = review
+              }
+            }
+            return migrated
+          })
+          setReviewWords(mergedEntries)
         }
       } catch {
         if (!cancelled) setReviewWords([])
@@ -906,6 +1080,16 @@ export default function App() {
       // Streak tracking is optional.
     }
   }, [activityDays])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(REVIEW_SCHEDULE_KEY, JSON.stringify(reviewSchedule))
+      window.localStorage.setItem(DAILY_GOAL_WORDS_KEY, JSON.stringify(dailyGoalWords))
+      window.localStorage.setItem(DAILY_REVIEW_COUNT_KEY, JSON.stringify(dailyReviewCount))
+    } catch {
+      // Local review scheduling remains active for this session.
+    }
+  }, [reviewSchedule, dailyGoalWords, dailyReviewCount])
 
   useEffect(() => {
     try {
@@ -986,7 +1170,6 @@ export default function App() {
 
     if (!supabase) {
       setDatabaseWords(null)
-      setCatalogCandidateCount(0)
       setCatalogLoading(false)
       setCatalogError(false)
       return () => { cancelled = true }
@@ -995,7 +1178,6 @@ export default function App() {
     const loadCatalog = async () => {
       setCatalogLoading(true)
       setCatalogError(false)
-      setCatalogCandidateCount(0)
 
       try {
         const standardCode = system === '2.0' ? 'hsk20' : 'hsk30'
@@ -1016,7 +1198,6 @@ export default function App() {
         if (!standard) {
           if (!cancelled) {
             setDatabaseWords(null)
-            setCatalogCandidateCount(0)
           }
           return
         }
@@ -1031,7 +1212,6 @@ export default function App() {
         }
 
         if (cancelled) return
-        setCatalogCandidateCount(catalogStatus.data.totalMemberships)
 
         // Candidate rows stay out of the public dictionary until membership,
         // readings, translations, and source rights have been reviewed.
@@ -1050,10 +1230,9 @@ export default function App() {
           throw new Error(catalogResult.error.message)
         }
 
-        const converted = [...new Map(catalogResult.data
+        const converted = mergeDictionaryEntries(catalogResult.data
           .map(row => databaseRowToWord(row, system))
-          .filter(word => word.hanzi && word.pinyin)
-          .map(word => [`${word.hanzi}|${normalizePinyin(word.pinyin)}`, word] as const)).values()]
+          .filter(word => word.hanzi && word.pinyin))
 
         if (!cancelled) {
           setDatabaseWords(converted.length > 0 ? converted : null)
@@ -1147,6 +1326,140 @@ export default function App() {
     }
   }, [])
 
+  // Load and merge the local learning history with the signed-in account.
+  // The merge is additive for completed work and timestamp-based for card schedules.
+  useEffect(() => {
+    const userId = authUser?.id
+    if (!supabase || !userId) {
+      setProgressSyncReadyFor(null)
+      return
+    }
+    const client = supabase
+
+    let cancelled = false
+    setProgressSyncReadyFor(null)
+
+    const loadProgress = async () => {
+      try {
+        const { data, error } = await client
+          .from('user_learning_progress')
+          .select('progress')
+          .eq('user_id', userId)
+          .maybeSingle()
+
+        if (error) throw error
+        if (cancelled) return
+
+        const localSnapshot: LearningProgressSnapshot = {
+          version: 1,
+          knownWords,
+          favoriteWordIds,
+          activityDays,
+          completedLessonIds,
+          examHistory,
+          reviewSchedule,
+          dailyTasks: { date: localDateKey(), done },
+          dailyGoalWords,
+          dailyReviewCount,
+        }
+        const merged = mergeLearningProgress(
+          localSnapshot,
+          (data?.progress ?? null) as Partial<LearningProgressSnapshot> | null,
+          localDateKey(),
+        )
+
+        const migrateIds = (ids: string[]) => [...new Set(
+          ids.map(id => dictionaryLegacyIdsRef.current.get(id) ?? id),
+        )]
+        const migratedSchedule: Record<string, ReviewState> = {}
+        for (const [id, review] of Object.entries(merged.reviewSchedule)) {
+          const canonicalId = dictionaryLegacyIdsRef.current.get(id) ?? id
+          const existing = migratedSchedule[canonicalId]
+          if (!existing || Date.parse(review.updatedAt) > Date.parse(existing.updatedAt)) {
+            migratedSchedule[canonicalId] = review
+          }
+        }
+
+        setKnownWords(migrateIds(merged.knownWords))
+        setFavoriteWordIds(migrateIds(merged.favoriteWordIds))
+        setActivityDays(merged.activityDays)
+        setCompletedLessonIds(merged.completedLessonIds)
+        setExamHistory(merged.examHistory)
+        setReviewSchedule(migratedSchedule)
+        setDone(merged.dailyTasks.done)
+        setDailyGoalWords(merged.dailyGoalWords)
+        setDailyReviewCount(merged.dailyReviewCount)
+        setProgressSyncReadyFor(userId)
+      } catch (error) {
+        if (!cancelled) {
+          setNotice({
+            text: lang === 'ru'
+              ? 'Не удалось загрузить облачный прогресс. Локальные данные сохранены.'
+              : lang === 'uz'
+                ? 'Bulutdagi natijalarni yuklab bo‘lmadi. Mahalliy ma’lumotlar saqlanadi.'
+                : 'Could not load cloud progress. Your local progress is preserved.',
+            kind: 'error',
+          })
+          // Do not enable cloud writes after a failed read: that could
+          // overwrite a returning learner's remote progress with local state.
+        }
+      }
+    }
+
+    void loadProgress()
+    return () => { cancelled = true }
+  }, [authUser?.id])
+
+  // Save only after the account's initial merge has completed, preventing an
+  // empty first render from overwriting a returning learner's cloud history.
+  useEffect(() => {
+    if (!supabase || !authUser?.id || progressSyncReadyFor !== authUser.id) return
+
+    let cancelled = false
+    const payload: LearningProgressSnapshot = {
+      version: 1,
+      knownWords,
+      favoriteWordIds,
+      activityDays,
+      completedLessonIds,
+      examHistory,
+      reviewSchedule,
+      dailyTasks: { date: localDateKey(), done },
+      dailyGoalWords,
+      dailyReviewCount,
+    }
+
+    const timeout = window.setTimeout(async () => {
+      try {
+        const { error } = await (supabase as any).rpc(
+          'merge_user_learning_progress',
+          { p_progress: payload },
+        )
+        if (error) throw error
+      } catch {
+        if (!cancelled) {
+          setNotice({
+            text: lang === 'ru'
+              ? 'Не удалось синхронизировать прогресс. Копия на этом устройстве сохранена.'
+              : lang === 'uz'
+                ? 'Natijalarni sinxronlab bo‘lmadi. Ushbu qurilmadagi nusxa saqlandi.'
+                : 'Could not sync progress. The copy on this device is saved.',
+            kind: 'error',
+          })
+        }
+      }
+    }, 700)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeout)
+    }
+  }, [
+    authUser?.id, progressSyncReadyFor, knownWords, favoriteWordIds,
+    activityDays, completedLessonIds, examHistory, reviewSchedule,
+    done, dailyGoalWords, dailyReviewCount, lang,
+  ])
+
   const submitAuth = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!supabase) {
@@ -1214,8 +1527,10 @@ export default function App() {
   const currentWords = useMemo(() => vocabularyCollection === 'course'
     ? originalLessonWords.filter(word => word.courseSystems?.includes(system))
     : availableWords.filter(word => {
-      const membership = system === '2.0' ? word.level20 : word.level30
-      return membership !== null && membership !== undefined && membership !== ''
+      const memberships = system === '2.0'
+        ? word.level20Memberships ?? (word.level20 == null ? [] : [word.level20])
+        : word.level30Memberships ?? (word.level30 == null ? [] : [word.level30])
+      return memberships.length > 0
     }), [availableWords, system, vocabularyCollection])
   const currentFavoriteCount = useMemo(
     () => currentWords.filter(word => favoriteWordIds.includes(wordId(word))).length,
@@ -1236,14 +1551,14 @@ export default function App() {
       const level = Number(levelValue) as CourseLevel
       const baseLessons = lessonTemplates.filter(lesson => lesson.system === system && lesson.level === level)
       const pool = wordsForCourseLevel(lessonEntries, system, level)
-      const uniquePool = [...new Map(pool.map(word => [`${word.hanzi}|${normalizePinyin(word.pinyin)}`, word])).values()]
+      const uniquePool = [...new Map(pool.map(word => [`${word.hanzi}|${normalizeDictionaryPinyin(word.pinyin)}`, word])).values()]
       if (!baseLessons.length || !uniquePool.length) continue
 
-      const poolKeys = new Set(uniquePool.map(word => `${word.hanzi}|${normalizePinyin(word.pinyin)}`))
+      const poolKeys = new Set(uniquePool.map(word => `${word.hanzi}|${normalizeDictionaryPinyin(word.pinyin)}`))
       const topicalOrder = baseLessons.flatMap(lesson => lessonAssignments[lesson.id] ?? [])
       const orderedWords = [...new Map([...topicalOrder, ...uniquePool].map(word => [
-        `${word.hanzi}|${normalizePinyin(word.pinyin)}`, word,
-      ])).values()].filter(word => poolKeys.has(`${word.hanzi}|${normalizePinyin(word.pinyin)}`))
+        `${word.hanzi}|${normalizeDictionaryPinyin(word.pinyin)}`, word,
+      ])).values()].filter(word => poolKeys.has(`${word.hanzi}|${normalizeDictionaryPinyin(word.pinyin)}`))
 
       // Choose the smallest number of lessons that keeps every lesson at 15–25 words.
       const unitCount = Math.ceil(orderedWords.length / 25)
@@ -1274,6 +1589,20 @@ export default function App() {
     }
     return { lessons: display, assignments: assignmentMap, volumeCounts: volumeSizes }
   }, [lessonAssignments, lessonEntries])
+
+  const dictionaryLessonMembership = useMemo(() => {
+    const memberships = new Map<string, Set<string>>()
+    for (const [lessonId, assignedWords] of Object.entries(expandedLessonData.assignments)) {
+      for (const word of assignedWords) {
+        const id = wordId(word)
+        const lessons = memberships.get(id) ?? new Set<string>()
+        lessons.add(lessonId)
+        memberships.set(id, lessons)
+      }
+    }
+    return memberships
+  }, [expandedLessonData.assignments])
+
   const courseAllLessons = expandedLessonData.lessons.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const courseVolumeCount = expandedLessonData.volumeCounts[`${courseSystem}-${courseLevel}`] ?? 1
   const courseLessons = courseAllLessons.filter(lesson => lesson.volume === selectedVolume)
@@ -1295,7 +1624,20 @@ export default function App() {
   ] : []
   const cardsLessons = expandedLessonData.lessons.filter(lesson => lesson.system === cardsSystem && lesson.level === cardsLevel)
   const selectedCardsLesson = cardsLessons.find(lesson => lesson.id === cardsLessonId) ?? cardsLessons[0]
-  const cardStudyWords = selectedCardsLesson ? expandedLessonData.assignments[selectedCardsLesson.id] ?? [] : []
+  const cardStudyWords = useMemo(() => {
+    const base = selectedCardsLesson ? expandedLessonData.assignments[selectedCardsLesson.id] ?? [] : []
+    const dueIds = new Set(dueReviewIds(reviewSchedule))
+    return [...base].sort((a, b) => {
+      const aId = wordId(a)
+      const bId = wordId(b)
+      const aRank = dueIds.has(aId) ? 0 : reviewSchedule[aId] ? 2 : 1
+      const bRank = dueIds.has(bId) ? 0 : reviewSchedule[bId] ? 2 : 1
+      if (aRank !== bRank) return aRank - bRank
+      const aDue = Date.parse(reviewSchedule[aId]?.dueAt ?? '') || 0
+      const bDue = Date.parse(reviewSchedule[bId]?.dueAt ?? '') || 0
+      return aDue - bDue
+    })
+  }, [selectedCardsLesson, expandedLessonData.assignments, reviewSchedule])
   const listeningLessons = expandedLessonData.lessons.filter(lesson => lesson.system === listeningSystem && lesson.level === listeningLevel)
   const selectedListeningLesson = listeningLessons.find(lesson => lesson.id === listeningLessonId) ?? listeningLessons[0]
   const listeningStudyWords = selectedListeningLesson ? expandedLessonData.assignments[selectedListeningLesson.id] ?? [] : []
@@ -1304,14 +1646,36 @@ export default function App() {
   const knownInCurrentWords = knownWords.filter(id => currentWords.some(word => wordId(word) === id)).length
   const activeCard = cardStudyWords.length ? cardStudyWords[((cardIndex % cardStudyWords.length) + cardStudyWords.length) % cardStudyWords.length] : undefined
   const listeningWord = listeningStudyWords.length ? listeningStudyWords[((listeningIndex % listeningStudyWords.length) + listeningStudyWords.length) % listeningStudyWords.length] : undefined
+  const currentAdaptiveDifficulty = adaptiveDifficulty(reviewSchedule)
   const listeningOptions = useMemo(() => {
     if (!listeningWord) return []
     const unique = [...new Map([listeningWord, ...listeningStudyWords.filter(word => wordId(word) !== wordId(listeningWord))].map(word => [wordId(word), word] as const)).values()]
-    return shuffleWithSeed(unique.slice(0, 4), listeningIndex + 101)
-  }, [listeningStudyWords, listeningIndex, listeningWord])
+    return shuffleWithSeed(unique.slice(0, currentAdaptiveDifficulty + 1), listeningIndex + 101)
+  }, [listeningStudyWords, listeningIndex, listeningWord, currentAdaptiveDifficulty])
   const recordActivity = () => {
     const today = localDateKey()
     setActivityDays(days => days.includes(today) ? days : [...days, today].slice(-400))
+  }
+
+  const rateFlashcard = (word: Word, quality: ReviewQuality) => {
+    const id = wordId(word)
+    setReviewSchedule(current => ({
+      ...current,
+      [id]: scheduleReview(current[id], quality),
+    }))
+    if (quality === 'again') {
+      setKnownWords(items => items.filter(item => item !== id))
+    } else if (quality === 'good' || quality === 'easy') {
+      setKnownWords(items => items.includes(id) ? items : [...items, id])
+    }
+    const today = localDateKey()
+    setDailyReviewCount(current => ({
+      date: today,
+      count: current.date === today ? current.count + 1 : 1,
+    }))
+    recordActivity()
+    setShowAnswer(false)
+    setCardIndex(index => cardStudyWords.length ? (index + 1) % cardStudyWords.length : 0)
   }
 
   const filtered = useMemo(() => {
@@ -1326,14 +1690,18 @@ export default function App() {
       ].filter(Boolean).join(' ')
 
       const normalizedQuery = normalizePinyin(query)
-      const activeLevel = vocabularyCollection === 'course'
-        ? word.courseStage
-        : system === '2.0' ? word.level20 : word.level30
+      const memberships = vocabularyCollection === 'course'
+        ? (word.courseStage == null ? [] : [word.courseStage])
+        : system === '2.0'
+          ? word.level20Memberships ?? (word.level20 == null ? [] : [word.level20])
+          : word.level30Memberships ?? (word.level30 == null ? [] : [word.level30])
 
       return (
-        (level === 'all' || String(activeLevel).replace('7-9', '7') === level) &&
+        (level === 'all' || memberships.some(value => String(value).replace('7-9', '7') === level)) &&
         (!favoritesOnly || favoriteWordIds.includes(wordId(word))) &&
         (!knownOnly || knownWords.includes(wordId(word))) &&
+        (!dictionaryLessonId || dictionaryLessonMembership.get(wordId(word))?.has(dictionaryLessonId)) &&
+        (!dictionaryPosFilter || word.partOfSpeech?.includes(dictionaryPosFilter)) &&
         (
           searchable.toLocaleLowerCase().includes(query.toLocaleLowerCase()) ||
           (
@@ -1353,10 +1721,13 @@ export default function App() {
         const levelB = Number(vocabularyCollection === 'course' ? b.courseStage : system === '2.0' ? b.level20 : b.level30)
         return levelA - levelB || a.hanzi.localeCompare(b.hanzi)
       }
+      if (dictionarySort === 'frequency') {
+        return (a.frequencyRank ?? Number.MAX_SAFE_INTEGER) - (b.frequencyRank ?? Number.MAX_SAFE_INTEGER) || a.hanzi.localeCompare(b.hanzi)
+      }
       return a.hanzi.localeCompare(b.hanzi)
     })
-  }, [currentWords, dictionarySort, favoriteWordIds, favoritesOnly, knownOnly, knownWords, level, query, system, vocabularyCollection])
-  useEffect(() => setDictionaryPage(0), [system, level, query, vocabularyCollection, favoritesOnly, knownOnly, dictionarySort])
+  }, [currentWords, dictionaryLessonId, dictionaryLessonMembership, dictionaryPosFilter, dictionarySort, favoriteWordIds, favoritesOnly, knownOnly, knownWords, level, query, system, vocabularyCollection])
+  useEffect(() => setDictionaryPage(0), [system, level, query, vocabularyCollection, favoritesOnly, knownOnly, dictionarySort, dictionaryLessonId, dictionaryPosFilter])
 
   const pageSize = 60
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
@@ -1384,8 +1755,29 @@ export default function App() {
     }))
     : (system === '2.0' ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 7]).map((levelValue, index) => ({
       value: String(levelValue),
-      label: `${levelNames[index]} · ${currentWords.filter(word => String(system === '2.0' ? word.level20 : word.level30).replace('7-9', '7') === String(levelValue)).length.toLocaleString(lang)}`,
+      label: `${levelNames[index]} · ${currentWords.filter(word => {
+        const memberships = system === '2.0'
+          ? word.level20Memberships ?? (word.level20 == null ? [] : [word.level20])
+          : word.level30Memberships ?? (word.level30 == null ? [] : [word.level30])
+        return memberships.some(value => String(value).replace('7-9', '7') === String(levelValue))
+      }).length.toLocaleString(lang)}`,
     }))
+  const dictionaryLessonOptions = expandedLessonData.lessons
+    .filter(lesson => lesson.system === system && (
+      level === 'all' || String(lesson.level) === level
+    ))
+    .map(lesson => ({
+      value: lesson.id,
+      label: `${lesson.title} · ${currentWords.filter(word => dictionaryLessonMembership.get(wordId(word))?.has(lesson.id)).length.toLocaleString(lang)}`,
+    }))
+
+  const dictionaryPosOptions = [...new Set(currentWords.flatMap(word => word.partOfSpeech ?? []))]
+    .sort()
+    .map(value => ({
+      value,
+      label: `${partOfSpeechLabel(value, lang)} · ${currentWords.filter(word => word.partOfSpeech?.includes(value)).length.toLocaleString(lang)}`,
+    }))
+
   const activeSectionName = section < 7
     ? t(navKeys[section])
     : t('page.profile')
@@ -1400,18 +1792,26 @@ export default function App() {
           : t('vocab.translationUnavailable')
 
   const exampleMeaning = (word: Word) => {
-    if (lang === 'ru') return word.exampleRu
+    if (lang === 'ru') return word.exampleRu || word.exampleEn
     if (lang === 'en') return word.exampleEn
-
     return word.exampleUzVerified && word.exampleUz
       ? word.exampleUz
-      : t('vocab.exampleUnavailable')
+      : word.exampleEn || t('vocab.exampleUnavailable')
   }
 
-  const translationStatusLabel = (status?: string) =>
-    !status
-      ? null
-      : t(status === 'ai_draft_unverified' ? 'vocab.aiDraft' : 'vocab.sourceUnverified')
+  const translationStatusLabel = (status?: string) => {
+    if (!status) return null
+    if (status === 'source_verified') {
+      return lang === 'ru' ? 'Подтверждено по источнику' : lang === 'uz' ? 'Manba bilan tasdiqlangan' : 'Source verified'
+    }
+    if (status === 'missing_translation') {
+      return lang === 'ru' ? 'Перевод отсутствует' : lang === 'uz' ? 'Tarjima yo‘q' : 'Translation missing'
+    }
+    if (status === 'ai_assisted_unverified' || status === 'ai_draft_unverified') return t('vocab.aiDraft')
+    return t('vocab.sourceUnverified')
+  }
+
+
 
   const toggleFavorite = (word: Word) => {
     const id = wordId(word)
@@ -1432,9 +1832,11 @@ export default function App() {
   }
 
   const dictionaryLevelLabel = (word: Word, standard: System) => {
-    const value = standard === '2.0' ? word.level20 : word.level30
-    if (value === null || value === undefined || value === '') return null
-    return `HSK ${String(value).replace('7-9', '7–9')}`
+    const memberships = standard === '2.0'
+      ? word.level20Memberships ?? (word.level20 == null ? [] : [word.level20])
+      : word.level30Memberships ?? (word.level30 == null ? [] : [word.level30])
+    if (memberships.length === 0) return null
+    return memberships.map(value => `HSK ${String(value).replace('7-9', '7–9')}`).join(' · ')
   }
 
   const selectedExamQuestion = examQuestionsState[examIndex]
@@ -1451,17 +1853,76 @@ export default function App() {
     question.manualReview && Boolean(examAnswers[index]?.trim()) ? 1 : 0
   ), 0)
   const examManualTotal = examQuestionsState.filter(question => question.manualReview).length
+  const examTotalSeconds = examFormat(examSystem, examLevel).minutes * 60
+  const examElapsedSeconds = examStarted
+    ? Math.max(0, examTotalSeconds - examSecondsLeft)
+    : 0
+  const examSectionStats = (['listening', 'reading', 'writing', 'translation', 'speaking'] as const)
+    .map(section => {
+      const items = examQuestionsState
+        .map((question, index) => ({ question, index }))
+        .filter(item => item.question.section === section)
+      if (items.length === 0) return null
+      const scored = items.filter(item => !item.question.manualReview)
+      const correct = scored.filter(({ question, index }) => {
+        const response = examAnswers[index] ?? ''
+        return question.section === 'writing'
+          ? normalizeWrittenAnswer(response) === normalizeWrittenAnswer(question.answer)
+          : response === question.answer
+      }).length
+      const manual = items.filter(item => item.question.manualReview)
+      const manualAnswered = manual.filter(({ index }) => Boolean(examAnswers[index]?.trim())).length
+      return { section, total: items.length, scored: scored.length, correct, manual: manual.length, manualAnswered }
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+
+  const profileWords = databaseWords ?? (reviewWords?.length ? reviewWords : [])
+  const profileKnownCount = profileWords.filter(word => knownWords.includes(wordId(word))).length
+  const profileFavoriteCount = profileWords.filter(word => favoriteWordIds.includes(wordId(word))).length
+  const profileExamAverage = examHistory.length
+    ? Math.round(examHistory.reduce((sum, attempt) => sum + (attempt.total ? attempt.score / attempt.total * 100 : 0), 0) / examHistory.length)
+    : 0
+  const profileDueReviews = dueReviewIds(reviewSchedule).length
 
   useEffect(() => {
     if (!examStarted || !examFinished || examSavedRef.current) return
     examSavedRef.current = true
-    setExamHistory(items => [{ system: examSystem, level: examLevel, score: examCorrectCount, total: examScoredCount, date: new Date().toISOString() }, ...items].slice(0, 30))
-  }, [examStarted, examFinished, examSystem, examLevel, examCorrectCount, examScoredCount])
+    setExamHistory(items => [{
+      system: examSystem,
+      level: examLevel,
+      score: examCorrectCount,
+      total: examScoredCount,
+      date: new Date().toISOString(),
+      manualAnswered: examManualCount,
+      manualTotal: examManualTotal,
+      durationSeconds: examElapsedSeconds,
+    }, ...items].slice(0, 30))
+  }, [examStarted, examFinished, examSystem, examLevel, examCorrectCount, examScoredCount, examManualCount, examManualTotal, examElapsedSeconds])
 
 
   const startExam = () => {
+    const sourceWords = databaseWords?.length
+      ? databaseWords
+      : reviewWords?.length
+        ? reviewWords
+        : null
+    if (!sourceWords) {
+      setNotice({
+        text: lang === 'ru' ? 'Сначала дождись загрузки полного словаря.' : lang === 'uz' ? 'Avval to‘liq lug‘at yuklanishini kuting.' : 'Wait for the full vocabulary to finish loading first.',
+        kind: 'error',
+      })
+      return
+    }
+    const generated = examQuestions(examSystem, examLevel, sourceWords, lang)
+    if (generated.length === 0) {
+      setNotice({
+        text: lang === 'ru' ? 'Не удалось сформировать экзамен для этого уровня. Проверь загрузку словаря и уроков.' : lang === 'uz' ? 'Bu daraja uchun imtihon tuzilmadi. Lug‘at va darslar yuklanganini tekshiring.' : 'Could not generate this exam. Check that the vocabulary and lessons have loaded.',
+        kind: 'error',
+      })
+      return
+    }
     examSavedRef.current = false
-    const generated = examQuestions(examSystem, examLevel, reviewWords?.length ? reviewWords : availableWords, lang)
+    setNotice(null)
     setExamQuestionsState(generated)
     setExamAnswers(Array(generated.length).fill(''))
     setExamIndex(0)
@@ -1527,7 +1988,11 @@ export default function App() {
           <div className="avatar">H</div>
           <div className="profile-name">
             <b>{authUser?.email || t('profile.guest')}</b>
-            <small>{authUser ? (lang === 'ru' ? 'В аккаунте' : 'Signed in') : t('profile.settings')}</small>
+            <small>{authUser
+              ? (progressSyncReadyFor === authUser.id
+                ? (lang === 'ru' ? 'Прогресс синхронизируется' : lang === 'uz' ? 'Natijalar sinxronlanadi' : 'Progress sync enabled')
+                : (lang === 'ru' ? 'Загрузка прогресса…' : lang === 'uz' ? 'Natijalar yuklanmoqda…' : 'Loading progress…'))
+              : t('profile.settings')}</small>
           </div>
           <button className="profile-action" title={authUser ? 'Sign out' : t('profile.signIn')} aria-label={authUser ? 'Sign out' : t('profile.signIn')} onClick={() => authUser ? void signOut() : (setAuthMode('signin'), setAuthOpen(true))}>
             <LockKeyhole size={17}/>
@@ -1631,6 +2096,25 @@ export default function App() {
                   <div className="continue-progress"><i style={{width: (courseAllLessons.length ? Math.round(completedLessonIds.filter(id => courseAllLessons.some(lesson => lesson.id === id)).length / courseAllLessons.length * 100) : 0) + '%'}}/></div>
                   <div className="continue-meta"><small>{completedLessonIds.filter(id => courseAllLessons.some(lesson => lesson.id === id)).length} / {courseAllLessons.length} {lang === 'ru' ? 'уроков пройдено' : 'lessons completed'}</small><button className="continue-play" onClick={() => setSection(1)} aria-label={lang === 'ru' ? 'Открыть урок' : 'Open lesson'}><Play size={17} fill="currentColor"/></button></div>
                 </div>
+              </div>
+            </section>
+
+            <section className="dashboard-panel daily-goal-panel">
+              <div className="section-heading">
+                <div>
+                  <span className="kicker">{lang === 'ru' ? 'ЕЖЕДНЕВНАЯ ЦЕЛЬ' : lang === 'uz' ? 'KUNLIK MAQSAD' : 'DAILY GOAL'}</span>
+                  <h2>{lang === 'ru' ? 'Повторение слов' : lang === 'uz' ? 'So‘zlarni takrorlash' : 'Word review'}</h2>
+                </div>
+                <label className="daily-goal-select">
+                  <span>{lang === 'ru' ? 'Цель в день' : lang === 'uz' ? 'Kunlik maqsad' : 'Daily target'}</span>
+                  <select value={dailyGoalWords} onChange={event => setDailyGoalWords(Number(event.target.value))}>
+                    {[5, 10, 15, 20, 30, 40, 50].map(value => <option key={value} value={value}>{value} {lang === 'ru' ? 'слов' : lang === 'uz' ? 'so‘z' : 'words'}</option>)}
+                  </select>
+                </label>
+              </div>
+              <div className="daily-goal-progress">
+                <div><b>{Math.min(dailyReviewCount.date === localDateKey() ? dailyReviewCount.count : 0, dailyGoalWords)} / {dailyGoalWords}</b><span>{lang === 'ru' ? 'повторений сегодня' : lang === 'uz' ? 'bugungi takrorlashlar' : 'reviews today'}</span></div>
+                <div className="daily-goal-track"><i style={{ width: Math.min(100, ((dailyReviewCount.date === localDateKey() ? dailyReviewCount.count : 0) / dailyGoalWords) * 100) + '%' }}/></div>
               </div>
             </section>
 
@@ -1940,13 +2424,14 @@ export default function App() {
             <p className="notice-text">{t('vocab.catalogError')}</p>
           )}
 
-          {vocabularyCollection === 'hsk' && catalogCandidateCount > 0 && !databaseWords && (
+          {vocabularyCollection === 'hsk' && (reviewWords?.length ?? 0) > 0 && (
             <p className="notice-text catalog-review-notice">
               {lang === 'ru'
-                ? `В базе найдено ${catalogCandidateCount.toLocaleString(lang)} записей-кандидатов. Их чтения, переводы и право публикации ещё не прошли проверку, поэтому они не показываются как подтверждённые слова. Пока доступен только предварительный набор.`
+                ? 'Список HSK и примеры собраны из открытых источников. Переводы RU/UZ частично подготовлены с помощью ИИ и требуют проверки; примеры не проверялись индивидуально.'
                 : lang === 'uz'
-                  ? `Bazadan ${catalogCandidateCount.toLocaleString(lang)} ta nomzod yozuv topildi. Ularning o‘qilishi, tarjimalari va nashr huquqlari hali tekshirilmagan, shu sababli ular tasdiqlangan so‘zlar sifatida ko‘rsatilmaydi. Hozircha faqat dastlabki to‘plam mavjud.`
-                  : `${catalogCandidateCount.toLocaleString(lang)} candidate records exist in the database. Their readings, translations, and publication rights are not yet verified, so they are not presented as approved vocabulary. A preview set is available for now.`}
+                  ? 'HSK ro‘yxati va misollar ochiq manbalardan yig‘ilgan. RU/UZ tarjimalarining bir qismi AI yordamida tayyorlangan va tekshiruv talab qiladi; misollar alohida tekshirilmagan.'
+                  : 'HSK vocabulary and examples are assembled from open sources. Some RU/UZ glosses are AI-assisted and still need review; example sentences have not been individually checked.'}
+              {' · '}<a href="/data-attribution.html" target="_blank" rel="noreferrer">{lang === 'ru' ? 'Источники и лицензии' : lang === 'uz' ? 'Manbalar va litsenziyalar' : 'Sources and licenses'}</a>
             </p>
           )}
 
@@ -1963,15 +2448,21 @@ export default function App() {
             </label>
 
             <label className="sr-only" htmlFor="system-filter">{t('vocab.system')}</label>
-            <select id="system-filter" value={system} onChange={e => { setSystem(e.target.value as System); setLevel('all') }}>
+            <select id="system-filter" value={system} onChange={e => { setSystem(e.target.value as System); setLevel('all'); setDictionaryLessonId(''); setDictionaryPosFilter('') }}>
               <option value="3.0">{t('vocab.hsk30')}</option>
               <option value="2.0">{t('vocab.hsk20')}</option>
             </select>
 
             <label className="sr-only" htmlFor="level-filter">{t('vocab.level')}</label>
-            <select id="level-filter" value={level} onChange={e => setLevel(e.target.value)}>
+            <select id="level-filter" value={level} onChange={e => { setLevel(e.target.value); setDictionaryLessonId(''); setDictionaryPosFilter('') }}>
               <option value="all">{t('vocab.allLevels')}</option>
               {levelFilterOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}
+            </select>
+
+            <label className="sr-only" htmlFor="dictionary-lesson">{lang === 'ru' ? 'Тема и урок' : lang === 'uz' ? 'Mavzu va dars' : 'Topic and lesson'}</label>
+            <select id="dictionary-lesson" value={dictionaryLessonId} onChange={e => setDictionaryLessonId(e.target.value)}>
+              <option value="">{lang === 'ru' ? 'Все темы и уроки' : lang === 'uz' ? 'Barcha mavzular va darslar' : 'All topics and lessons'}</option>
+              {dictionaryLessonOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
 
             <label className="sr-only" htmlFor="dictionary-sort">{lang === 'ru' ? 'Сортировка' : lang === 'uz' ? 'Saralash' : 'Sort order'}</label>
@@ -1979,6 +2470,13 @@ export default function App() {
               <option value="hanzi">{lang === 'ru' ? 'По иероглифам' : lang === 'uz' ? 'Ieroglif bo‘yicha' : 'By characters'}</option>
               <option value="pinyin">{lang === 'ru' ? 'По пиньиню' : lang === 'uz' ? 'Pinyin bo‘yicha' : 'By pinyin'}</option>
               <option value="level">{lang === 'ru' ? 'По уровню HSK' : lang === 'uz' ? 'HSK darajasi bo‘yicha' : 'By HSK level'}</option>
+              <option value="frequency">{lang === 'ru' ? 'По частоте' : lang === 'uz' ? 'Chastota bo‘yicha' : 'By frequency'}</option>
+            </select>
+
+            <label className="sr-only" htmlFor="dictionary-pos">{lang === 'ru' ? 'Часть речи' : lang === 'uz' ? 'So‘z turkumi' : 'Part of speech'}</label>
+            <select id="dictionary-pos" value={dictionaryPosFilter} onChange={e => setDictionaryPosFilter(e.target.value)}>
+              <option value="">{lang === 'ru' ? 'Все категории' : lang === 'uz' ? 'Barcha turkumlar' : 'All categories'}</option>
+              {dictionaryPosOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
 
             <button className={`outline favorites-filter ${favoritesOnly ? 'selected' : ''}`} type="button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(value => !value)}>
@@ -2021,7 +2519,7 @@ export default function App() {
                   <span className="level-pill">
                     {vocabularyCollection === 'course'
                       ? `${t('vocab.courseStageShort')} ${word.courseStage}`
-                      : `HSK ${String(system === '2.0' ? word.level20 : word.level30).replace('7-9', '7–9')}`}
+                      : dictionaryLevelLabel(word, system) ?? ''}
                   </span>
 
                   <button
@@ -2045,6 +2543,10 @@ export default function App() {
                     <Volume2 size={18}/>
                   </button>
                 </div>
+
+                {word.partOfSpeech && word.partOfSpeech.length > 0 && <div className="word-category-tags">
+                  {word.partOfSpeech.map(category => <span className="word-category-tag" key={category}>{partOfSpeechLabel(category, lang)}</span>)}
+                </div>}
 
                 <div className="word-meanings">
                   <div><b>RU</b><span>{word.ru || t('vocab.translationUnavailable')}</span>{word.ruStatus && <small>{translationStatusLabel(word.ruStatus)}</small>}</div>
@@ -2097,7 +2599,7 @@ export default function App() {
             </label>
           </div>
           {activeCard ? <>
-            <p className="notice-text">{cardStudyWords.length} {lang === 'ru' ? 'слов в этом уроке' : lang === 'uz' ? 'ta so‘z ushbu darsda' : 'words in this lesson'} · {lang === 'ru' ? 'изучено' : lang === 'uz' ? 'o‘rganilgan' : 'learned'}: {cardStudyWords.filter(word => knownWords.includes(wordId(word))).length}</p>
+            <p className="notice-text">{cardStudyWords.length} {lang === 'ru' ? 'слов в этом уроке' : lang === 'uz' ? 'ta so‘z ushbu darsda' : 'words in this lesson'} · {lang === 'ru' ? 'изучено' : lang === 'uz' ? 'o‘rganilgan' : 'learned'}: {cardStudyWords.filter(word => knownWords.includes(wordId(word))).length} · {lang === 'ru' ? 'к повторению' : lang === 'uz' ? 'takrorlash kerak' : 'due'}: {dueReviewIds(reviewSchedule).filter(id => cardStudyWords.some(word => wordId(word) === id)).length} · {lang === 'ru' ? 'сложность' : lang === 'uz' ? 'daraja' : 'difficulty'}: {currentAdaptiveDifficulty}/3</p>
             <article className="study-card">
               <span className="study-hanzi">{activeCard.hanzi}</span>
               {showAnswer && <div className="study-answer"><b>{activeCard.pinyin}</b><span>{vocabularyMeaning(activeCard)}</span>{activeCard.example && <small>{activeCard.example} · {activeCard.examplePinyin}</small>}</div>}
@@ -2105,8 +2607,10 @@ export default function App() {
             <div className="study-actions">
               {!showAnswer && <button className="primary" onClick={() => setShowAnswer(true)}>{t('flashcards.showAnswer')}</button>}
               {showAnswer && <>
-                <button className="outline" onClick={() => { setShowAnswer(false); setCardIndex(i => (i + 1) % cardStudyWords.length) }}>{t('flashcards.again')}</button>
-                <button className="primary" onClick={() => { const id = wordId(activeCard); setKnownWords(items => items.includes(id) ? items : [...items, id]); recordActivity(); setShowAnswer(false); setCardIndex(i => (i + 1) % cardStudyWords.length) }}>{t('flashcards.markKnown')}</button>
+                <button className="outline" onClick={() => rateFlashcard(activeCard, 'again')}>{lang === 'ru' ? 'Снова · 10 мин' : lang === 'uz' ? 'Yana · 10 daq' : 'Again · 10 min'}</button>
+                <button className="outline" onClick={() => rateFlashcard(activeCard, 'hard')}>{lang === 'ru' ? 'Трудно' : lang === 'uz' ? 'Qiyin' : 'Hard'}</button>
+                <button className="primary" onClick={() => rateFlashcard(activeCard, 'good')}>{lang === 'ru' ? 'Хорошо' : lang === 'uz' ? 'Yaxshi' : 'Good'}</button>
+                <button className="primary easy-review" onClick={() => rateFlashcard(activeCard, 'easy')}>{lang === 'ru' ? 'Легко' : lang === 'uz' ? 'Oson' : 'Easy'}</button>
               </>}
             </div>
             <div className="study-footer">
@@ -2190,7 +2694,31 @@ export default function App() {
         <section className="panel learning-page exam-page">
           <div className="panel-head"><div><span className="kicker">{t('exam.kicker')}</span><h2>{t('exam.title')}</h2></div><span className="demo-tag">HSK {examSystem}</span></div>
           <p className="notice-text">{t('exam.intro')}</p>
-          {examHistory.length > 0 && <p className="notice-text">{lang === 'ru' ? 'Сохранённые попытки' : lang === 'uz' ? 'Saqlangan urinishlar' : 'Saved attempts'}: {examHistory.length} · {lang === 'ru' ? 'последний результат' : lang === 'uz' ? 'oxirgi natija' : 'latest score'}: {examHistory[0].score}/{examHistory[0].total}</p>}
+          <p className="notice-text exam-provenance-note">
+            {examSystem === '3.0' && examLevel >= 7
+              ? (lang === 'ru' ? 'Формат соответствует пяти разделам HSK 7–9. Автоматически оцениваются только объективные задания; письмо, перевод и устная речь требуют самостоятельной или преподавательской проверки. Официальный экзамен использует отдельные баллы по пяти навыкам и модель IRT.'
+                : lang === 'uz' ? 'Format HSK 7–9 ning besh bo‘limiga mos. Faqat test savollari avtomatik baholanadi; yozish, tarjima va nutq mustaqil yoki o‘qituvchi tomonidan tekshiriladi. Rasmiy imtihon besh ko‘nikma bo‘yicha alohida IRT ballarini beradi.'
+                  : 'The format follows the five HSK 7–9 sections. Only objective questions are auto-graded; writing, translation and speaking need self- or teacher review. The official test reports five skill scores using IRT.')
+              : (lang === 'ru' ? 'Это тренировочная симуляция по структуре экзамена, а не официальный вариант прошлых лет. Открытые письменные задания могут требовать ручной проверки.'
+                : lang === 'uz' ? 'Bu imtihon tuzilishiga asoslangan mashq simulyatsiyasi, rasmiy oldingi imtihon varianti emas. Ochiq yozma topshiriqlar qo‘lda tekshirilishi mumkin.'
+                  : 'This is a practice simulation aligned to the test structure, not an official past paper. Open-ended writing tasks may require manual review.')}
+            {' · '}<a href="https://www.chinesetest.cn/HSK" target="_blank" rel="noreferrer">{lang === 'ru' ? 'Официальная структура HSK' : lang === 'uz' ? 'HSK rasmiy tuzilishi' : 'Official HSK structure'}</a>
+          </p>
+          {examHistory.length > 0 && <section className="exam-history">
+            <div className="section-heading">
+              <h3>{lang === 'ru' ? 'История экзаменов' : lang === 'uz' ? 'Imtihonlar tarixi' : 'Exam history'}</h3>
+              <span>{examHistory.length} {lang === 'ru' ? 'попыток' : lang === 'uz' ? 'urinish' : 'attempts'}</span>
+            </div>
+            {examHistory.slice(0, 5).map((attempt, index) => <div className="exam-history-row" key={`${attempt.date}-${attempt.system}-${attempt.level}-${index}`}>
+              <span>HSK {attempt.system} · {attempt.system === '3.0' && attempt.level === 7 ? '7–9' : attempt.level}</span>
+              <b>{attempt.score}/{attempt.total} · {attempt.total ? Math.round(attempt.score / attempt.total * 100) : 0}%</b>
+              <small>
+                {new Date(attempt.date).toLocaleDateString(lang)}
+                {attempt.durationSeconds != null && ` · ${formatExamTime(attempt.durationSeconds)}`}
+                {attempt.manualTotal ? ` · ${attempt.manualAnswered ?? 0}/${attempt.manualTotal} ${lang === 'ru' ? 'ручных' : lang === 'uz' ? 'qo‘lda' : 'manual'}` : ''}
+              </small>
+            </div>)}
+          </section>}
 
           {!examStarted && <>
             <div className="standard-switch" role="group" aria-label={t('vocab.system')}>
@@ -2219,15 +2747,53 @@ export default function App() {
                 </>
               })()}
             </div>
-            <button className="primary exam-start" onClick={startExam}>{t('exam.start')}<ChevronRight size={17}/></button>
+            <button className="primary exam-start" onClick={startExam} disabled={catalogLoading || (!reviewWords?.length && !databaseWords?.length)}>
+              {catalogLoading ? (lang === 'ru' ? 'Загружаем словарь…' : lang === 'uz' ? 'Lug‘at yuklanmoqda…' : 'Loading vocabulary…') : t('exam.start')}
+              <ChevronRight size={17}/>
+            </button>
           </>}
 
           {examStarted && examFinished && <div className="exam-result">
             <div className="review-icon"><CheckCircle2/></div>
             <span className="kicker">{examSystem === '3.0' && examLevel >= 7 ? 'HSK 3.0 · 7–9' : `HSK ${examSystem} · ${examLevel}`} · {t('exam.result')}</span>
             <strong>{examCorrectCount} / {examScoredCount}</strong>
-            <p>{examCorrectCount >= Math.ceil(examScoredCount * .6) ? t('exam.pass') : t('exam.notPass')}</p>
+            {examSystem === '3.0' && examLevel >= 7
+              ? <p className="notice-text">{lang === 'ru' ? 'Результат автоматической части. Это не официальный балл HSK 7–9.' : lang === 'uz' ? 'Avtomatik baholangan qism natijasi. Bu rasmiy HSK 7–9 bali emas.' : 'Auto-graded practice result. This is not an official HSK 7–9 score.'}</p>
+              : <p>{examCorrectCount >= Math.ceil(examScoredCount * .6) ? t('exam.pass') : t('exam.notPass')} · {lang === 'ru' ? 'ориентир 60% по автоматически оцениваемым заданиям' : lang === 'uz' ? 'avtomatik baholanadigan savollarda 60% mezon' : '60% practice benchmark on auto-graded questions'}</p>}
+            <p className="exam-time-used">{lang === 'ru' ? 'Время' : lang === 'uz' ? 'Sarflangan vaqt' : 'Time used'} · {formatExamTime(examElapsedSeconds)}</p>
             {examManualTotal > 0 && <p className="notice-text">{examManualCount} / {examManualTotal} · {t('exam.manualTasks')}</p>}
+            <section className="exam-section-results" aria-label={lang === 'ru' ? 'Результаты по разделам' : lang === 'uz' ? 'Bo‘limlar bo‘yicha natijalar' : 'Section results'}>
+              {examSectionStats.map(stat => <div className="exam-section-result" key={stat.section}>
+                <span>{t(`exam.${stat.section}` as TranslationKey)}</span>
+                <b>{stat.scored > 0 ? `${stat.correct}/${stat.scored}` : `${stat.manualAnswered}/${stat.manual}`}</b>
+                {stat.manual > 0 && <small>{lang === 'ru' ? 'ручная проверка' : lang === 'uz' ? 'qo‘lda tekshirish' : 'manual review'}</small>}
+              </div>)}
+            </section>
+            <section className="exam-answer-review">
+              <h3>{lang === 'ru' ? 'Разбор ответов' : lang === 'uz' ? 'Javoblar tahlili' : 'Answer review'}</h3>
+              {examQuestionsState.map((question, index) => {
+                const response = examAnswers[index] ?? ''
+                const correct = !question.manualReview && (
+                  question.section === 'writing'
+                    ? normalizeWrittenAnswer(response) === normalizeWrittenAnswer(question.answer)
+                    : response === question.answer
+                )
+                return <article className={`exam-review-row ${question.manualReview ? 'manual' : correct ? 'correct' : 'incorrect'}`} key={`${question.section}-${question.part}-${index}`}>
+                  <div className="exam-review-title">
+                    <b>{index + 1}. {t(`exam.${question.section}` as TranslationKey)}</b>
+                    <span>{question.manualReview
+                      ? (lang === 'ru' ? 'Проверка вручную' : lang === 'uz' ? 'Qo‘lda tekshiriladi' : 'Manual review')
+                      : correct
+                        ? (lang === 'ru' ? 'Верно' : lang === 'uz' ? 'To‘g‘ri' : 'Correct')
+                        : (lang === 'ru' ? 'Ошибка' : lang === 'uz' ? 'Xato' : 'Incorrect')}</span>
+                  </div>
+                  <p>{question.prompt}</p>
+                  <small>{lang === 'ru' ? 'Твой ответ' : lang === 'uz' ? 'Sizning javobingiz' : 'Your answer'}: {response || '—'}</small>
+                  {!question.manualReview && !correct && <small>{lang === 'ru' ? 'Правильный ответ' : lang === 'uz' ? 'To‘g‘ri javob' : 'Correct answer'}: {question.answer}</small>}
+                  {question.explanation && <small className="exam-explanation">{question.explanation}</small>}
+                </article>
+              })}
+            </section>
             <button className="primary" onClick={startExam}>{t('exam.retry')}</button>
           </div>}
 
@@ -2244,8 +2810,7 @@ export default function App() {
                 {selectedExamQuestion.options.map((option, index) => {
                   const selected = (examAnswers[examIndex] ?? '') === option
                   const answered = Boolean(examAnswers[examIndex])
-                  const correct = option === selectedExamQuestion.answer
-                  return <button key={`${option}-${index}`} className={`answer-option ${answered && correct ? 'correct' : ''} ${selected && !correct ? 'incorrect' : ''}`} disabled={answered} onClick={() => selectExamAnswer(option)}><span>{option}</span></button>
+                  return <button key={`${option}-${index}`} className={`answer-option ${selected ? 'selected' : ''}`} disabled={answered} onClick={() => selectExamAnswer(option)}><span>{option}</span></button>
                 })}
               </div>}
               {selectedExamQuestion.section === 'listening' && examAnswers[examIndex] && <p className="exam-reveal">{selectedExamQuestion.audio} · {selectedExamQuestion.pinyin}</p>}
@@ -2256,21 +2821,101 @@ export default function App() {
       )}
 
       {section === 7 && (
-        <section className="panel settings-page">
-          <div className="review-icon"><Settings/></div>
-          <span className="kicker">HANZIPATH</span>
-          <h2>{t('profile.settings')}</h2>
+        <section className="panel settings-page profile-page">
+          <div className="profile-page-heading">
+            <div className="review-icon"><Settings/></div>
+            <span className="kicker">HANZIPATH · 汉字之路</span>
+            <h2>{t('profile.settings')}</h2>
+            <p>{lang === 'ru' ? 'Твой прогресс, цели и настройки обучения.' : lang === 'uz' ? 'O‘qish jarayoni, maqsadlar va sozlamalaringiz.' : 'Your learning progress, goals and account settings.'}</p>
+          </div>
 
-          <label className="setting-row">
-            <span>{t('language.label')}</span>
-            <select value={lang} onChange={e => void changeLanguage(e.target.value as Locale)}>
-              {(['ru', 'en', 'uz'] as const).map(locale => (
-                <option key={locale} value={locale}>{t(`language.${locale}` as TranslationKey)}</option>
-              ))}
-            </select>
-          </label>
+          <section className="profile-account-card">
+            <div className="profile-account-copy">
+              <span className="kicker">{lang === 'ru' ? 'АККАУНТ' : lang === 'uz' ? 'HISOB' : 'ACCOUNT'}</span>
+              <h3>{authUser?.email ?? (lang === 'ru' ? 'Гостевой режим' : lang === 'uz' ? 'Mehmon rejimi' : 'Guest mode')}</h3>
+              <p>{authUser
+                ? progressSyncReadyFor === authUser.id
+                  ? (lang === 'ru' ? 'Облачная синхронизация активна' : lang === 'uz' ? 'Bulutli sinxronlash faol' : 'Cloud sync is active')
+                  : (lang === 'ru' ? 'Синхронизируем прогресс…' : lang === 'uz' ? 'Jarayon sinxronlanmoqda…' : 'Syncing your progress…')
+                : (lang === 'ru' ? 'Прогресс пока хранится на этом устройстве' : lang === 'uz' ? 'Jarayon hozircha shu qurilmada saqlanadi' : 'Progress is currently stored on this device')}</p>
+            </div>
+            {authUser
+              ? <button className="outline profile-account-action" type="button" onClick={async () => {
+                  if (!supabase) return
+                  const { error } = await supabase.auth.signOut()
+                  if (error) setNotice({ text: error.message, kind: 'error' })
+                  else setNotice({ text: lang === 'ru' ? 'Вы вышли из аккаунта. Локальный прогресс сохранён.' : lang === 'uz' ? 'Hisobdan chiqdingiz. Mahalliy jarayon saqlandi.' : 'Signed out. Your local progress is preserved.', kind: 'success' })
+                }}>
+                  {lang === 'ru' ? 'Выйти' : lang === 'uz' ? 'Chiqish' : 'Sign out'}
+                </button>
+              : <div className="profile-account-actions">
+                  <button className="primary" type="button" disabled={!supabase} onClick={() => { setAuthMode('signin'); setAuthOpen(true) }}>{lang === 'ru' ? 'Войти' : lang === 'uz' ? 'Kirish' : 'Sign in'}</button>
+                  <button className="outline" type="button" disabled={!supabase} onClick={() => { setAuthMode('signup'); setAuthOpen(true) }}>{lang === 'ru' ? 'Создать аккаунт' : lang === 'uz' ? 'Hisob yaratish' : 'Create account'}</button>
+                </div>}
+          </section>
 
-          <p>{supabase ? t('profile.languageSaved') : t('profile.languageLocal')}</p>
+          <section className="profile-stats-grid" aria-label={lang === 'ru' ? 'Статистика обучения' : lang === 'uz' ? 'O‘qish statistikasi' : 'Learning statistics'}>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Изучено слов' : lang === 'uz' ? 'O‘rganilgan so‘zlar' : 'Learned words'}</span><strong>{profileKnownCount.toLocaleString(lang)}</strong></article>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Избранное' : lang === 'uz' ? 'Sevimlilar' : 'Favorites'}</span><strong>{profileFavoriteCount.toLocaleString(lang)}</strong></article>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Завершено уроков' : lang === 'uz' ? 'Tugatilgan darslar' : 'Completed lessons'}</span><strong>{completedLessonIds.length.toLocaleString(lang)}</strong></article>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Серия занятий' : lang === 'uz' ? 'Ketma-ket kunlar' : 'Current streak'}</span><strong>{getStreak(activityDays)} <small>{lang === 'ru' ? 'дн.' : lang === 'uz' ? 'kun' : 'days'}</small></strong></article>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Дней с занятиями' : lang === 'uz' ? 'Faol kunlar' : 'Study days'}</span><strong>{activityDays.length.toLocaleString(lang)}</strong></article>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Повторений сегодня' : lang === 'uz' ? 'Bugungi takrorlashlar' : 'Reviews today'}</span><strong>{dailyReviewCount.count.toLocaleString(lang)}</strong></article>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Экзамены' : lang === 'uz' ? 'Imtihonlar' : 'Exam attempts'}</span><strong>{examHistory.length.toLocaleString(lang)}<small>{examHistory.length ? ` · ${profileExamAverage}%` : ''}</small></strong></article>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Карточки к повторению' : lang === 'uz' ? 'Takrorlash kartalari' : 'Cards due'}</span><strong>{profileDueReviews.toLocaleString(lang)}</strong></article>
+          </section>
+
+          <section className="profile-goal-card">
+            <div className="profile-section-heading">
+              <div><span className="kicker">{lang === 'ru' ? 'КАЖДЫЙ ДЕНЬ' : lang === 'uz' ? 'HAR KUNI' : 'DAILY ROUTINE'}</span><h3>{lang === 'ru' ? 'Ежедневная цель' : lang === 'uz' ? 'Kunlik maqsad' : 'Daily goal'}</h3></div>
+              <label className="profile-goal-select">
+                <span className="sr-only">{lang === 'ru' ? 'Цель повторений в день' : lang === 'uz' ? 'Kunlik takrorlash maqsadi' : 'Daily review goal'}</span>
+                <select value={dailyGoalWords} onChange={event => setDailyGoalWords(Number(event.target.value))}>
+                  {[5, 10, 15, 20, 30, 50].map(value => <option key={value} value={value}>{value} {lang === 'ru' ? 'слов' : lang === 'uz' ? 'so‘z' : 'words'}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="profile-goal-progress"><i style={{ width: `${Math.min(100, dailyReviewCount.count / Math.max(1, dailyGoalWords) * 100)}%` }}/></div>
+            <p>{dailyReviewCount.count.toLocaleString(lang)} / {dailyGoalWords.toLocaleString(lang)} · {lang === 'ru' ? 'повторений сегодня' : lang === 'uz' ? 'bugungi takrorlashlar' : 'reviews today'}</p>
+            <small>{lang === 'ru' ? 'Цель относится к повторению карточек, а не только к новым словам.' : lang === 'uz' ? 'Maqsad faqat yangi so‘zlarga emas, kartochkalarni takrorlashga ham tegishli.' : 'This goal tracks flashcard reviews, not only newly learned words.'}</small>
+          </section>
+
+          <section className="profile-sync-card">
+            <div className="profile-section-heading"><div><span className="kicker">{lang === 'ru' ? 'СОХРАНЕНИЕ' : lang === 'uz' ? 'SAQLASH' : 'BACKUP'}</span><h3>{lang === 'ru' ? 'Синхронизация прогресса' : lang === 'uz' ? 'Jarayonni sinxronlash' : 'Progress sync'}</h3></div>
+              <span className={`profile-sync-status ${authUser && progressSyncReadyFor === authUser.id ? 'ready' : ''}`}>{authUser
+                ? progressSyncReadyFor === authUser.id
+                  ? (lang === 'ru' ? 'Синхронизировано' : lang === 'uz' ? 'Sinxronlangan' : 'Synced')
+                  : (lang === 'ru' ? 'Синхронизация…' : lang === 'uz' ? 'Sinxronlanmoqda…' : 'Syncing…')
+                : (lang === 'ru' ? 'Только устройство' : lang === 'uz' ? 'Faqat qurilma' : 'Device only')}</span>
+            </div>
+            <p>{lang === 'ru'
+              ? 'После входа в один и тот же аккаунт на другом устройстве будут доступны изученные слова, избранное, интервалы повторения, ежедневная цель, серия занятий, завершённые уроки и история экзаменов.'
+              : lang === 'uz'
+                ? 'Boshqa qurilmada shu hisobga kirganingizda o‘rganilgan so‘zlar, sevimlilar, takrorlash oralig‘i, kunlik maqsad, ketma-ket kunlar, tugatilgan darslar va imtihonlar tarixi sinxronlanadi.'
+                : 'Sign in with the same account on another device to sync learned words, favorites, review intervals, daily goal, streak, completed lessons and exam history.'}</p>
+          </section>
+
+          {examHistory.length > 0 && <section className="profile-exam-history">
+            <div className="profile-section-heading"><div><span className="kicker">{lang === 'ru' ? 'ПРАКТИКА' : lang === 'uz' ? 'MASHQ' : 'PRACTICE'}</span><h3>{lang === 'ru' ? 'Последние экзамены' : lang === 'uz' ? 'So‘nggi imtihonlar' : 'Recent exams'}</h3></div><span>{profileExamAverage}% {lang === 'ru' ? 'средний результат' : lang === 'uz' ? 'o‘rtacha natija' : 'average auto-score'}</span></div>
+            {examHistory.slice(0, 5).map((attempt, index) => <div className="exam-history-row" key={`profile-${attempt.date}-${index}`}>
+              <span>HSK {attempt.system} · {attempt.system === '3.0' && attempt.level === 7 ? '7–9' : attempt.level}</span>
+              <b>{attempt.score}/{attempt.total} · {attempt.total ? Math.round(attempt.score / attempt.total * 100) : 0}%</b>
+              <small>{new Date(attempt.date).toLocaleDateString(lang)}{attempt.durationSeconds != null ? ` · ${formatExamTime(attempt.durationSeconds)}` : ''}</small>
+            </div>)}
+          </section>}
+
+          <section className="profile-preferences">
+            <div className="profile-section-heading"><div><span className="kicker">{lang === 'ru' ? 'НАСТРОЙКИ' : lang === 'uz' ? 'SOZLAMALAR' : 'PREFERENCES'}</span><h3>{lang === 'ru' ? 'Язык интерфейса' : lang === 'uz' ? 'Interfeys tili' : 'Interface language'}</h3></div></div>
+            <label className="setting-row">
+              <span>{t('language.label')}</span>
+              <select value={lang} onChange={event => void changeLanguage(event.target.value as Locale)}>
+                {(['ru', 'en', 'uz'] as const).map(locale => (
+                  <option key={locale} value={locale}>{t(`language.${locale}` as TranslationKey)}</option>
+                ))}
+              </select>
+            </label>
+            <p>{supabase ? t('profile.languageSaved') : t('profile.languageLocal')}</p>
+          </section>
         </section>
       )}
 
@@ -2334,7 +2979,10 @@ export default function App() {
             {dictionaryLevelLabel(selectedDictionaryWord, '2.0') && <span>{t('vocab.hsk20')} · {dictionaryLevelLabel(selectedDictionaryWord, '2.0')}</span>}
             {dictionaryLevelLabel(selectedDictionaryWord, '3.0') && <span>{t('vocab.hsk30')} · {dictionaryLevelLabel(selectedDictionaryWord, '3.0')}</span>}
             {selectedDictionaryWord.courseStage && <span>{t('vocab.courseStage')} {selectedDictionaryWord.courseStage}</span>}
-            {selectedDictionaryWord.membershipStatus && <small>{t('vocab.membershipUnverified')}</small>}
+            {selectedDictionaryWord.partOfSpeech && selectedDictionaryWord.partOfSpeech.length > 0 && <span>{selectedDictionaryWord.partOfSpeech.map(value => partOfSpeechLabel(value, lang)).join(' · ')}</span>}
+            {selectedDictionaryWord.membershipStatus && <small>{selectedDictionaryWord.membershipStatus === 'source_verified'
+              ? (lang === 'ru' ? 'Уровень подтверждён источником' : lang === 'uz' ? 'Daraja manba bilan tasdiqlangan' : 'Level verified against source')
+              : t('vocab.membershipUnverified')}</small>}
           </div>
 
           <button className={`outline dictionary-known-action ${knownWords.includes(wordId(selectedDictionaryWord)) ? 'selected' : ''}`} type="button" onClick={() => toggleKnownWord(selectedDictionaryWord)}>
@@ -2359,7 +3007,8 @@ export default function App() {
               ? <div className="word-detail-example">
                 <span>{selectedDictionaryWord.example}</span>
                 {selectedDictionaryWord.examplePinyin && <small>{selectedDictionaryWord.examplePinyin}</small>}
-                <p>{exampleMeaning(selectedDictionaryWord) || t('vocab.exampleUnavailable')}</p>
+                <p>{(lang !== 'en' && !selectedDictionaryWord.exampleRu && !selectedDictionaryWord.exampleUzVerified && selectedDictionaryWord.exampleEn ? 'EN · ' : '')}{exampleMeaning(selectedDictionaryWord) || t('vocab.exampleUnavailable')}</p>
+                {selectedDictionaryWord.exampleSource && <small>{selectedDictionaryWord.exampleSource} · {selectedDictionaryWord.exampleLicense || 'CC BY-SA 4.0'} · {lang === 'ru' ? 'пример из источника, без индивидуальной проверки' : lang === 'uz' ? 'manba namunasi, alohida tekshirilmagan' : 'source example, not individually reviewed'}</small>}
                 <button className="sound" type="button" onClick={() => speak(selectedDictionaryWord.example)} aria-label={`${t('vocab.listen')}: ${selectedDictionaryWord.example}`}><Volume2 size={17}/></button>
               </div>
               : <p className="word-detail-missing">{t('vocab.exampleUnavailable')}</p>}
