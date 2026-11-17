@@ -923,11 +923,34 @@ export default function App() {
 
     const loadReviewDataset = async () => {
       try {
-        let response = await fetch('/vocabulary-catalog.json')
-        if (!response.ok) response = await fetch('/vocabulary-review.json')
-        if (!response.ok) throw new Error('Vocabulary catalogue could not be loaded.')
-        const payload = await response.json() as { entries?: unknown[] }
-        const entries = Array.isArray(payload.entries) ? payload.entries : []
+        const [hsk30Response, hsk20Response, translationsResponse] = await Promise.all([
+          fetch('/vocabulary-catalog-hsk30.json'),
+          fetch('/vocabulary-catalog-hsk20.json'),
+          fetch('/vocabulary-translations-ru-uz.json'),
+        ])
+
+        let entries: unknown[] = []
+        if (hsk30Response.ok && hsk20Response.ok) {
+          const [hsk30Payload, hsk20Payload, translationsPayload] = await Promise.all([
+            hsk30Response.json() as Promise<{ entries?: unknown[] }>,
+            hsk20Response.json() as Promise<{ entries?: unknown[] }>,
+            translationsResponse.ok
+              ? translationsResponse.json() as Promise<{ entries?: unknown[] }>
+              : Promise.resolve({ entries: [] as unknown[] }),
+          ])
+          const translationsByWordKey = new Map(
+            (translationsPayload.entries ?? []).map((entry: any) => [entry.wordKey, entry]),
+          )
+          entries = [...(hsk30Payload.entries ?? []), ...(hsk20Payload.entries ?? [])].map((entry: any) => ({
+            ...entry,
+            ...(translationsByWordKey.get(entry.wordKey) ?? {}),
+          }))
+        } else {
+          const fallbackResponse = await fetch('/vocabulary-review.json')
+          if (!fallbackResponse.ok) throw new Error('Vocabulary catalogue could not be loaded.')
+          const fallbackPayload = await fallbackResponse.json() as { entries?: unknown[] }
+          entries = Array.isArray(fallbackPayload.entries) ? fallbackPayload.entries : []
+        }
 
         if (!cancelled && entries.length > 0) {
           const mergedEntries = mergeDictionaryEntries(
