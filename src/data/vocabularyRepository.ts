@@ -346,6 +346,7 @@ export async function getVocabularyCatalog(
         let query = client.from('standard_memberships')
           .select('id, vocabulary_item_id, level_category', { count: 'exact' })
           .eq('standard_version_id', options.standardVersionId)
+          .eq('verification_status', 'verified')
 
         if (options.level) query = query.eq('level_category', options.level)
         return keysetPage(query, cursor, pageSize)
@@ -553,6 +554,66 @@ export async function getStandardVersions(
   } catch (error) {
     return failed([], error)
   }
+}
+
+/**
+ * Returns lightweight catalog readiness counts without downloading unverified
+ * translations or example rows. Candidate counts are informational only.
+ */
+export async function getVocabularyCatalogStatus(
+  standardVersionId: string,
+  level?: StandardLevel,
+): Promise<RepositoryResult<{
+  totalMemberships: number
+  verifiedMemberships: number
+  byLevel: Partial<Record<StandardLevel, number>>
+  verifiedByLevel: Partial<Record<StandardLevel, number>>
+}>> {
+  const empty = {
+    totalMemberships: 0,
+    verifiedMemberships: 0,
+    byLevel: {} as Partial<Record<StandardLevel, number>>,
+    verifiedByLevel: {} as Partial<Record<StandardLevel, number>>,
+  }
+
+  if (!supabase) return failed(empty, EMPTY_CATALOG_ERROR)
+  if (!standardVersionId.trim()) {
+    return failed(empty, {
+      code: 'INVALID_STANDARD_VERSION_ID',
+      message: 'A standard version ID is required.',
+    })
+  }
+
+  const memberships = await fetchAllPages<{
+    id: string
+    level_category: StandardLevel
+    verification_status: 'verified' | 'unverified' | 'rejected'
+  }>((cursor, pageSize) => {
+    let query = supabase!.from('standard_memberships')
+      .select('id, level_category, verification_status', { count: 'exact' })
+      .eq('standard_version_id', standardVersionId)
+
+    if (level) query = query.eq('level_category', level)
+    return keysetPage(query, cursor, pageSize)
+  }, 500)
+
+  if (memberships.error) return failed(empty, memberships.error)
+
+  const status = { ...empty }
+  status.totalMemberships = memberships.data.length
+
+  for (const membership of memberships.data) {
+    status.byLevel[membership.level_category] =
+      (status.byLevel[membership.level_category] ?? 0) + 1
+
+    if (membership.verification_status === 'verified') {
+      status.verifiedMemberships += 1
+      status.verifiedByLevel[membership.level_category] =
+        (status.verifiedByLevel[membership.level_category] ?? 0) + 1
+    }
+  }
+
+  return { data: status, error: null }
 }
 
 /**
