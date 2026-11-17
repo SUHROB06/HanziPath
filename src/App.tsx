@@ -924,8 +924,9 @@ export default function App() {
 
     const loadReviewDataset = async () => {
       try {
-        const response = await fetch('/vocabulary-review.json')
-        if (!response.ok) throw new Error('Vocabulary review dataset not found.')
+        let response = await fetch('/vocabulary-catalog.json')
+        if (!response.ok) response = await fetch('/vocabulary-review.json')
+        if (!response.ok) throw new Error('Vocabulary catalogue could not be loaded.')
         const payload = await response.json() as { entries?: unknown[] }
         const entries = Array.isArray(payload.entries) ? payload.entries : []
 
