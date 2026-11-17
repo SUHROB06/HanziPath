@@ -52,6 +52,18 @@ type Word = {
   level20Memberships?: Array<number | string>
   level30Memberships?: Array<number | string>
   legacyIds?: string[]
+  partOfSpeech?: string[]
+  frequencyRank?: number | null
+  pinyinNum?: string
+  translationSource?: string
+  translationLicense?: string
+  membershipSource?: string
+  definitionSource?: string
+  dataLicense?: string
+  exampleSource?: string
+  exampleSourceId?: string
+  exampleLicense?: string
+  exampleStatus?: string
   example: string
   examplePinyin: string
   exampleRu: string
@@ -712,6 +724,7 @@ function databaseRowToWord(row: any, system: System): Word {
     level30: system === '3.0' ? level : null,
     level20Memberships: system === '2.0' ? [level] : [],
     level30Memberships: system === '3.0' ? [level] : [],
+    partOfSpeech: [...new Set(readings.map((item: any) => item.part_of_speech).filter(Boolean))],
     example: example?.sentence_hanzi ?? '',
     examplePinyin: example?.sentence_pinyin ?? '',
     exampleRu: exampleMeaning('ru') ?? '',
@@ -727,6 +740,7 @@ function reviewRowToWord(row: any, index: number): Word {
     hanzi: row.hanzi ?? '',
     traditional: row.traditional ?? '',
     pinyin: row.pinyin ?? '',
+    pinyinNum: row.pinyinNum ?? '',
     ru: row.ru ?? '',
     en: row.en ?? '',
     uz: row.uz ?? null,
@@ -737,10 +751,26 @@ function reviewRowToWord(row: any, index: number): Word {
     membershipStatus: row.membershipStatus,
     level20: row.level20 ?? null,
     level30: row.level30 ?? null,
-    example: sample?.example ?? '',
-    examplePinyin: sample?.examplePinyin ?? '',
-    exampleRu: sample?.exampleRu ?? '',
-    exampleEn: sample?.exampleEn ?? '',
+    level20Memberships: Array.isArray(row.level20Memberships) ? row.level20Memberships : undefined,
+    level30Memberships: Array.isArray(row.level30Memberships) ? row.level30Memberships : undefined,
+    legacyIds: Array.isArray(row.legacyIds) ? row.legacyIds : [],
+    partOfSpeech: Array.isArray(row.partOfSpeech) ? row.partOfSpeech : [],
+    frequencyRank: Number.isFinite(Number(row.frequencyRank)) ? Number(row.frequencyRank) : null,
+    translationSource: row.translationSource,
+    translationLicense: row.translationLicense,
+    membershipSource: row.membershipSource,
+    definitionSource: row.definitionSource,
+    dataLicense: row.dataLicense,
+    example: row.example || sample?.example || '',
+    examplePinyin: row.examplePinyin || sample?.examplePinyin || '',
+    exampleRu: row.exampleRu || sample?.exampleRu || '',
+    exampleEn: row.exampleEn || sample?.exampleEn || '',
+    exampleUz: row.exampleUz ?? null,
+    exampleUzVerified: Boolean(row.exampleUzVerified),
+    exampleSource: row.exampleSource,
+    exampleSourceId: row.exampleSourceId,
+    exampleLicense: row.exampleLicense,
+    exampleStatus: row.exampleStatus,
   }
 }
 
@@ -758,8 +788,9 @@ export default function App() {
   const [dictionaryPage, setDictionaryPage] = useState(0)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [knownOnly, setKnownOnly] = useState(false)
-  const [dictionarySort, setDictionarySort] = useState<'hanzi' | 'pinyin' | 'level'>('hanzi')
+  const [dictionarySort, setDictionarySort] = useState<'hanzi' | 'pinyin' | 'level' | 'frequency'>('hanzi')
   const [dictionaryLessonId, setDictionaryLessonId] = useState('')
+  const [dictionaryPosFilter, setDictionaryPosFilter] = useState('')
   const [selectedDictionaryWord, setSelectedDictionaryWord] = useState<Word | null>(null)
   const [menu, setMenu] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -1655,18 +1686,47 @@ export default function App() {
           : t('vocab.translationUnavailable')
 
   const exampleMeaning = (word: Word) => {
-    if (lang === 'ru') return word.exampleRu
+    if (lang === 'ru') return word.exampleRu || word.exampleEn
     if (lang === 'en') return word.exampleEn
-
     return word.exampleUzVerified && word.exampleUz
       ? word.exampleUz
-      : t('vocab.exampleUnavailable')
+      : word.exampleEn || t('vocab.exampleUnavailable')
   }
 
-  const translationStatusLabel = (status?: string) =>
-    !status
-      ? null
-      : t(status === 'ai_draft_unverified' ? 'vocab.aiDraft' : 'vocab.sourceUnverified')
+  const translationStatusLabel = (status?: string) => {
+    if (!status) return null
+    if (status === 'source_verified') {
+      return lang === 'ru' ? 'Подтверждено по источнику' : lang === 'uz' ? 'Manba bilan tasdiqlangan' : 'Source verified'
+    }
+    if (status === 'missing_translation') {
+      return lang === 'ru' ? 'Перевод отсутствует' : lang === 'uz' ? 'Tarjima yo‘q' : 'Translation missing'
+    }
+    if (status === 'ai_assisted_unverified' || status === 'ai_draft_unverified') return t('vocab.aiDraft')
+    return t('vocab.sourceUnverified')
+  }
+
+  const partOfSpeechLabel = (value: string) => {
+    const labels: Record<string, Record<Locale, string>> = {
+      noun: { ru: 'Существительное', en: 'Noun', uz: 'Ot' },
+      verb: { ru: 'Глагол', en: 'Verb', uz: 'Fe’l' },
+      adjective: { ru: 'Прилагательное', en: 'Adjective', uz: 'Sifat' },
+      adverb: { ru: 'Наречие', en: 'Adverb', uz: 'Ravish' },
+      pronoun: { ru: 'Местоимение', en: 'Pronoun', uz: 'Olmosh' },
+      numeral: { ru: 'Числительное', en: 'Numeral', uz: 'Son' },
+      preposition: { ru: 'Предлог', en: 'Preposition', uz: 'Ko‘makchi' },
+      conjunction: { ru: 'Союз', en: 'Conjunction', uz: 'Bog‘lovchi' },
+      particle: { ru: 'Частица', en: 'Particle', uz: 'Yuklama' },
+      classifier: { ru: 'Счётное слово', en: 'Classifier', uz: 'Hisob so‘zi' },
+      'measure word': { ru: 'Счётное слово', en: 'Measure word', uz: 'Hisob so‘zi' },
+      interjection: { ru: 'Междометие', en: 'Interjection', uz: 'Undov' },
+      auxiliary: { ru: 'Вспомогательный глагол', en: 'Auxiliary', uz: 'Yordamchi fe’l' },
+      determiner: { ru: 'Определитель', en: 'Determiner', uz: 'Aniqlovchi' },
+      phrase: { ru: 'Выражение', en: 'Phrase', uz: 'Ibora' },
+      idiom: { ru: 'Идиома', en: 'Idiom', uz: 'Iboraviy birlik' },
+      character: { ru: 'Иероглиф', en: 'Character', uz: 'Iyeroglif' },
+    }
+    return labels[value]?.[lang] ?? value
+  }
 
   const toggleFavorite = (word: Word) => {
     const id = wordId(word)
