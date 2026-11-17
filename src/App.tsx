@@ -26,6 +26,8 @@ import {
   getVocabularyCatalogStatus,
 } from './data/vocabularyRepository'
 import type { StandardLevel } from './types/vocabulary'
+import { mergeLearningProgress, type LearningProgressSnapshot } from './data/learningProgress'
+import { adaptiveDifficulty, dueReviewIds, scheduleReview, type ReviewQuality, type ReviewState } from './data/spacedRepetition'
 
 type System = '2.0' | '3.0'
 
@@ -142,6 +144,9 @@ const FAVORITE_WORDS_KEY = 'hanzipath.favoriteWords'
 const DAILY_TASKS_KEY = 'hanzipath.dailyTasks'
 const ACTIVITY_DAYS_KEY = 'hanzipath.activityDays'
 const COMPLETED_LESSONS_KEY = 'hanzipath.completedLessons'
+const REVIEW_SCHEDULE_KEY = 'hanzipath.reviewSchedule'
+const DAILY_REVIEW_COUNT_KEY = 'hanzipath.dailyReviewCount'
+const DAILY_GOAL_WORDS_KEY = 'hanzipath.dailyGoalWords'
 
 const lessonTemplates = [...hsk20LessonTemplates, ...hsk30LessonTemplates]
 const originalLessonWords: Word[] = (() => {
@@ -768,6 +773,12 @@ export default function App() {
   const [knownWords, setKnownWords] = useState<string[]>(() => readStored(KNOWN_WORDS_KEY, []))
   const [favoriteWordIds, setFavoriteWordIds] = useState<string[]>(() => readStored(FAVORITE_WORDS_KEY, []))
   const [activityDays, setActivityDays] = useState<string[]>(() => readStored(ACTIVITY_DAYS_KEY, []))
+  const [reviewSchedule, setReviewSchedule] = useState<Record<string, ReviewState>>(() => readStored(REVIEW_SCHEDULE_KEY, {}))
+  const [dailyGoalWords, setDailyGoalWords] = useState<number>(() => readStored(DAILY_GOAL_WORDS_KEY, 15))
+  const [dailyReviewCount, setDailyReviewCount] = useState<{ date: string; count: number }>(() => {
+    const saved = readStored<{ date: string; count: number }>(DAILY_REVIEW_COUNT_KEY, { date: '', count: 0 })
+    return saved.date === localDateKey() ? saved : { date: localDateKey(), count: 0 }
+  })
   const [cardsSystem, setCardsSystem] = useState<CourseSystem>(() => readStored<CourseSystem>('hanzipath.cards.system', '2.0'))
   const [cardsLevel, setCardsLevel] = useState<CourseLevel>(() => readStored<CourseLevel>('hanzipath.cards.level', 1))
   const [cardsLessonId, setCardsLessonId] = useState<string>(() => readStored<string>('hanzipath.cards.lesson', ''))
@@ -802,6 +813,7 @@ export default function App() {
   const [authBusy, setAuthBusy] = useState(false)
   const [authFeedback, setAuthFeedback] = useState<Notice | null>(null)
   const [authUser, setAuthUser] = useState<{ id: string; email: string } | null>(null)
+  const [progressSyncReadyFor, setProgressSyncReadyFor] = useState<string | null>(null)
   const [selectedVolume, setSelectedVolume] = useState(1)
 
   const [databaseWords, setDatabaseWords] = useState<Word[] | null>(null)
@@ -906,6 +918,16 @@ export default function App() {
       // Streak tracking is optional.
     }
   }, [activityDays])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(REVIEW_SCHEDULE_KEY, JSON.stringify(reviewSchedule))
+      window.localStorage.setItem(DAILY_GOAL_WORDS_KEY, JSON.stringify(dailyGoalWords))
+      window.localStorage.setItem(DAILY_REVIEW_COUNT_KEY, JSON.stringify(dailyReviewCount))
+    } catch {
+      // Local review scheduling remains active for this session.
+    }
+  }, [reviewSchedule, dailyGoalWords, dailyReviewCount])
 
   useEffect(() => {
     try {
@@ -1147,6 +1169,129 @@ export default function App() {
     }
   }, [])
 
+  // Load and merge the local learning history with the signed-in account.
+  // The merge is additive for completed work and timestamp-based for card schedules.
+  useEffect(() => {
+    const userId = authUser?.id
+    if (!supabase || !userId) {
+      setProgressSyncReadyFor(null)
+      return
+    }
+
+    let cancelled = false
+    setProgressSyncReadyFor(null)
+
+    const loadProgress = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_learning_progress')
+          .select('progress')
+          .eq('user_id', userId)
+          .maybeSingle()
+
+        if (error) throw error
+        if (cancelled) return
+
+        const localSnapshot: LearningProgressSnapshot = {
+          version: 1,
+          knownWords,
+          favoriteWordIds,
+          activityDays,
+          completedLessonIds,
+          examHistory,
+          reviewSchedule,
+          dailyTasks: { date: localDateKey(), done },
+          dailyGoalWords,
+          dailyReviewCount,
+        }
+        const merged = mergeLearningProgress(
+          localSnapshot,
+          (data?.progress ?? null) as Partial<LearningProgressSnapshot> | null,
+          localDateKey(),
+        )
+
+        setKnownWords(merged.knownWords)
+        setFavoriteWordIds(merged.favoriteWordIds)
+        setActivityDays(merged.activityDays)
+        setCompletedLessonIds(merged.completedLessonIds)
+        setExamHistory(merged.examHistory)
+        setReviewSchedule(merged.reviewSchedule)
+        setDone(merged.dailyTasks.done)
+        setDailyGoalWords(merged.dailyGoalWords)
+        setDailyReviewCount(merged.dailyReviewCount)
+        setProgressSyncReadyFor(userId)
+      } catch (error) {
+        if (!cancelled) {
+          setNotice({
+            text: lang === 'ru'
+              ? 'Не удалось загрузить облачный прогресс. Локальные данные сохранены.'
+              : lang === 'uz'
+                ? 'Bulutdagi natijalarni yuklab bo‘lmadi. Mahalliy ma’lumotlar saqlanadi.'
+                : 'Could not load cloud progress. Your local progress is preserved.',
+            kind: 'error',
+          })
+          setProgressSyncReadyFor(userId)
+        }
+      }
+    }
+
+    void loadProgress()
+    return () => { cancelled = true }
+  }, [authUser?.id])
+
+  // Save only after the account's initial merge has completed, preventing an
+  // empty first render from overwriting a returning learner's cloud history.
+  useEffect(() => {
+    if (!supabase || !authUser?.id || progressSyncReadyFor !== authUser.id) return
+
+    let cancelled = false
+    const payload: LearningProgressSnapshot = {
+      version: 1,
+      knownWords,
+      favoriteWordIds,
+      activityDays,
+      completedLessonIds,
+      examHistory,
+      reviewSchedule,
+      dailyTasks: { date: localDateKey(), done },
+      dailyGoalWords,
+      dailyReviewCount,
+    }
+
+    const timeout = window.setTimeout(async () => {
+      try {
+        const { error } = await supabase!
+          .from('user_learning_progress')
+          .upsert({
+            user_id: authUser.id,
+            progress: payload,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'user_id' })
+        if (error) throw error
+      } catch {
+        if (!cancelled) {
+          setNotice({
+            text: lang === 'ru'
+              ? 'Не удалось синхронизировать прогресс. Копия на этом устройстве сохранена.'
+              : lang === 'uz'
+                ? 'Natijalarni sinxronlab bo‘lmadi. Ushbu qurilmadagi nusxa saqlandi.'
+                : 'Could not sync progress. The copy on this device is saved.',
+            kind: 'error',
+          })
+        }
+      }
+    }, 700)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeout)
+    }
+  }, [
+    authUser?.id, progressSyncReadyFor, knownWords, favoriteWordIds,
+    activityDays, completedLessonIds, examHistory, reviewSchedule,
+    done, dailyGoalWords, dailyReviewCount, lang,
+  ])
+
   const submitAuth = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!supabase) {
@@ -1295,7 +1440,20 @@ export default function App() {
   ] : []
   const cardsLessons = expandedLessonData.lessons.filter(lesson => lesson.system === cardsSystem && lesson.level === cardsLevel)
   const selectedCardsLesson = cardsLessons.find(lesson => lesson.id === cardsLessonId) ?? cardsLessons[0]
-  const cardStudyWords = selectedCardsLesson ? expandedLessonData.assignments[selectedCardsLesson.id] ?? [] : []
+  const cardStudyWords = useMemo(() => {
+    const base = selectedCardsLesson ? expandedLessonData.assignments[selectedCardsLesson.id] ?? [] : []
+    const dueIds = new Set(dueReviewIds(reviewSchedule))
+    return [...base].sort((a, b) => {
+      const aId = wordId(a)
+      const bId = wordId(b)
+      const aRank = dueIds.has(aId) ? 0 : reviewSchedule[aId] ? 2 : 1
+      const bRank = dueIds.has(bId) ? 0 : reviewSchedule[bId] ? 2 : 1
+      if (aRank !== bRank) return aRank - bRank
+      const aDue = Date.parse(reviewSchedule[aId]?.dueAt ?? '') || 0
+      const bDue = Date.parse(reviewSchedule[bId]?.dueAt ?? '') || 0
+      return aDue - bDue
+    })
+  }, [selectedCardsLesson, expandedLessonData.assignments, reviewSchedule])
   const listeningLessons = expandedLessonData.lessons.filter(lesson => lesson.system === listeningSystem && lesson.level === listeningLevel)
   const selectedListeningLesson = listeningLessons.find(lesson => lesson.id === listeningLessonId) ?? listeningLessons[0]
   const listeningStudyWords = selectedListeningLesson ? expandedLessonData.assignments[selectedListeningLesson.id] ?? [] : []
@@ -1304,14 +1462,36 @@ export default function App() {
   const knownInCurrentWords = knownWords.filter(id => currentWords.some(word => wordId(word) === id)).length
   const activeCard = cardStudyWords.length ? cardStudyWords[((cardIndex % cardStudyWords.length) + cardStudyWords.length) % cardStudyWords.length] : undefined
   const listeningWord = listeningStudyWords.length ? listeningStudyWords[((listeningIndex % listeningStudyWords.length) + listeningStudyWords.length) % listeningStudyWords.length] : undefined
+  const currentAdaptiveDifficulty = adaptiveDifficulty(reviewSchedule)
   const listeningOptions = useMemo(() => {
     if (!listeningWord) return []
     const unique = [...new Map([listeningWord, ...listeningStudyWords.filter(word => wordId(word) !== wordId(listeningWord))].map(word => [wordId(word), word] as const)).values()]
-    return shuffleWithSeed(unique.slice(0, 4), listeningIndex + 101)
-  }, [listeningStudyWords, listeningIndex, listeningWord])
+    return shuffleWithSeed(unique.slice(0, currentAdaptiveDifficulty + 1), listeningIndex + 101)
+  }, [listeningStudyWords, listeningIndex, listeningWord, currentAdaptiveDifficulty])
   const recordActivity = () => {
     const today = localDateKey()
     setActivityDays(days => days.includes(today) ? days : [...days, today].slice(-400))
+  }
+
+  const rateFlashcard = (word: Word, quality: ReviewQuality) => {
+    const id = wordId(word)
+    setReviewSchedule(current => ({
+      ...current,
+      [id]: scheduleReview(current[id], quality),
+    }))
+    if (quality === 'again') {
+      setKnownWords(items => items.filter(item => item !== id))
+    } else if (quality === 'good' || quality === 'easy') {
+      setKnownWords(items => items.includes(id) ? items : [...items, id])
+    }
+    const today = localDateKey()
+    setDailyReviewCount(current => ({
+      date: today,
+      count: current.date === today ? current.count + 1 : 1,
+    }))
+    recordActivity()
+    setShowAnswer(false)
+    setCardIndex(index => cardStudyWords.length ? (index + 1) % cardStudyWords.length : 0)
   }
 
   const filtered = useMemo(() => {
@@ -1527,7 +1707,11 @@ export default function App() {
           <div className="avatar">H</div>
           <div className="profile-name">
             <b>{authUser?.email || t('profile.guest')}</b>
-            <small>{authUser ? (lang === 'ru' ? 'В аккаунте' : 'Signed in') : t('profile.settings')}</small>
+            <small>{authUser
+              ? (progressSyncReadyFor === authUser.id
+                ? (lang === 'ru' ? 'Прогресс синхронизируется' : lang === 'uz' ? 'Natijalar sinxronlanadi' : 'Progress sync enabled')
+                : (lang === 'ru' ? 'Загрузка прогресса…' : lang === 'uz' ? 'Natijalar yuklanmoqda…' : 'Loading progress…'))
+              : t('profile.settings')}</small>
           </div>
           <button className="profile-action" title={authUser ? 'Sign out' : t('profile.signIn')} aria-label={authUser ? 'Sign out' : t('profile.signIn')} onClick={() => authUser ? void signOut() : (setAuthMode('signin'), setAuthOpen(true))}>
             <LockKeyhole size={17}/>
@@ -1631,6 +1815,25 @@ export default function App() {
                   <div className="continue-progress"><i style={{width: (courseAllLessons.length ? Math.round(completedLessonIds.filter(id => courseAllLessons.some(lesson => lesson.id === id)).length / courseAllLessons.length * 100) : 0) + '%'}}/></div>
                   <div className="continue-meta"><small>{completedLessonIds.filter(id => courseAllLessons.some(lesson => lesson.id === id)).length} / {courseAllLessons.length} {lang === 'ru' ? 'уроков пройдено' : 'lessons completed'}</small><button className="continue-play" onClick={() => setSection(1)} aria-label={lang === 'ru' ? 'Открыть урок' : 'Open lesson'}><Play size={17} fill="currentColor"/></button></div>
                 </div>
+              </div>
+            </section>
+
+            <section className="dashboard-panel daily-goal-panel">
+              <div className="section-heading">
+                <div>
+                  <span className="kicker">{lang === 'ru' ? 'ЕЖЕДНЕВНАЯ ЦЕЛЬ' : lang === 'uz' ? 'KUNLIK MAQSAD' : 'DAILY GOAL'}</span>
+                  <h2>{lang === 'ru' ? 'Повторение слов' : lang === 'uz' ? 'So‘zlarni takrorlash' : 'Word review'}</h2>
+                </div>
+                <label className="daily-goal-select">
+                  <span>{lang === 'ru' ? 'Цель в день' : lang === 'uz' ? 'Kunlik maqsad' : 'Daily target'}</span>
+                  <select value={dailyGoalWords} onChange={event => setDailyGoalWords(Number(event.target.value))}>
+                    {[5, 10, 15, 20, 30, 40, 50].map(value => <option key={value} value={value}>{value} {lang === 'ru' ? 'слов' : lang === 'uz' ? 'so‘z' : 'words'}</option>)}
+                  </select>
+                </label>
+              </div>
+              <div className="daily-goal-progress">
+                <div><b>{Math.min(dailyReviewCount.date === localDateKey() ? dailyReviewCount.count : 0, dailyGoalWords)} / {dailyGoalWords}</b><span>{lang === 'ru' ? 'повторений сегодня' : lang === 'uz' ? 'bugungi takrorlashlar' : 'reviews today'}</span></div>
+                <div className="daily-goal-track"><i style={{ width: Math.min(100, ((dailyReviewCount.date === localDateKey() ? dailyReviewCount.count : 0) / dailyGoalWords) * 100) + '%' }}/></div>
               </div>
             </section>
 
@@ -2097,7 +2300,7 @@ export default function App() {
             </label>
           </div>
           {activeCard ? <>
-            <p className="notice-text">{cardStudyWords.length} {lang === 'ru' ? 'слов в этом уроке' : lang === 'uz' ? 'ta so‘z ushbu darsda' : 'words in this lesson'} · {lang === 'ru' ? 'изучено' : lang === 'uz' ? 'o‘rganilgan' : 'learned'}: {cardStudyWords.filter(word => knownWords.includes(wordId(word))).length}</p>
+            <p className="notice-text">{cardStudyWords.length} {lang === 'ru' ? 'слов в этом уроке' : lang === 'uz' ? 'ta so‘z ushbu darsda' : 'words in this lesson'} · {lang === 'ru' ? 'изучено' : lang === 'uz' ? 'o‘rganilgan' : 'learned'}: {cardStudyWords.filter(word => knownWords.includes(wordId(word))).length} · {lang === 'ru' ? 'к повторению' : lang === 'uz' ? 'takrorlash kerak' : 'due'}: {dueReviewIds(reviewSchedule).filter(id => cardStudyWords.some(word => wordId(word) === id)).length} · {lang === 'ru' ? 'сложность' : lang === 'uz' ? 'daraja' : 'difficulty'}: {currentAdaptiveDifficulty}/3</p>
             <article className="study-card">
               <span className="study-hanzi">{activeCard.hanzi}</span>
               {showAnswer && <div className="study-answer"><b>{activeCard.pinyin}</b><span>{vocabularyMeaning(activeCard)}</span>{activeCard.example && <small>{activeCard.example} · {activeCard.examplePinyin}</small>}</div>}
@@ -2105,8 +2308,10 @@ export default function App() {
             <div className="study-actions">
               {!showAnswer && <button className="primary" onClick={() => setShowAnswer(true)}>{t('flashcards.showAnswer')}</button>}
               {showAnswer && <>
-                <button className="outline" onClick={() => { setShowAnswer(false); setCardIndex(i => (i + 1) % cardStudyWords.length) }}>{t('flashcards.again')}</button>
-                <button className="primary" onClick={() => { const id = wordId(activeCard); setKnownWords(items => items.includes(id) ? items : [...items, id]); recordActivity(); setShowAnswer(false); setCardIndex(i => (i + 1) % cardStudyWords.length) }}>{t('flashcards.markKnown')}</button>
+                <button className="outline" onClick={() => rateFlashcard(activeCard, 'again')}>{lang === 'ru' ? 'Снова · 10 мин' : lang === 'uz' ? 'Yana · 10 daq' : 'Again · 10 min'}</button>
+                <button className="outline" onClick={() => rateFlashcard(activeCard, 'hard')}>{lang === 'ru' ? 'Трудно' : lang === 'uz' ? 'Qiyin' : 'Hard'}</button>
+                <button className="primary" onClick={() => rateFlashcard(activeCard, 'good')}>{lang === 'ru' ? 'Хорошо' : lang === 'uz' ? 'Yaxshi' : 'Good'}</button>
+                <button className="primary easy-review" onClick={() => rateFlashcard(activeCard, 'easy')}>{lang === 'ru' ? 'Легко' : lang === 'uz' ? 'Oson' : 'Easy'}</button>
               </>}
             </div>
             <div className="study-footer">
