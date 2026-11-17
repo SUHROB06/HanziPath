@@ -87,12 +87,18 @@ assert.equal(duplicateMerge.length, 1)
 assert.deepEqual(duplicateMerge[0].level20Memberships, [1])
 assert.deepEqual(duplicateMerge[0].level30Memberships, [1, 5])
 assert.match(duplicateMerge[0].ru, /хороший \/ хорошо/)
-assert.deepEqual(duplicateMerge[0].legacyIds.sort(), ['legacy-a', 'legacy-b'])
+assert.deepEqual(duplicateMerge[0].legacyIds.sort(), ['dictionary:好|hǎo', 'legacy-a', 'legacy-b'])
 const differentTones = quality.mergeDictionaryEntries([
   { hanzi: '行', pinyin: 'xíng', ru: 'идти', en: 'to walk', uz: 'yurmoq', level20: 1, level30: null },
   { hanzi: '行', pinyin: 'háng', ru: 'ряд; строка', en: 'row; line', uz: 'qator', level20: null, level30: 2 },
 ])
 assert.equal(differentTones.length, 2)
+const numberedPinyinDuplicates = quality.mergeDictionaryEntries([
+  { hanzi: '实在', pinyin: 'shízài', pinyinNum: 'shi2zai4', ru: 'на самом деле', en: 'really', uz: 'haqiqatan' },
+  { hanzi: '实在', pinyin: 'shí zài', pinyinNum: 'shi2zai4', ru: 'действительно', en: 'indeed', uz: 'darhaqiqat' },
+])
+assert.equal(numberedPinyinDuplicates.length, 1)
+assert.match(numberedPinyinDuplicates[0].ru, /на самом деле \/ действительно/)
 
 const missing = Object.fromEntries(['hanzi', 'pinyin', 'ru', 'en', 'uz'].map(key => [
   key,
