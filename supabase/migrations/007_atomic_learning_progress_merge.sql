@@ -40,19 +40,22 @@ begin
   select coalesce(jsonb_agg(value order by value->>'date' desc), '[]'::jsonb)
     into v_exam_history
   from (
-    select distinct on (
-      value->>'system', value->>'level', value->>'score', value->>'total', value->>'date'
-    ) value
-    from jsonb_array_elements(
-      (case when jsonb_typeof(v_current->'examHistory') = 'array' then v_current->'examHistory' else '[]'::jsonb end)
-      ||
-      (case when jsonb_typeof(v_incoming->'examHistory') = 'array' then v_incoming->'examHistory' else '[]'::jsonb end)
-    ) as attempts(value)
-    order by
-      value->>'system', value->>'level', value->>'score', value->>'total', value->>'date',
-      value->>'date' desc
-  ) as unique_attempts
-  limit 50;
+    select value
+    from (
+      select distinct on (
+        value->>'system', value->>'level', value->>'score', value->>'total', value->>'date'
+      ) value
+      from jsonb_array_elements(
+        (case when jsonb_typeof(v_current->'examHistory') = 'array' then v_current->'examHistory' else '[]'::jsonb end)
+        ||
+        (case when jsonb_typeof(v_incoming->'examHistory') = 'array' then v_incoming->'examHistory' else '[]'::jsonb end)
+      ) as attempts(value)
+      order by
+        value->>'system', value->>'level', value->>'score', value->>'total', value->>'date'
+    ) as unique_attempts
+    order by value->>'date' desc
+    limit 50
+  ) as latest_attempts;
 
   -- Per-card schedules merge by updatedAt, keeping the newest rating for each word.
   select coalesce(jsonb_object_agg(merged.key, merged.value), '{}'::jsonb)
@@ -85,9 +88,9 @@ begin
     v_tasks := jsonb_build_object(
       'date', v_date_current,
       'done', jsonb_build_array(
-        (v_tasks_current->'done'->>0 = 'true' or v_tasks_incoming->'done'->>0 = 'true'),
-        (v_tasks_current->'done'->>1 = 'true' or v_tasks_incoming->'done'->>1 = 'true'),
-        (v_tasks_current->'done'->>2 = 'true' or v_tasks_incoming->'done'->>2 = 'true')
+        (coalesce(v_tasks_current->'done'->>0 = 'true', false) or coalesce(v_tasks_incoming->'done'->>0 = 'true', false)),
+        (coalesce(v_tasks_current->'done'->>1 = 'true', false) or coalesce(v_tasks_incoming->'done'->>1 = 'true', false)),
+        (coalesce(v_tasks_current->'done'->>2 = 'true', false) or coalesce(v_tasks_incoming->'done'->>2 = 'true', false))
       )
     );
   elsif v_date_incoming >= v_date_current then
@@ -100,7 +103,219 @@ begin
   v_daily_review := case when jsonb_typeof(v_current->'dailyReviewCount') = 'object' then v_current->'dailyReviewCount' else '{}'::jsonb end;
   v_today := coalesce(v_incoming->'dailyReviewCount'->>'date', '');
   if v_today <> '' and v_today = v_daily_review->>'date' then
-    v_count_current := greatest(coalesce((v_daily_review->>'count')::integer, 0), 0);
+    v_count_current := greatest(case when coalesce(v_daily_review->>'count', '') ~ '^[0-9]+;
+    v_count_incoming := greatest(case when coalesce(v_incoming->'dailyReviewCount'->>'count', '') ~ '^[0-9]+;
+    v_daily_review := jsonb_build_object('date', v_today, 'count', greatest(v_count_current, v_count_incoming));
+  elsif v_today >= coalesce(v_daily_review->>'date', '') then
+    v_daily_review := coalesce(v_incoming->'dailyReviewCount', v_daily_review);
+  end if;
+
+  return v_result || jsonb_build_object(
+    'examHistory', v_exam_history,
+    'reviewSchedule', v_review_schedule,
+    'dailyTasks', v_tasks,
+    'dailyReviewCount', v_daily_review,
+    'dailyGoalWords', coalesce(v_incoming->'dailyGoalWords', v_current->'dailyGoalWords', '15'::jsonb)
+  );
+end;
+$$;
+
+create or replace function public.merge_learning_string_arrays(p_left jsonb, p_right jsonb)
+returns jsonb
+language sql
+immutable
+security invoker
+set search_path = public, pg_temp
+as $$
+  select coalesce(jsonb_agg(value order by value), '[]'::jsonb)
+  from (
+    select distinct value
+    from jsonb_array_elements(
+      (case when jsonb_typeof(p_left) = 'array' then p_left else '[]'::jsonb end)
+      ||
+      (case when jsonb_typeof(p_right) = 'array' then p_right else '[]'::jsonb end)
+    ) as values(value)
+    where jsonb_typeof(value) = 'string'
+  ) as unique_values;
+$$;
+
+create or replace function public.merge_user_learning_progress(p_progress jsonb)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_merged jsonb;
+begin
+  if v_user_id is null then
+    raise exception 'Authentication required';
+  end if;
+
+  if jsonb_typeof(p_progress) <> 'object' then
+    raise exception 'Learning progress must be a JSON object';
+  end if;
+
+  insert into public.user_learning_progress as stored (user_id, progress, updated_at)
+  values (v_user_id, p_progress, now())
+  on conflict (user_id) do update
+    set progress = public.merge_learning_progress_payload(stored.progress, excluded.progress),
+        updated_at = now()
+  returning progress into v_merged;
+
+  return v_merged;
+end;
+$$;
+
+revoke all on function public.merge_learning_string_arrays(jsonb, jsonb) from public, anon;
+revoke all on function public.merge_learning_progress_payload(jsonb, jsonb) from public, anon;
+revoke all on function public.merge_user_learning_progress(jsonb) from public, anon;
+grant execute on function public.merge_learning_string_arrays(jsonb, jsonb) to authenticated;
+grant execute on function public.merge_learning_progress_payload(jsonb, jsonb) to authenticated;
+grant execute on function public.merge_user_learning_progress(jsonb) to authenticated;
+ then (v_daily_review->>'count')::integer else 0 end, 0);
+    v_count_incoming := greatest(coalesce((v_incoming->'dailyReviewCount'->>'count')::integer, 0), 0);
+    v_daily_review := jsonb_build_object('date', v_today, 'count', greatest(v_count_current, v_count_incoming));
+  elsif v_today >= coalesce(v_daily_review->>'date', '') then
+    v_daily_review := coalesce(v_incoming->'dailyReviewCount', v_daily_review);
+  end if;
+
+  return v_result || jsonb_build_object(
+    'examHistory', v_exam_history,
+    'reviewSchedule', v_review_schedule,
+    'dailyTasks', v_tasks,
+    'dailyReviewCount', v_daily_review,
+    'dailyGoalWords', coalesce(v_incoming->'dailyGoalWords', v_current->'dailyGoalWords', '15'::jsonb)
+  );
+end;
+$$;
+
+create or replace function public.merge_learning_string_arrays(p_left jsonb, p_right jsonb)
+returns jsonb
+language sql
+immutable
+security invoker
+set search_path = public, pg_temp
+as $$
+  select coalesce(jsonb_agg(value order by value), '[]'::jsonb)
+  from (
+    select distinct value
+    from jsonb_array_elements(
+      (case when jsonb_typeof(p_left) = 'array' then p_left else '[]'::jsonb end)
+      ||
+      (case when jsonb_typeof(p_right) = 'array' then p_right else '[]'::jsonb end)
+    ) as values(value)
+    where jsonb_typeof(value) = 'string'
+  ) as unique_values;
+$$;
+
+create or replace function public.merge_user_learning_progress(p_progress jsonb)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_merged jsonb;
+begin
+  if v_user_id is null then
+    raise exception 'Authentication required';
+  end if;
+
+  if jsonb_typeof(p_progress) <> 'object' then
+    raise exception 'Learning progress must be a JSON object';
+  end if;
+
+  insert into public.user_learning_progress as stored (user_id, progress, updated_at)
+  values (v_user_id, p_progress, now())
+  on conflict (user_id) do update
+    set progress = public.merge_learning_progress_payload(stored.progress, excluded.progress),
+        updated_at = now()
+  returning progress into v_merged;
+
+  return v_merged;
+end;
+$$;
+
+revoke all on function public.merge_learning_string_arrays(jsonb, jsonb) from public, anon;
+revoke all on function public.merge_learning_progress_payload(jsonb, jsonb) from public, anon;
+revoke all on function public.merge_user_learning_progress(jsonb) from public, anon;
+grant execute on function public.merge_learning_string_arrays(jsonb, jsonb) to authenticated;
+grant execute on function public.merge_learning_progress_payload(jsonb, jsonb) to authenticated;
+grant execute on function public.merge_user_learning_progress(jsonb) to authenticated;
+ then (v_incoming->'dailyReviewCount'->>'count')::integer else 0 end, 0);
+    v_daily_review := jsonb_build_object('date', v_today, 'count', greatest(v_count_current, v_count_incoming));
+  elsif v_today >= coalesce(v_daily_review->>'date', '') then
+    v_daily_review := coalesce(v_incoming->'dailyReviewCount', v_daily_review);
+  end if;
+
+  return v_result || jsonb_build_object(
+    'examHistory', v_exam_history,
+    'reviewSchedule', v_review_schedule,
+    'dailyTasks', v_tasks,
+    'dailyReviewCount', v_daily_review,
+    'dailyGoalWords', coalesce(v_incoming->'dailyGoalWords', v_current->'dailyGoalWords', '15'::jsonb)
+  );
+end;
+$$;
+
+create or replace function public.merge_learning_string_arrays(p_left jsonb, p_right jsonb)
+returns jsonb
+language sql
+immutable
+security invoker
+set search_path = public, pg_temp
+as $$
+  select coalesce(jsonb_agg(value order by value), '[]'::jsonb)
+  from (
+    select distinct value
+    from jsonb_array_elements(
+      (case when jsonb_typeof(p_left) = 'array' then p_left else '[]'::jsonb end)
+      ||
+      (case when jsonb_typeof(p_right) = 'array' then p_right else '[]'::jsonb end)
+    ) as values(value)
+    where jsonb_typeof(value) = 'string'
+  ) as unique_values;
+$$;
+
+create or replace function public.merge_user_learning_progress(p_progress jsonb)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_merged jsonb;
+begin
+  if v_user_id is null then
+    raise exception 'Authentication required';
+  end if;
+
+  if jsonb_typeof(p_progress) <> 'object' then
+    raise exception 'Learning progress must be a JSON object';
+  end if;
+
+  insert into public.user_learning_progress as stored (user_id, progress, updated_at)
+  values (v_user_id, p_progress, now())
+  on conflict (user_id) do update
+    set progress = public.merge_learning_progress_payload(stored.progress, excluded.progress),
+        updated_at = now()
+  returning progress into v_merged;
+
+  return v_merged;
+end;
+$$;
+
+revoke all on function public.merge_learning_string_arrays(jsonb, jsonb) from public, anon;
+revoke all on function public.merge_learning_progress_payload(jsonb, jsonb) from public, anon;
+revoke all on function public.merge_user_learning_progress(jsonb) from public, anon;
+grant execute on function public.merge_learning_string_arrays(jsonb, jsonb) to authenticated;
+grant execute on function public.merge_learning_progress_payload(jsonb, jsonb) to authenticated;
+grant execute on function public.merge_user_learning_progress(jsonb) to authenticated;
+ then (v_daily_review->>'count')::integer else 0 end, 0);
     v_count_incoming := greatest(coalesce((v_incoming->'dailyReviewCount'->>'count')::integer, 0), 0);
     v_daily_review := jsonb_build_object('date', v_today, 'count', greatest(v_count_current, v_count_incoming));
   elsif v_today >= coalesce(v_daily_review->>'date', '') then
