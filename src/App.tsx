@@ -2294,13 +2294,14 @@ export default function App() {
             <p className="notice-text">{t('vocab.catalogError')}</p>
           )}
 
-          {vocabularyCollection === 'hsk' && catalogCandidateCount > 0 && !databaseWords && (
+          {vocabularyCollection === 'hsk' && reviewWords.length > 0 && (
             <p className="notice-text catalog-review-notice">
               {lang === 'ru'
-                ? `В базе найдено ${catalogCandidateCount.toLocaleString(lang)} записей-кандидатов. Их чтения, переводы и право публикации ещё не прошли проверку, поэтому они не показываются как подтверждённые слова. Пока доступен только предварительный набор.`
+                ? 'Список HSK и примеры собраны из открытых источников. Переводы RU/UZ частично подготовлены с помощью ИИ и требуют проверки; примеры не проверялись индивидуально.'
                 : lang === 'uz'
-                  ? `Bazadan ${catalogCandidateCount.toLocaleString(lang)} ta nomzod yozuv topildi. Ularning o‘qilishi, tarjimalari va nashr huquqlari hali tekshirilmagan, shu sababli ular tasdiqlangan so‘zlar sifatida ko‘rsatilmaydi. Hozircha faqat dastlabki to‘plam mavjud.`
-                  : `${catalogCandidateCount.toLocaleString(lang)} candidate records exist in the database. Their readings, translations, and publication rights are not yet verified, so they are not presented as approved vocabulary. A preview set is available for now.`}
+                  ? 'HSK ro‘yxati va misollar ochiq manbalardan yig‘ilgan. RU/UZ tarjimalarining bir qismi AI yordamida tayyorlangan va tekshiruv talab qiladi; misollar alohida tekshirilmagan.'
+                  : 'HSK vocabulary and examples are assembled from open sources. Some RU/UZ glosses are AI-assisted and still need review; example sentences have not been individually checked.'}
+              {' · '}<a href="/data-attribution.html" target="_blank" rel="noreferrer">{lang === 'ru' ? 'Источники и лицензии' : lang === 'uz' ? 'Manbalar va litsenziyalar' : 'Sources and licenses'}</a>
             </p>
           )}
 
