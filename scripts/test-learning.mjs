@@ -74,20 +74,25 @@ const dataset = JSON.parse(await readFile(new URL('../public/vocabulary-review.j
 const entries = Array.isArray(dataset.entries) ? dataset.entries : []
 const audit = quality.auditDictionaryEntries(entries)
 assert.equal(audit.rows, 11147)
-assert.equal(audit.uniqueEntries, 11059)
-assert.equal(audit.duplicateRowsCollapsed, 88)
+assert.equal(audit.uniqueEntries, 11105)
+assert.equal(audit.duplicateRowsCollapsed, 42)
 assert.equal(audit.pinyinWithoutTone, 18)
 assert.equal(audit.missingExamples, 11147)
 
 const duplicateMerge = quality.mergeDictionaryEntries([
   { sourceEntryKey: 'legacy-a', hanzi: '好', pinyin: 'hǎo', ru: 'хороший', en: 'good', uz: 'yaxshi', level20: 1, level30: 1 },
-  { sourceEntryKey: 'legacy-b', hanzi: '好', pinyin: 'hao3', ru: 'хорошо', en: 'well', uz: 'yaxshi', level20: null, level30: 5 },
+  { sourceEntryKey: 'legacy-b', hanzi: '好', pinyin: 'hǎo ', ru: 'хорошо', en: 'well', uz: 'yaxshi', level20: null, level30: 5 },
 ])
 assert.equal(duplicateMerge.length, 1)
 assert.deepEqual(duplicateMerge[0].level20Memberships, [1])
 assert.deepEqual(duplicateMerge[0].level30Memberships, [1, 5])
 assert.match(duplicateMerge[0].ru, /хороший \/ хорошо/)
 assert.deepEqual(duplicateMerge[0].legacyIds.sort(), ['legacy-a', 'legacy-b'])
+const differentTones = quality.mergeDictionaryEntries([
+  { hanzi: '行', pinyin: 'xíng', ru: 'идти', en: 'to walk', uz: 'yurmoq', level20: 1, level30: null },
+  { hanzi: '行', pinyin: 'háng', ru: 'ряд; строка', en: 'row; line', uz: 'qator', level20: null, level30: 2 },
+])
+assert.equal(differentTones.length, 2)
 
 const missing = Object.fromEntries(['hanzi', 'pinyin', 'ru', 'en', 'uz'].map(key => [
   key,
