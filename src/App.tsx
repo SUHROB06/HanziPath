@@ -143,24 +143,43 @@ const ACTIVITY_DAYS_KEY = 'hanzipath.activityDays'
 const COMPLETED_LESSONS_KEY = 'hanzipath.completedLessons'
 
 const lessonTemplates = [...hsk20LessonTemplates, ...hsk30LessonTemplates]
-const originalLessonWords: Word[] = lessonVocabulary.map((entry, index) => ({
-  sourceEntryKey: `hanzipath-course-${entry.stage}-${index + 1}`,
-  hanzi: entry.hanzi,
-  pinyin: entry.pinyin,
-  ru: entry.ru,
-  en: entry.en,
-  uz: entry.uz,
-  ruStatus: 'ai_draft_unverified',
-  uzStatus: 'ai_draft_unverified',
-  courseStage: entry.stage,
-  courseSystems: entry.systems,
-  level20: null,
-  level30: null,
-  example: '',
-  examplePinyin: '',
-  exampleRu: '',
-  exampleEn: '',
-}))
+const originalLessonWords: Word[] = (() => {
+  const unique = new Map<string, Word>()
+
+  lessonVocabulary.forEach((entry, index) => {
+    const key = `${entry.stage}|${entry.hanzi}|${normalizePinyin(entry.pinyin)}`
+    const existing = unique.get(key)
+
+    if (existing) {
+      existing.courseSystems = [...new Set([
+        ...(existing.courseSystems ?? []),
+        ...entry.systems,
+      ])]
+      return
+    }
+
+    unique.set(key, {
+      sourceEntryKey: `hanzipath-course-${entry.stage}-${index + 1}`,
+      hanzi: entry.hanzi,
+      pinyin: entry.pinyin,
+      ru: entry.ru,
+      en: entry.en,
+      uz: entry.uz,
+      ruStatus: 'ai_draft_unverified',
+      uzStatus: 'ai_draft_unverified',
+      courseStage: entry.stage,
+      courseSystems: entry.systems,
+      level20: null,
+      level30: null,
+      example: '',
+      examplePinyin: '',
+      exampleRu: '',
+      exampleEn: '',
+    })
+  })
+
+  return [...unique.values()]
+})()
 
 const classroomDialogue = [
   {
@@ -634,7 +653,7 @@ function getLevelValue(level: string): StandardLevel | undefined {
  * Converts a database vocabulary record into the shape
  * already used by the dictionary interface.
  */
-function databaseRowToWord(row: any): Word {
+function databaseRowToWord(row: any, system: System): Word {
   const readings = (row.vocabulary_readings ?? []).filter(
     (item: any) => item.verification_status === 'verified',
   )
@@ -668,14 +687,19 @@ function databaseRowToWord(row: any): Word {
     : Number(row.level_category ?? 1)
 
   return {
+    sourceEntryKey: row.id ? `vocabulary-db-${row.id}` : undefined,
     hanzi: row.simplified ?? '',
+    traditional: row.traditional ?? '',
     pinyin: readings[0]?.pinyin ?? '',
     ru: meaning('ru') ?? '',
     en: meaning('en') ?? '',
     uz: meaning('uz'),
     uzVerified: Boolean(meaning('uz')),
-    level20: level,
-    level30: level,
+    ruStatus: meaning('ru') ? undefined : 'source_unverified',
+    enStatus: meaning('en') ? undefined : 'source_unverified',
+    uzStatus: meaning('uz') ? undefined : 'source_unverified',
+    level20: system === '2.0' ? level : null,
+    level30: system === '3.0' ? level : null,
     example: example?.sentence_hanzi ?? '',
     examplePinyin: example?.sentence_pinyin ?? '',
     exampleRu: exampleMeaning('ru') ?? '',
@@ -684,7 +708,6 @@ function databaseRowToWord(row: any): Word {
     exampleUzVerified: Boolean(exampleMeaning('uz')),
   }
 }
-
 function reviewRowToWord(row: any, index: number): Word {
   const sample = words.find(word => word.hanzi === row.hanzi && word.pinyin === row.pinyin)
   return {
@@ -722,6 +745,8 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [dictionaryPage, setDictionaryPage] = useState(0)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [knownOnly, setKnownOnly] = useState(false)
+  const [dictionarySort, setDictionarySort] = useState<'hanzi' | 'pinyin' | 'level'>('hanzi')
   const [selectedDictionaryWord, setSelectedDictionaryWord] = useState<Word | null>(null)
   const [menu, setMenu] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -782,6 +807,7 @@ export default function App() {
   const [reviewWords, setReviewWords] = useState<Word[] | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogError, setCatalogError] = useState(false)
+  const [catalogCandidateCount, setCatalogCandidateCount] = useState(0)
 
   const localeChangeRef = useRef(0)
   const wordDialogRef = useRef<HTMLDialogElement>(null)
@@ -959,6 +985,7 @@ export default function App() {
 
     if (!supabase) {
       setDatabaseWords(null)
+      setCatalogCandidateCount(0)
       setCatalogLoading(false)
       setCatalogError(false)
       return () => { cancelled = true }
@@ -967,6 +994,7 @@ export default function App() {
     const loadCatalog = async () => {
       setCatalogLoading(true)
       setCatalogError(false)
+      setCatalogCandidateCount(0)
 
       try {
         const standardCode = system === '2.0' ? 'hsk20' : 'hsk30'
@@ -985,25 +1013,30 @@ export default function App() {
 
         // Pending or unpublished sources are intentionally invisible under RLS.
         if (!standard) {
-          if (!cancelled) setDatabaseWords(null)
+          if (!cancelled) {
+            setDatabaseWords(null)
+            setCatalogCandidateCount(0)
+          }
           return
         }
 
         const catalogResult = await getVocabularyCatalog({
           standardVersionId: standard.id,
           level: getLevelValue(level),
-          limit: 3000,
+          limit: 12000,
         })
 
         if (catalogResult.error) {
           throw new Error(catalogResult.error.message)
         }
 
-        const converted = catalogResult.data
-          .map(databaseRowToWord)
+        const converted = [...new Map(catalogResult.data
+          .map(row => databaseRowToWord(row, system))
           .filter(word => word.hanzi && word.pinyin)
+          .map(word => [`${word.hanzi}|${normalizePinyin(word.pinyin)}`, word] as const)).values()]
 
         if (!cancelled) {
+          setCatalogCandidateCount(catalogResult.data.length)
           setDatabaseWords(converted.length > 0 ? converted : null)
         }
       } catch (error) {
@@ -1263,7 +1296,7 @@ export default function App() {
   }
 
   const filtered = useMemo(() => {
-    return currentWords.filter(word => {
+    const matches = currentWords.filter(word => {
       const searchable = [
         word.hanzi,
         word.traditional,
@@ -1281,6 +1314,7 @@ export default function App() {
       return (
         (level === 'all' || String(activeLevel).replace('7-9', '7') === level) &&
         (!favoritesOnly || favoriteWordIds.includes(wordId(word))) &&
+        (!knownOnly || knownWords.includes(wordId(word))) &&
         (
           searchable.toLocaleLowerCase().includes(query.toLocaleLowerCase()) ||
           (
@@ -1290,9 +1324,20 @@ export default function App() {
         )
       )
     })
-  }, [currentWords, favoriteWordIds, favoritesOnly, level, query, system, vocabularyCollection])
 
-  useEffect(() => setDictionaryPage(0), [system, level, query, vocabularyCollection, favoritesOnly])
+    return matches.sort((a, b) => {
+      if (dictionarySort === 'pinyin') {
+        return normalizePinyin(a.pinyin).localeCompare(normalizePinyin(b.pinyin))
+      }
+      if (dictionarySort === 'level') {
+        const levelA = Number(vocabularyCollection === 'course' ? a.courseStage : system === '2.0' ? a.level20 : a.level30)
+        const levelB = Number(vocabularyCollection === 'course' ? b.courseStage : system === '2.0' ? b.level20 : b.level30)
+        return levelA - levelB || a.hanzi.localeCompare(b.hanzi)
+      }
+      return a.hanzi.localeCompare(b.hanzi)
+    })
+  }, [currentWords, dictionarySort, favoriteWordIds, favoritesOnly, knownOnly, knownWords, level, query, system, vocabularyCollection])
+  useEffect(() => setDictionaryPage(0), [system, level, query, vocabularyCollection, favoritesOnly, knownOnly, dictionarySort])
 
   const pageSize = 60
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
@@ -1309,10 +1354,6 @@ export default function App() {
     }
   }
 
-  const levels = system === '2.0'
-    ? ['150', '300', '600', '1200', '2500', '5000']
-    : ['300', '500', '1000', '2000', '3600', '5400', '11000']
-
   const levelNames = system === '2.0'
     ? ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6']
     : ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6', 'HSK 7–9']
@@ -1320,10 +1361,12 @@ export default function App() {
   const levelFilterOptions = vocabularyCollection === 'course'
     ? Array.from({ length: system === '2.0' ? 6 : 9 }, (_, index) => ({
       value: String(index + 1),
-      label: `${t('vocab.courseStage')} ${index + 1} · ${currentWords.filter(word => word.courseStage === index + 1).length}`,
+      label: `${t('vocab.courseStage')} ${index + 1} · ${currentWords.filter(word => word.courseStage === index + 1).length.toLocaleString(lang)}`,
     }))
-    : levels.map((count, index) => ({ value: String(index + 1), label: `${levelNames[index]} · ${count}` }))
-
+    : (system === '2.0' ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 7]).map((levelValue, index) => ({
+      value: String(levelValue),
+      label: `${levelNames[index]} · ${currentWords.filter(word => String(system === '2.0' ? word.level20 : word.level30).replace('7-9', '7') === String(levelValue)).length.toLocaleString(lang)}`,
+    }))
   const activeSectionName = section < 7
     ? t(navKeys[section])
     : t('page.profile')
@@ -1878,25 +1921,30 @@ export default function App() {
             <p className="notice-text">{t('vocab.catalogError')}</p>
           )}
 
-          <div className="filters">
+          {vocabularyCollection === 'hsk' && catalogCandidateCount > 0 && !databaseWords && (
+            <p className="notice-text catalog-review-notice">
+              {lang === 'ru'
+                ? `В базе найдено ${catalogCandidateCount.toLocaleString(lang)} записей-кандидатов. Их чтения, переводы и право публикации ещё не прошли проверку, поэтому они не показываются как подтверждённые слова. Пока доступен только предварительный набор.`
+                : lang === 'uz'
+                  ? `Bazadan ${catalogCandidateCount.toLocaleString(lang)} ta nomzod yozuv topildi. Ularning o‘qilishi, tarjimalari va nashr huquqlari hali tekshirilmagan, shu sababli ular tasdiqlangan so‘zlar sifatida ko‘rsatilmaydi. Hozircha faqat dastlabki to‘plam mavjud.`
+                  : `${catalogCandidateCount.toLocaleString(lang)} candidate records exist in the database. Their readings, translations, and publication rights are not yet verified, so they are not presented as approved vocabulary. A preview set is available for now.`}
+            </p>
+          )}
+
+          <div className="filters dictionary-filters">
             <label className="searchbox">
               <Search size={18}/>
               <input
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder={t('vocab.search')}
+                aria-label={t('vocab.search')}
               />
+              {query && <button className="dictionary-clear-search" type="button" onClick={() => setQuery('')} aria-label={lang === 'ru' ? 'Очистить поиск' : lang === 'uz' ? 'Qidiruvni tozalash' : 'Clear search'}><X size={15}/></button>}
             </label>
 
             <label className="sr-only" htmlFor="system-filter">{t('vocab.system')}</label>
-            <select
-              id="system-filter"
-              value={system}
-              onChange={e => {
-                setSystem(e.target.value as System)
-                setLevel('all')
-              }}
-            >
+            <select id="system-filter" value={system} onChange={e => { setSystem(e.target.value as System); setLevel('all') }}>
               <option value="3.0">{t('vocab.hsk30')}</option>
               <option value="2.0">{t('vocab.hsk20')}</option>
             </select>
@@ -1907,15 +1955,23 @@ export default function App() {
               {levelFilterOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}
             </select>
 
-            <button
-              className={`outline favorites-filter ${favoritesOnly ? 'selected' : ''}`}
-              type="button"
-              aria-pressed={favoritesOnly}
-              onClick={() => setFavoritesOnly(value => !value)}
-            >
+            <label className="sr-only" htmlFor="dictionary-sort">{lang === 'ru' ? 'Сортировка' : lang === 'uz' ? 'Saralash' : 'Sort order'}</label>
+            <select id="dictionary-sort" value={dictionarySort} onChange={e => setDictionarySort(e.target.value as typeof dictionarySort)}>
+              <option value="hanzi">{lang === 'ru' ? 'По иероглифам' : lang === 'uz' ? 'Ieroglif bo‘yicha' : 'By characters'}</option>
+              <option value="pinyin">{lang === 'ru' ? 'По пиньиню' : lang === 'uz' ? 'Pinyin bo‘yicha' : 'By pinyin'}</option>
+              <option value="level">{lang === 'ru' ? 'По уровню HSK' : lang === 'uz' ? 'HSK darajasi bo‘yicha' : 'By HSK level'}</option>
+            </select>
+
+            <button className={`outline favorites-filter ${favoritesOnly ? 'selected' : ''}`} type="button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(value => !value)}>
               <Star size={15} fill={favoritesOnly ? 'currentColor' : 'none'}/>
               {favoritesOnly ? t('vocab.showAllWords') : t('vocab.favorites')}
               <span>{currentFavoriteCount.toLocaleString(lang)}</span>
+            </button>
+
+            <button className={`outline known-filter ${knownOnly ? 'selected' : ''}`} type="button" aria-pressed={knownOnly} onClick={() => setKnownOnly(value => !value)}>
+              <CheckCircle2 size={15}/>
+              {knownOnly ? (lang === 'ru' ? 'Все слова' : lang === 'uz' ? 'Barcha so‘zlar' : 'All words') : (lang === 'ru' ? 'Изученные' : lang === 'uz' ? 'O‘rganilgan' : 'Learned')}
+              <span>{currentWords.filter(word => knownWords.includes(wordId(word))).length.toLocaleString(lang)}</span>
             </button>
           </div>
 
@@ -2261,6 +2317,13 @@ export default function App() {
             {selectedDictionaryWord.courseStage && <span>{t('vocab.courseStage')} {selectedDictionaryWord.courseStage}</span>}
             {selectedDictionaryWord.membershipStatus && <small>{t('vocab.membershipUnverified')}</small>}
           </div>
+
+          <button className={`outline dictionary-known-action ${knownWords.includes(wordId(selectedDictionaryWord)) ? 'selected' : ''}`} type="button" onClick={() => toggleKnownWord(selectedDictionaryWord)}>
+            <CheckCircle2 size={16}/>
+            {knownWords.includes(wordId(selectedDictionaryWord))
+              ? (lang === 'ru' ? 'Убрать из изученных' : lang === 'uz' ? 'O‘rganilganlardan olib tashlash' : 'Mark as not learned')
+              : (lang === 'ru' ? 'Отметить как изученное' : lang === 'uz' ? 'O‘rganilgan deb belgilash' : 'Mark as learned')}
+          </button>
 
           <section className="word-detail-section">
             <h3>{t('vocab.meanings')}</h3>
