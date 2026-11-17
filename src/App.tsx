@@ -2808,21 +2808,101 @@ export default function App() {
       )}
 
       {section === 7 && (
-        <section className="panel settings-page">
-          <div className="review-icon"><Settings/></div>
-          <span className="kicker">HANZIPATH</span>
-          <h2>{t('profile.settings')}</h2>
+        <section className="panel settings-page profile-page">
+          <div className="profile-page-heading">
+            <div className="review-icon"><Settings/></div>
+            <span className="kicker">HANZIPATH · 汉字之路</span>
+            <h2>{t('profile.settings')}</h2>
+            <p>{lang === 'ru' ? 'Твой прогресс, цели и настройки обучения.' : lang === 'uz' ? 'O‘qish jarayoni, maqsadlar va sozlamalaringiz.' : 'Your learning progress, goals and account settings.'}</p>
+          </div>
 
-          <label className="setting-row">
-            <span>{t('language.label')}</span>
-            <select value={lang} onChange={e => void changeLanguage(e.target.value as Locale)}>
-              {(['ru', 'en', 'uz'] as const).map(locale => (
-                <option key={locale} value={locale}>{t(`language.${locale}` as TranslationKey)}</option>
-              ))}
-            </select>
-          </label>
+          <section className="profile-account-card">
+            <div className="profile-account-copy">
+              <span className="kicker">{lang === 'ru' ? 'АККАУНТ' : lang === 'uz' ? 'HISOB' : 'ACCOUNT'}</span>
+              <h3>{authUser?.email ?? (lang === 'ru' ? 'Гостевой режим' : lang === 'uz' ? 'Mehmon rejimi' : 'Guest mode')}</h3>
+              <p>{authUser
+                ? progressSyncReadyFor === authUser.id
+                  ? (lang === 'ru' ? 'Облачная синхронизация активна' : lang === 'uz' ? 'Bulutli sinxronlash faol' : 'Cloud sync is active')
+                  : (lang === 'ru' ? 'Синхронизируем прогресс…' : lang === 'uz' ? 'Jarayon sinxronlanmoqda…' : 'Syncing your progress…')
+                : (lang === 'ru' ? 'Прогресс пока хранится на этом устройстве' : lang === 'uz' ? 'Jarayon hozircha shu qurilmada saqlanadi' : 'Progress is currently stored on this device')}</p>
+            </div>
+            {authUser
+              ? <button className="outline profile-account-action" type="button" onClick={async () => {
+                  if (!supabase) return
+                  const { error } = await supabase.auth.signOut()
+                  if (error) setNotice({ text: error.message, kind: 'error' })
+                  else setNotice({ text: lang === 'ru' ? 'Вы вышли из аккаунта. Локальный прогресс сохранён.' : lang === 'uz' ? 'Hisobdan chiqdingiz. Mahalliy jarayon saqlandi.' : 'Signed out. Your local progress is preserved.', kind: 'success' })
+                }}>
+                  {lang === 'ru' ? 'Выйти' : lang === 'uz' ? 'Chiqish' : 'Sign out'}
+                </button>
+              : <div className="profile-account-actions">
+                  <button className="primary" type="button" disabled={!supabase} onClick={() => { setAuthMode('signin'); setAuthOpen(true) }}>{lang === 'ru' ? 'Войти' : lang === 'uz' ? 'Kirish' : 'Sign in'}</button>
+                  <button className="outline" type="button" disabled={!supabase} onClick={() => { setAuthMode('signup'); setAuthOpen(true) }}>{lang === 'ru' ? 'Создать аккаунт' : lang === 'uz' ? 'Hisob yaratish' : 'Create account'}</button>
+                </div>}
+          </section>
 
-          <p>{supabase ? t('profile.languageSaved') : t('profile.languageLocal')}</p>
+          <section className="profile-stats-grid" aria-label={lang === 'ru' ? 'Статистика обучения' : lang === 'uz' ? 'O‘qish statistikasi' : 'Learning statistics'}>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Изучено слов' : lang === 'uz' ? 'O‘rganilgan so‘zlar' : 'Learned words'}</span><strong>{profileKnownCount.toLocaleString(lang)}</strong></article>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Избранное' : lang === 'uz' ? 'Sevimlilar' : 'Favorites'}</span><strong>{profileFavoriteCount.toLocaleString(lang)}</strong></article>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Завершено уроков' : lang === 'uz' ? 'Tugatilgan darslar' : 'Completed lessons'}</span><strong>{completedLessonIds.length.toLocaleString(lang)}</strong></article>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Серия занятий' : lang === 'uz' ? 'Ketma-ket kunlar' : 'Current streak'}</span><strong>{getStreak(activityDays)} <small>{lang === 'ru' ? 'дн.' : lang === 'uz' ? 'kun' : 'days'}</small></strong></article>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Дней с занятиями' : lang === 'uz' ? 'Faol kunlar' : 'Study days'}</span><strong>{activityDays.length.toLocaleString(lang)}</strong></article>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Повторений сегодня' : lang === 'uz' ? 'Bugungi takrorlashlar' : 'Reviews today'}</span><strong>{dailyReviewCount.count.toLocaleString(lang)}</strong></article>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Экзамены' : lang === 'uz' ? 'Imtihonlar' : 'Exam attempts'}</span><strong>{examHistory.length.toLocaleString(lang)}<small>{examHistory.length ? ` · ${profileExamAverage}%` : ''}</small></strong></article>
+            <article className="profile-stat-card"><span>{lang === 'ru' ? 'Карточки к повторению' : lang === 'uz' ? 'Takrorlash kartalari' : 'Cards due'}</span><strong>{profileDueReviews.toLocaleString(lang)}</strong></article>
+          </section>
+
+          <section className="profile-goal-card">
+            <div className="profile-section-heading">
+              <div><span className="kicker">{lang === 'ru' ? 'КАЖДЫЙ ДЕНЬ' : lang === 'uz' ? 'HAR KUNI' : 'DAILY ROUTINE'}</span><h3>{lang === 'ru' ? 'Ежедневная цель' : lang === 'uz' ? 'Kunlik maqsad' : 'Daily goal'}</h3></div>
+              <label className="profile-goal-select">
+                <span className="sr-only">{lang === 'ru' ? 'Цель повторений в день' : lang === 'uz' ? 'Kunlik takrorlash maqsadi' : 'Daily review goal'}</span>
+                <select value={dailyGoalWords} onChange={event => setDailyGoalWords(Number(event.target.value))}>
+                  {[5, 10, 15, 20, 30, 50].map(value => <option key={value} value={value}>{value} {lang === 'ru' ? 'слов' : lang === 'uz' ? 'so‘z' : 'words'}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="profile-goal-progress"><i style={{ width: `${Math.min(100, dailyReviewCount.count / Math.max(1, dailyGoalWords) * 100)}%` }}/></div>
+            <p>{dailyReviewCount.count.toLocaleString(lang)} / {dailyGoalWords.toLocaleString(lang)} · {lang === 'ru' ? 'повторений сегодня' : lang === 'uz' ? 'bugungi takrorlashlar' : 'reviews today'}</p>
+            <small>{lang === 'ru' ? 'Цель относится к повторению карточек, а не только к новым словам.' : lang === 'uz' ? 'Maqsad faqat yangi so‘zlarga emas, kartochkalarni takrorlashga ham tegishli.' : 'This goal tracks flashcard reviews, not only newly learned words.'}</small>
+          </section>
+
+          <section className="profile-sync-card">
+            <div className="profile-section-heading"><div><span className="kicker">{lang === 'ru' ? 'СОХРАНЕНИЕ' : lang === 'uz' ? 'SAQLASH' : 'BACKUP'}</span><h3>{lang === 'ru' ? 'Синхронизация прогресса' : lang === 'uz' ? 'Jarayonni sinxronlash' : 'Progress sync'}</h3></div>
+              <span className={`profile-sync-status ${authUser && progressSyncReadyFor === authUser.id ? 'ready' : ''}`}>{authUser
+                ? progressSyncReadyFor === authUser.id
+                  ? (lang === 'ru' ? 'Синхронизировано' : lang === 'uz' ? 'Sinxronlangan' : 'Synced')
+                  : (lang === 'ru' ? 'Синхронизация…' : lang === 'uz' ? 'Sinxronlanmoqda…' : 'Syncing…')
+                : (lang === 'ru' ? 'Только устройство' : lang === 'uz' ? 'Faqat qurilma' : 'Device only')}</span>
+            </div>
+            <p>{lang === 'ru'
+              ? 'После входа в один и тот же аккаунт на другом устройстве будут доступны изученные слова, избранное, интервалы повторения, ежедневная цель, серия занятий, завершённые уроки и история экзаменов.'
+              : lang === 'uz'
+                ? 'Boshqa qurilmada shu hisobga kirganingizda o‘rganilgan so‘zlar, sevimlilar, takrorlash oralig‘i, kunlik maqsad, ketma-ket kunlar, tugatilgan darslar va imtihonlar tarixi sinxronlanadi.'
+                : 'Sign in with the same account on another device to sync learned words, favorites, review intervals, daily goal, streak, completed lessons and exam history.'}</p>
+          </section>
+
+          {examHistory.length > 0 && <section className="profile-exam-history">
+            <div className="profile-section-heading"><div><span className="kicker">{lang === 'ru' ? 'ПРАКТИКА' : lang === 'uz' ? 'MASHQ' : 'PRACTICE'}</span><h3>{lang === 'ru' ? 'Последние экзамены' : lang === 'uz' ? 'So‘nggi imtihonlar' : 'Recent exams'}</h3></div><span>{profileExamAverage}% {lang === 'ru' ? 'средний результат' : lang === 'uz' ? 'o‘rtacha natija' : 'average auto-score'}</span></div>
+            {examHistory.slice(0, 5).map((attempt, index) => <div className="exam-history-row" key={`profile-${attempt.date}-${index}`}>
+              <span>HSK {attempt.system} · {attempt.system === '3.0' && attempt.level === 7 ? '7–9' : attempt.level}</span>
+              <b>{attempt.score}/{attempt.total} · {attempt.total ? Math.round(attempt.score / attempt.total * 100) : 0}%</b>
+              <small>{new Date(attempt.date).toLocaleDateString(lang)}{attempt.durationSeconds != null ? ` · ${formatExamTime(attempt.durationSeconds)}` : ''}</small>
+            </div>)}
+          </section>}
+
+          <section className="profile-preferences">
+            <div className="profile-section-heading"><div><span className="kicker">{lang === 'ru' ? 'НАСТРОЙКИ' : lang === 'uz' ? 'SOZLAMALAR' : 'PREFERENCES'}</span><h3>{lang === 'ru' ? 'Язык интерфейса' : lang === 'uz' ? 'Interfeys tili' : 'Interface language'}</h3></div></div>
+            <label className="setting-row">
+              <span>{t('language.label')}</span>
+              <select value={lang} onChange={event => void changeLanguage(event.target.value as Locale)}>
+                {(['ru', 'en', 'uz'] as const).map(locale => (
+                  <option key={locale} value={locale}>{t(`language.${locale}` as TranslationKey)}</option>
+                ))}
+              </select>
+            </label>
+            <p>{supabase ? t('profile.languageSaved') : t('profile.languageLocal')}</p>
+          </section>
         </section>
       )}
 
