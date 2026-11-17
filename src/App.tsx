@@ -482,24 +482,20 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     const seed = (attemptSeed + (level + 1) * 1009 + index * 97) >>> 0
 
     if (index < format.listening) {
-      const lesson = uniqueListeningLessons[(index % Math.max(1, uniqueListeningLessons.length))] ?? shuffledLessons[index % shuffledLessons.length]
-      const grammar = lesson.grammar
-      const distractors = lessons
-        .filter(candidate => candidate.id !== lesson.id)
-        .map(candidate => candidate.grammar.meaning)
-        .filter(meaning => meaning !== grammar.meaning)
-      const options = shuffleWithSeed([
-        grammar.meaning,
-        ...shuffleWithSeed([...new Set(distractors)], seed).slice(0, 3),
-      ], seed + 1)
+      const word = shuffledWords[index % shuffledWords.length]
+      const answer = localeMeaning(word, locale) || word.en || word.ru
+      const distractors = shuffledWords
+        .filter(candidate => wordId(candidate) !== wordId(word))
+        .map(candidate => localeMeaning(candidate, locale))
+        .filter((meaning): meaning is string => Boolean(meaning) && meaning !== answer)
       questions.push({
         section: 'listening',
         part: partNumber(index, format.listeningParts),
-        prompt: locale === 'ru' ? 'Прослушай фразу и выбери её значение.' : locale === 'uz' ? 'Gapni tinglang va uning ma’nosini tanlang.' : 'Listen to the sentence and choose its meaning.',
-        options,
-        answer: grammar.meaning,
-        audio: grammar.example,
-        pinyin: grammar.pinyin,
+        prompt: locale === 'ru' ? 'Прослушай слово или фразу и выбери правильное значение.' : locale === 'uz' ? 'So‘z yoki iborani tinglang va to‘g‘ri ma’nosini tanlang.' : 'Listen to the word or phrase and choose its meaning.',
+        options: shuffleWithSeed([answer, ...shuffleWithSeed([...new Set(distractors)], seed).slice(0, 3)], seed + 1),
+        answer,
+        audio: word.example || word.hanzi,
+        pinyin: word.examplePinyin || word.pinyin,
       })
       continue
     }
@@ -768,12 +764,12 @@ export default function App() {
   const [knownWords, setKnownWords] = useState<string[]>(() => readStored(KNOWN_WORDS_KEY, []))
   const [favoriteWordIds, setFavoriteWordIds] = useState<string[]>(() => readStored(FAVORITE_WORDS_KEY, []))
   const [activityDays, setActivityDays] = useState<string[]>(() => readStored(ACTIVITY_DAYS_KEY, []))
-  const [cardIndex, setCardIndex] = useState(0)
+  const [cardIndex, setCardIndex] = useState(() => Math.max(0, readStored<Record<string, any>>('hanzipath.progress', {}).cardIndex ?? 0))
   const [showAnswer, setShowAnswer] = useState(false)
-  const [listeningIndex, setListeningIndex] = useState(0)
-  const [practiceSystem, setPracticeSystem] = useState<CourseSystem>('2.0')
-  const [practiceLevel, setPracticeLevel] = useState<CourseLevel>(1)
-  const [practiceUnitId, setPracticeUnitId] = useState<string | null>(null)
+  const [listeningIndex, setListeningIndex] = useState(() => Math.max(0, readStored<Record<string, any>>('hanzipath.progress', {}).listeningIndex ?? 0))
+  const [practiceSystem, setPracticeSystem] = useState<CourseSystem>(() => readStored<Record<string, any>>('hanzipath.progress', {}).practiceSystem === '3.0' ? '3.0' : '2.0')
+  const [practiceLevel, setPracticeLevel] = useState<CourseLevel>(() => { const value = readStored<Record<string, any>>('hanzipath.progress', {}).practiceLevel; return Number.isInteger(value) && value >= 1 && value <= 9 ? value : 1 })
+  const [practiceUnitId, setPracticeUnitId] = useState<string | null>(() => readStored<Record<string, any>>('hanzipath.progress', {}).practiceUnitId ?? null)
   const [grammarExpandedId, setGrammarExpandedId] = useState<string | null>(null)
   const [listeningChoice, setListeningChoice] = useState<string | null>(null)
   const [lessonListeningChoice, setLessonListeningChoice] = useState<string | null>(null)
