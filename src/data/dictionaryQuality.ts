@@ -15,6 +15,18 @@ export type DictionaryQualityEntry = {
   exampleRu?: string
   exampleEn?: string
   exampleUz?: string | null
+  partOfSpeech?: string[]
+  frequencyRank?: number | null
+  exampleSource?: string
+  exampleSourceId?: string
+  exampleLicense?: string
+  exampleStatus?: string
+  translationSource?: string
+  translationLicense?: string
+  membershipSource?: string
+  definitionSource?: string
+  dataLicense?: string
+  pinyinNum?: string
 }
 
 export function normalizeDictionaryPinyin(value: string): string {
@@ -97,6 +109,20 @@ export function mergeDictionaryEntries<T extends DictionaryQualityEntry>(entries
       exampleRu: previous.exampleRu || entry.exampleRu || '',
       exampleEn: previous.exampleEn || entry.exampleEn || '',
       exampleUz: previous.exampleUz || entry.exampleUz || null,
+      exampleSource: previous.exampleSource || entry.exampleSource,
+      exampleSourceId: previous.exampleSourceId || entry.exampleSourceId,
+      exampleLicense: previous.exampleLicense || entry.exampleLicense,
+      exampleStatus: previous.exampleStatus || entry.exampleStatus,
+      partOfSpeech: [...new Set([...(previous.partOfSpeech ?? []), ...(entry.partOfSpeech ?? [])])].sort(),
+      frequencyRank: previous.frequencyRank == null ? entry.frequencyRank ?? null
+        : entry.frequencyRank == null ? previous.frequencyRank
+          : Math.min(previous.frequencyRank, entry.frequencyRank),
+      translationSource: previous.translationSource || entry.translationSource,
+      translationLicense: previous.translationLicense || entry.translationLicense,
+      membershipSource: previous.membershipSource || entry.membershipSource,
+      definitionSource: previous.definitionSource || entry.definitionSource,
+      dataLicense: previous.dataLicense || entry.dataLicense,
+      pinyinNum: previous.pinyinNum || entry.pinyinNum,
       legacyIds: [...new Set([
         ...(previous.legacyIds ?? []),
         ...(entry.legacyIds ?? []),
