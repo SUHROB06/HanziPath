@@ -358,13 +358,14 @@ export async function getVocabularyCatalog(
         levelByItem.set(membership.vocabulary_item_id, membership.level_category)
       }
     } else {
-      const items = await fetchAllPages<{ id: string }>((cursor, pageSize) =>
-        keysetPage(
+      const items = await fetchAllPages<{ id: string }>(
+        (cursor, pageSize) => keysetPage(
           client.from('vocabulary_items').select('id', { count: 'exact' }),
           cursor,
           pageSize,
         ),
-      , 500)
+        500,
+      )
 
       if (items.error) return failed([], items.error)
       itemIds = items.data.map(row => row.id)
