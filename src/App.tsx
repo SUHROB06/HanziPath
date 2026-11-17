@@ -514,7 +514,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     .filter(word => word.hanzi && word.pinyin && (localeMeaning(word, locale) || word.en || word.ru))
     .map(word => {
       const pronunciation = word.pinyinNum
-        ? word.pinyinNum.toLowerCase().replaceAll(' ', '').replaceAll("'", '').replaceAll('’', '')
+        ? word.pinyinNum.toLowerCase().split(' ').join('').split("'").join('').split('’').join('')
         : normalizePinyin(word.pinyin)
       return [word.hanzi + '|' + pronunciation, word] as const
     })).values()]
@@ -767,7 +767,7 @@ function databaseRowToWord(row: any, system: System): Word {
     level30: system === '3.0' ? level : null,
     level20Memberships: system === '2.0' ? [level] : [],
     level30Memberships: system === '3.0' ? [level] : [],
-    partOfSpeech: [...new Set(readings.map((item: any) => item.part_of_speech).filter(Boolean))],
+    partOfSpeech: [...new Set(readings.map((item: any) => item.part_of_speech).filter((value: unknown): value is string => typeof value === 'string' && value.length > 0))],
     example: example?.sentence_hanzi ?? '',
     examplePinyin: example?.sentence_pinyin ?? '',
     exampleRu: exampleMeaning('ru') ?? '',
@@ -1163,7 +1163,6 @@ export default function App() {
     const loadCatalog = async () => {
       setCatalogLoading(true)
       setCatalogError(false)
-      setCatalogCandidateCount(0)
 
       try {
         const standardCode = system === '2.0' ? 'hsk20' : 'hsk30'
@@ -2410,7 +2409,7 @@ export default function App() {
             <p className="notice-text">{t('vocab.catalogError')}</p>
           )}
 
-          {vocabularyCollection === 'hsk' && reviewWords.length > 0 && (
+          {vocabularyCollection === 'hsk' && (reviewWords?.length ?? 0) > 0 && (
             <p className="notice-text catalog-review-notice">
               {lang === 'ru'
                 ? 'Список HSK и примеры собраны из открытых источников. Переводы RU/UZ частично подготовлены с помощью ИИ и требуют проверки; примеры не проверялись индивидуально.'
