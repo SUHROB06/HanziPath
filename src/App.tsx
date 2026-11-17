@@ -470,7 +470,8 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
   const safeWords = wordPool.length >= 4 ? wordPool : words
   // Shuffle once per attempt so a question set uses each lesson/word before cycling.
   const shuffledLessons = shuffleWithSeed([...lessons], attemptSeed ^ 0x51f15e)
-  const shuffledWords = shuffleWithSeed([...safeWords], attemptSeed ^ 0x2a91c3)
+  const shuffledWords = shuffleWithSeed([...new Map(safeWords.map(word => [wordId(word), word])).values()], attemptSeed ^ 0x2a91c3)
+  const shuffledAudioWords = shuffleWithSeed([...new Map(safeWords.map(word => [word.example || word.hanzi, word])).values()], attemptSeed ^ 0x71b42d)
   const uniqueListeningLessons = [...new Map(shuffledLessons.map(lesson => [lesson.grammar.example, lesson])).values()]
   const questions: ExamQuestion[] = []
   if (!lessons.length || !safeWords.length) return questions
@@ -482,9 +483,9 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     const seed = (attemptSeed + (level + 1) * 1009 + index * 97) >>> 0
 
     if (index < format.listening) {
-      const word = shuffledWords[index % shuffledWords.length]
+      const word = shuffledAudioWords[index % shuffledAudioWords.length]
       const answer = localeMeaning(word, locale) || word.en || word.ru
-      const distractors = shuffledWords
+      const distractors = shuffledAudioWords
         .filter(candidate => wordId(candidate) !== wordId(word))
         .map(candidate => localeMeaning(candidate, locale))
         .filter((meaning): meaning is string => Boolean(meaning) && meaning !== answer)
@@ -501,36 +502,21 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     }
 
     if (index < format.listening + format.reading) {
-      if (index % 2 === 0) {
-      const word = shuffledWords[((index - format.listening) % shuffledWords.length)]
-      const answer = localeMeaning(word, locale) || word.en || word.ru
-      const distractors = safeWords
-        .filter(candidate => candidate.hanzi !== word.hanzi)
-        .map(candidate => localeMeaning(candidate, locale))
-        .filter((meaning): meaning is string => Boolean(meaning) && meaning !== answer)
+      const readingIndex = index - format.listening
+      const word = shuffledWords[(format.listening + readingIndex) % shuffledWords.length]
+      const meaning = localeMeaning(word, locale) || word.en || word.ru
+      const reverseDirection = readingIndex % 2 === 1
+      const answer = reverseDirection ? word.hanzi : meaning
+      const distractors = shuffledWords
+        .filter(candidate => wordId(candidate) !== wordId(word))
+        .map(candidate => reverseDirection ? candidate.hanzi : localeMeaning(candidate, locale))
+        .filter((value): value is string => Boolean(value) && value !== answer)
       questions.push({
         section: 'reading',
-        part: partNumber(index - format.listening, format.readingParts),
-        prompt: locale === 'ru' ? `Выбери значение слова ${word.hanzi} (${word.pinyin}).` : locale === 'uz' ? `${word.hanzi} (${word.pinyin}) so‘zining ma’nosini tanlang.` : `Choose the meaning of ${word.hanzi} (${word.pinyin}).`,
-        options: shuffleWithSeed([
-          answer,
-          ...shuffleWithSeed([...new Set(distractors)], seed).slice(0, 3),
-        ], seed + 1),
-        answer,
-      })
-      continue
-      }
-
-      const lesson = shuffledLessons[((index - format.listening) % shuffledLessons.length)]
-      const answer = lesson.grammar.meaning
-      const distractors = lessons
-        .filter(candidate => candidate.id !== lesson.id)
-        .map(candidate => candidate.grammar.meaning)
-        .filter(meaning => meaning !== answer)
-      questions.push({
-        section: 'reading',
-        part: partNumber(index - format.listening, format.readingParts),
-        prompt: locale === 'ru' ? `Прочитай фразу ${lesson.grammar.example} и выбери её значение.` : locale === 'uz' ? `${lesson.grammar.example} gapini o‘qing va ma’nosini tanlang.` : `Read ${lesson.grammar.example} and choose its meaning.`,
+        part: partNumber(readingIndex, format.readingParts),
+        prompt: reverseDirection
+          ? (locale === 'ru' ? `Выбери иероглифы для значения «${meaning}».` : locale === 'uz' ? `«${meaning}» ma’nosiga mos ierogliflarni tanlang.` : `Choose the Chinese word for “${meaning}”.`)
+          : (locale === 'ru' ? `Выбери значение слова ${word.hanzi} (${word.pinyin}).` : locale === 'uz' ? `${word.hanzi} (${word.pinyin}) so‘zining ma’nosini tanlang.` : `Choose the meaning of ${word.hanzi} (${word.pinyin}).`),
         options: shuffleWithSeed([answer, ...shuffleWithSeed([...new Set(distractors)], seed).slice(0, 3)], seed + 1),
         answer,
       })
@@ -541,7 +527,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       const lesson = shuffledLessons[((index - format.listening - format.reading) % shuffledLessons.length)]
       const writingIndex = index - format.listening - format.reading
       if ((system === '2.0' || system === '3.0') && level === 3 && writingIndex < 5) {
-        const word = shuffledWords[writingIndex % shuffledWords.length]
+        const word = shuffledWords[(format.listening + format.reading + writingIndex) % shuffledWords.length]
         const meaning = localeMeaning(word, locale) || word.en || word.ru
         questions.push({
           section: 'writing',
