@@ -75,6 +75,29 @@ type Word = {
 type Notice = { text: string; kind: 'success' | 'error' | 'info' }
 type DisplayLesson = LessonTemplate & { volume: number; volumeLesson: number; mergedLessons?: LessonTemplate[] }
 
+function partOfSpeechLabel(value: string, lang: Locale): string {
+  const labels: Record<string, Record<Locale, string>> = {
+    noun: { ru: 'Существительное', en: 'Noun', uz: 'Ot' },
+    verb: { ru: 'Глагол', en: 'Verb', uz: 'Fe’l' },
+    adjective: { ru: 'Прилагательное', en: 'Adjective', uz: 'Sifat' },
+    adverb: { ru: 'Наречие', en: 'Adverb', uz: 'Ravish' },
+    pronoun: { ru: 'Местоимение', en: 'Pronoun', uz: 'Olmosh' },
+    numeral: { ru: 'Числительное', en: 'Numeral', uz: 'Son' },
+    preposition: { ru: 'Предлог', en: 'Preposition', uz: 'Ko‘makchi' },
+    conjunction: { ru: 'Союз', en: 'Conjunction', uz: 'Bog‘lovchi' },
+    particle: { ru: 'Частица', en: 'Particle', uz: 'Yuklama' },
+    classifier: { ru: 'Счётное слово', en: 'Classifier', uz: 'Hisob so‘zi' },
+    'measure word': { ru: 'Счётное слово', en: 'Measure word', uz: 'Hisob so‘zi' },
+    interjection: { ru: 'Междометие', en: 'Interjection', uz: 'Undov' },
+    auxiliary: { ru: 'Вспомогательный глагол', en: 'Auxiliary', uz: 'Yordamchi fe’l' },
+    determiner: { ru: 'Определитель', en: 'Determiner', uz: 'Aniqlovchi' },
+    phrase: { ru: 'Выражение', en: 'Phrase', uz: 'Ibora' },
+    idiom: { ru: 'Идиома', en: 'Idiom', uz: 'Iboraviy birlik' },
+    character: { ru: 'Иероглиф', en: 'Character', uz: 'Iyeroglif' },
+  }
+  return labels[value]?.[lang] ?? value
+}
+
 function normalizePinyin(value: string): string {
   return value.toLowerCase()
     .normalize('NFD')
@@ -1680,7 +1703,7 @@ export default function App() {
     .sort()
     .map(value => ({
       value,
-      label: `${partOfSpeechLabel(value)} · ${currentWords.filter(word => word.partOfSpeech?.includes(value)).length.toLocaleString(lang)}`,
+      label: `${partOfSpeechLabel(value, lang)} · ${currentWords.filter(word => word.partOfSpeech?.includes(value)).length.toLocaleString(lang)}`,
     }))
 
   const activeSectionName = section < 7
@@ -1716,28 +1739,7 @@ export default function App() {
     return t('vocab.sourceUnverified')
   }
 
-  const partOfSpeechLabel = (value: string) => {
-    const labels: Record<string, Record<Locale, string>> = {
-      noun: { ru: 'Существительное', en: 'Noun', uz: 'Ot' },
-      verb: { ru: 'Глагол', en: 'Verb', uz: 'Fe’l' },
-      adjective: { ru: 'Прилагательное', en: 'Adjective', uz: 'Sifat' },
-      adverb: { ru: 'Наречие', en: 'Adverb', uz: 'Ravish' },
-      pronoun: { ru: 'Местоимение', en: 'Pronoun', uz: 'Olmosh' },
-      numeral: { ru: 'Числительное', en: 'Numeral', uz: 'Son' },
-      preposition: { ru: 'Предлог', en: 'Preposition', uz: 'Ko‘makchi' },
-      conjunction: { ru: 'Союз', en: 'Conjunction', uz: 'Bog‘lovchi' },
-      particle: { ru: 'Частица', en: 'Particle', uz: 'Yuklama' },
-      classifier: { ru: 'Счётное слово', en: 'Classifier', uz: 'Hisob so‘zi' },
-      'measure word': { ru: 'Счётное слово', en: 'Measure word', uz: 'Hisob so‘zi' },
-      interjection: { ru: 'Междометие', en: 'Interjection', uz: 'Undov' },
-      auxiliary: { ru: 'Вспомогательный глагол', en: 'Auxiliary', uz: 'Yordamchi fe’l' },
-      determiner: { ru: 'Определитель', en: 'Determiner', uz: 'Aniqlovchi' },
-      phrase: { ru: 'Выражение', en: 'Phrase', uz: 'Ibora' },
-      idiom: { ru: 'Идиома', en: 'Idiom', uz: 'Iboraviy birlik' },
-      character: { ru: 'Иероглиф', en: 'Character', uz: 'Iyeroglif' },
-    }
-    return labels[value]?.[lang] ?? value
-  }
+
 
   const toggleFavorite = (word: Word) => {
     const id = wordId(word)
