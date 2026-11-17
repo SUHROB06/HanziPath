@@ -2015,7 +2015,7 @@ export default function App() {
                 setKnownWords(items => items.includes(id) ? items : [...items, id])
                 recordActivity()
                 setShowAnswer(false)
-                setCardIndex(i => (i + 1) % studyWords.length)
+                setCardIndex(i => (i + 1) % practiceWords.length)
               }}>{t('flashcards.markKnown')}</button>
             </>}
           </div>
