@@ -750,6 +750,13 @@ function databaseRowToWord(row: any, system: System): Word {
   const level = row.level_category === '7-9'
     ? 7
     : Number(row.level_category ?? 1)
+  const partOfSpeech: string[] = []
+  for (const reading of readings as any[]) {
+    const value = reading.part_of_speech
+    if (typeof value === 'string' && value.length > 0 && !partOfSpeech.includes(value)) {
+      partOfSpeech.push(value)
+    }
+  }
 
   return {
     sourceEntryKey: row.id ? `vocabulary-db-${row.id}` : undefined,
@@ -767,7 +774,7 @@ function databaseRowToWord(row: any, system: System): Word {
     level30: system === '3.0' ? level : null,
     level20Memberships: system === '2.0' ? [level] : [],
     level30Memberships: system === '3.0' ? [level] : [],
-    partOfSpeech: readings.reduce<string[]>((values, item: any) => { const value = item.part_of_speech; if (typeof value === 'string' && value.length > 0 && !values.includes(value)) values.push(value); return values }, []),
+    partOfSpeech,
     example: example?.sentence_hanzi ?? '',
     examplePinyin: example?.sentence_pinyin ?? '',
     exampleRu: exampleMeaning('ru') ?? '',
