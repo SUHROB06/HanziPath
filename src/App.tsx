@@ -2538,7 +2538,7 @@ export default function App() {
                     ? normalizeWrittenAnswer(response) === normalizeWrittenAnswer(question.answer)
                     : response === question.answer
                 )
-                return <article className={`exam-review-row ${question.manualReview ? 'manual' : correct ? 'correct' : 'incorrect'}`} key={question.id}>
+                return <article className={`exam-review-row ${question.manualReview ? 'manual' : correct ? 'correct' : 'incorrect'}`} key={`${question.section}-${question.part}-${index}`}>
                   <div className="exam-review-title">
                     <b>{index + 1}. {t(`exam.${question.section}` as TranslationKey)}</b>
                     <span>{question.manualReview
