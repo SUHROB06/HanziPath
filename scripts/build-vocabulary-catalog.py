@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import csv
 import hashlib
 import json
 import re
@@ -23,6 +24,8 @@ MARPALO_REPO = "marpalo/hsk-vocabulary-dataset"
 MARPALO_SHA = "c24f2d32b6d03a39423eae871d3197df0df1edc8"
 ZHONGDEX_REPO = "saymei/zhongdex"
 ZHONGDEX_SHA = "8ee771fd915b2821a1302ff50c79d8932f80b0a8"
+ZITOU_REPO = "Maqsudjonpolatov/hsk-chinese-uzbek-russian"
+ZITOU_SHA = "759f6b2735774ace66ca277be65a20370b8a8b56"
 
 POS_MAP = {
     "n": "noun", "N": "noun", "noun": "noun",
@@ -108,6 +111,36 @@ def resolve_source_dir(argument: str | None, repo: str, sha: str, cache: Path) -
         return path
     return download_repo(repo, sha, cache)
 
+def load_zitou_translations(path: Path):
+    exact = collections.defaultdict(list)
+    by_word = collections.defaultdict(list)
+    with path.open(encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            word = row.get("simplified", "")
+            pinyin_num = row.get("pinyin_numeric", "")
+            if not word or not pinyin_num:
+                continue
+            exact[(word, norm_pinyin_num(pinyin_num))].append(row)
+            by_word[word].append(row)
+    return exact, by_word
+
+def find_zitou_translations(entry, exact, by_word):
+    word = entry["hanzi"]
+    pinyin_num = norm_pinyin_num(entry.get("pinyinNum", ""))
+    rows = exact.get((word, pinyin_num), [])
+    if rows:
+        return rows
+    candidates = [
+        row for row in by_word.get(word, [])
+        if base_pinyin(row.get("pinyin", "")) == base_pinyin(entry.get("pinyin", ""))
+    ]
+    if candidates and len({norm_pinyin_num(row.get("pinyin_numeric", "")) for row in candidates}) == 1:
+        return candidates
+    all_rows = by_word.get(word, [])
+    if all_rows and len({norm_pinyin_num(row.get("pinyin_numeric", "")) for row in all_rows}) == 1:
+        return all_rows
+    return []
+
 def load_old_translations(path: Path):
     if not path.exists():
         return {}, {}
@@ -159,8 +192,9 @@ def best_example(candidates):
         )
     return min(candidates, key=score)[1]
 
-def build_catalog(marpalo_root: Path, zhongdex_root: Path, old_path: Path, output: Path):
+def build_catalog(marpalo_root: Path, zhongdex_root: Path, zitou_csv: Path, old_path: Path, output: Path):
     exact_old, old_by_word = load_old_translations(old_path)
+    exact_zitou, zitou_by_word = load_zitou_translations(zitou_csv)
 
     # Sentence links use the exact Zhongdex word ID. Keep source IDs intact
     # so polyphonic words and distinct parts of speech do not get cross-wired.
@@ -344,24 +378,49 @@ def build_catalog(marpalo_root: Path, zhongdex_root: Path, old_path: Path, outpu
                     target["partOfSpeech"] = sorted(set(target["partOfSpeech"]) | set(pos))
                     target["en"] = "; ".join(unique_text(target["en"].split("; ") + english))
 
-    # Bring across the existing RU/UZ draft translations while retaining their
-    # unverified status. No draft translation is silently marked as verified.
+    # Prefer the openly licensed Zitou CSV; retain the older candidate bundle
+    # only as a clearly marked fallback. Both translation sources remain
+    # AI-assisted/unverified and are never promoted to human-verified status.
     missing_ru = 0
     missing_uz = 0
     legacy_migrated = 0
+    entries_with_zitou = 0
+    entries_with_old_fallback = 0
     for (word, pinyin_key), entry in catalog.items():
-        candidates = find_old_translations(word, entry["pinyin"], exact_old, old_by_word)
-        if candidates:
-            ru_values = unique_text([row.get("ru", "") for row in candidates])
-            uz_values = unique_text([row.get("uz", "") for row in candidates])
-            traditional_values = unique_text([row.get("traditional", "") for row in candidates])
+        zitou_rows = find_zitou_translations(entry, exact_zitou, zitou_by_word)
+        old_rows = find_old_translations(word, entry["pinyin"], exact_old, old_by_word)
+
+        if zitou_rows:
+            ru_values = unique_text([row.get("russian", "") for row in zitou_rows])
+            uz_values = unique_text([row.get("uzbek", "") for row in zitou_rows])
+            traditional_values = unique_text([row.get("traditional", "") for row in zitou_rows])
+            entry["ru"] = " / ".join(ru_values)
+            entry["uz"] = " / ".join(uz_values)
+            entry["traditional"] = traditional_values[0] if traditional_values else entry["traditional"]
+            entry["ruStatus"] = "ai_assisted_unverified" if entry["ru"] else "missing_translation"
+            entry["uzStatus"] = "ai_assisted_unverified" if entry["uz"] else "missing_translation"
+            entry["translationSource"] = "Maqsudjonpolatov / Zitou HSK Chinese–Uzbek–Russian"
+            entry["translationLicense"] = "CC BY 4.0"
+            ranks = [int(row["frequency_rank"]) for row in zitou_rows if str(row.get("frequency_rank", "")).isdigit()]
+            entry["frequencyRank"] = min(ranks) if ranks else None
+            entries_with_zitou += 1
+        elif old_rows:
+            ru_values = unique_text([row.get("ru", "") for row in old_rows])
+            uz_values = unique_text([row.get("uz", "") for row in old_rows])
+            traditional_values = unique_text([row.get("traditional", "") for row in old_rows])
             entry["ru"] = " / ".join(ru_values)
             entry["uz"] = " / ".join(uz_values)
             entry["traditional"] = traditional_values[0] if traditional_values else entry["traditional"]
             entry["ruStatus"] = "source_unverified" if entry["ru"] else "missing_translation"
             entry["uzStatus"] = "source_unverified" if entry["uz"] else "missing_translation"
-            entry["legacyIds"] = unique_text(entry["legacyIds"] + [row["_legacyId"] for row in candidates])
-            legacy_migrated += len(candidates)
+            entry["translationSource"] = "Zitou candidate translation bundle"
+            entry["translationLicense"] = "CC BY 4.0 declared; source review pending"
+            entries_with_old_fallback += 1
+
+        if old_rows:
+            entry["legacyIds"] = unique_text(entry["legacyIds"] + [row["_legacyId"] for row in old_rows])
+            legacy_migrated += len(old_rows)
+
         if not entry["ru"]:
             missing_ru += 1
         if not entry["uz"]:
@@ -379,6 +438,8 @@ def build_catalog(marpalo_root: Path, zhongdex_root: Path, old_path: Path, outpu
         "totalUniqueWordReadings": len(entries),
         "hsk30EntriesWithExamples": sum(1 for entry in entries if entry["level30"] is not None and entry["example"]),
         "entriesWithExamples": sum(1 for entry in entries if entry["example"]),
+        "entriesWithZitouTranslations": entries_with_zitou,
+        "entriesWithOldCandidateTranslations": entries_with_old_fallback,
         "missingRussian": missing_ru,
         "missingUzbek": missing_uz,
         "legacyProgressIdsMigrated": legacy_migrated,
@@ -414,6 +475,7 @@ def main():
     parser.add_argument("--marpalo-dir")
     parser.add_argument("--zhongdex-dir")
     parser.add_argument("--cache-dir", default=".cache/vocabulary-sources")
+    parser.add_argument("--zitou-csv")
     parser.add_argument("--old-candidates", default="public/vocabulary-review.json")
     parser.add_argument("--output", default="public/vocabulary-catalog.json")
     args = parser.parse_args()
@@ -422,7 +484,14 @@ def main():
     cache = root / args.cache_dir
     marpalo = resolve_source_dir(args.marpalo_dir, MARPALO_REPO, MARPALO_SHA, cache)
     zhongdex = resolve_source_dir(args.zhongdex_dir, ZHONGDEX_REPO, ZHONGDEX_SHA, cache)
-    build_catalog(marpalo, zhongdex, root / args.old_candidates, root / args.output)
+    zitou_csv = Path(args.zitou_csv).resolve() if args.zitou_csv else root / ".cache" / "hsk_uz_ru.csv"
+    if not zitou_csv.exists():
+        zitou_csv.parent.mkdir(parents=True, exist_ok=True)
+        url = f"https://huggingface.co/datasets/{ZITOU_REPO}/resolve/{ZITOU_SHA}/hsk_uz_ru.csv"
+        request = urllib.request.Request(url, headers={"User-Agent": "HanziPath-vocabulary-builder"})
+        with urllib.request.urlopen(request, timeout=120) as response:
+            zitou_csv.write_bytes(response.read())
+    build_catalog(marpalo, zhongdex, zitou_csv, root / args.old_candidates, root / args.output)
 
 if __name__ == "__main__":
     main()
