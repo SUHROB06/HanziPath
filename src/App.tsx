@@ -468,6 +468,10 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     system === '3.0' && level >= 7 ? lesson.level >= 7 : lesson.level <= level
   ))
   const safeWords = wordPool.length >= 4 ? wordPool : words
+  // Shuffle once per attempt so a question set uses each lesson/word before cycling.
+  const shuffledLessons = shuffleWithSeed([...lessons], attemptSeed ^ 0x51f15e)
+  const shuffledWords = shuffleWithSeed([...new Map(safeWords.map(word => [wordId(word), word])).values()], attemptSeed ^ 0x2a91c3)
+  const shuffledAudioWords = shuffleWithSeed([...new Map(safeWords.map(word => [word.example || word.hanzi, word])).values()], attemptSeed ^ 0x71b42d)
   const questions: ExamQuestion[] = []
   if (!lessons.length || !safeWords.length) return questions
   const writingEnd = format.listening + format.reading + format.writing
@@ -478,59 +482,40 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     const seed = (attemptSeed + (level + 1) * 1009 + index * 97) >>> 0
 
     if (index < format.listening) {
-      const lesson = lessons[(index * 7 + level + (attemptSeed % lessons.length)) % lessons.length]
-      const grammar = lesson.grammar
-      const distractors = lessons
-        .filter(candidate => candidate.id !== lesson.id)
-        .map(candidate => candidate.grammar.meaning)
-        .filter(meaning => meaning !== grammar.meaning)
-      const options = shuffleWithSeed([
-        grammar.meaning,
-        ...shuffleWithSeed([...new Set(distractors)], seed).slice(0, 3),
-      ], seed + 1)
+      const word = shuffledAudioWords[index % shuffledAudioWords.length]
+      const answer = localeMeaning(word, locale) || word.en || word.ru
+      const distractors = shuffledAudioWords
+        .filter(candidate => wordId(candidate) !== wordId(word))
+        .map(candidate => localeMeaning(candidate, locale))
+        .filter((meaning): meaning is string => Boolean(meaning) && meaning !== answer)
       questions.push({
         section: 'listening',
         part: partNumber(index, format.listeningParts),
-        prompt: locale === 'ru' ? 'Прослушай фразу и выбери её значение.' : locale === 'uz' ? 'Gapni tinglang va uning ma’nosini tanlang.' : 'Listen to the sentence and choose its meaning.',
-        options,
-        answer: grammar.meaning,
-        audio: grammar.example,
-        pinyin: grammar.pinyin,
+        prompt: locale === 'ru' ? 'Прослушай слово или фразу и выбери правильное значение.' : locale === 'uz' ? 'So‘z yoki iborani tinglang va to‘g‘ri ma’nosini tanlang.' : 'Listen to the word or phrase and choose its meaning.',
+        options: shuffleWithSeed([answer, ...shuffleWithSeed([...new Set(distractors)], seed).slice(0, 3)], seed + 1),
+        answer,
+        audio: word.example || word.hanzi,
+        pinyin: word.examplePinyin || word.pinyin,
       })
       continue
     }
 
     if (index < format.listening + format.reading) {
-      if (index % 2 === 0) {
-      const word = safeWords[(index * 11 + level * 5) % safeWords.length]
-      const answer = localeMeaning(word, locale) || word.en || word.ru
-      const distractors = safeWords
-        .filter(candidate => candidate.hanzi !== word.hanzi)
-        .map(candidate => localeMeaning(candidate, locale))
-        .filter((meaning): meaning is string => Boolean(meaning) && meaning !== answer)
+      const readingIndex = index - format.listening
+      const word = shuffledWords[(format.listening + readingIndex) % shuffledWords.length]
+      const meaning = localeMeaning(word, locale) || word.en || word.ru
+      const reverseDirection = readingIndex % 2 === 1
+      const answer = reverseDirection ? word.hanzi : meaning
+      const distractors = shuffledWords
+        .filter(candidate => wordId(candidate) !== wordId(word))
+        .map(candidate => reverseDirection ? candidate.hanzi : localeMeaning(candidate, locale))
+        .filter((value): value is string => Boolean(value) && value !== answer)
       questions.push({
         section: 'reading',
-        part: partNumber(index - format.listening, format.readingParts),
-        prompt: locale === 'ru' ? `Выбери значение слова ${word.hanzi} (${word.pinyin}).` : locale === 'uz' ? `${word.hanzi} (${word.pinyin}) so‘zining ma’nosini tanlang.` : `Choose the meaning of ${word.hanzi} (${word.pinyin}).`,
-        options: shuffleWithSeed([
-          answer,
-          ...shuffleWithSeed([...new Set(distractors)], seed).slice(0, 3),
-        ], seed + 1),
-        answer,
-      })
-      continue
-      }
-
-      const lesson = lessons[(index * 3 + level + (attemptSeed % lessons.length)) % lessons.length]
-      const answer = lesson.grammar.meaning
-      const distractors = lessons
-        .filter(candidate => candidate.id !== lesson.id)
-        .map(candidate => candidate.grammar.meaning)
-        .filter(meaning => meaning !== answer)
-      questions.push({
-        section: 'reading',
-        part: partNumber(index - format.listening, format.readingParts),
-        prompt: locale === 'ru' ? `Прочитай фразу ${lesson.grammar.example} и выбери её значение.` : locale === 'uz' ? `${lesson.grammar.example} gapini o‘qing va ma’nosini tanlang.` : `Read ${lesson.grammar.example} and choose its meaning.`,
+        part: partNumber(readingIndex, format.readingParts),
+        prompt: reverseDirection
+          ? (locale === 'ru' ? `Выбери иероглифы для значения «${meaning}».` : locale === 'uz' ? `«${meaning}» ma’nosiga mos ierogliflarni tanlang.` : `Choose the Chinese word for “${meaning}”.`)
+          : (locale === 'ru' ? `Выбери значение слова ${word.hanzi} (${word.pinyin}).` : locale === 'uz' ? `${word.hanzi} (${word.pinyin}) so‘zining ma’nosini tanlang.` : `Choose the meaning of ${word.hanzi} (${word.pinyin}).`),
         options: shuffleWithSeed([answer, ...shuffleWithSeed([...new Set(distractors)], seed).slice(0, 3)], seed + 1),
         answer,
       })
@@ -538,10 +523,10 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     }
 
     if (index < writingEnd) {
-      const lesson = lessons[(index * 5 + level + (attemptSeed % lessons.length)) % lessons.length]
+      const lesson = shuffledLessons[((index - format.listening - format.reading) % shuffledLessons.length)]
       const writingIndex = index - format.listening - format.reading
       if ((system === '2.0' || system === '3.0') && level === 3 && writingIndex < 5) {
-        const word = safeWords[(writingIndex * 19 + level * 7 + (attemptSeed % safeWords.length)) % safeWords.length]
+        const word = shuffledWords[(format.listening + format.reading + writingIndex) % shuffledWords.length]
         const meaning = localeMeaning(word, locale) || word.en || word.ru
         questions.push({
           section: 'writing',
@@ -591,7 +576,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     }
 
     if (index < translationEnd) {
-      const lesson = lessons[(index * 7 + level + (attemptSeed % lessons.length)) % lessons.length]
+      const lesson = shuffledLessons[((index - writingEnd) % shuffledLessons.length)]
       const translateToChinese = (index - writingEnd) % 2 === 1
       questions.push({
         section: 'translation',
@@ -608,7 +593,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       continue
     }
 
-    const lesson = lessons[(index * 11 + level + (attemptSeed % lessons.length)) % lessons.length]
+    const lesson = shuffledLessons[((index - translationEnd) % shuffledLessons.length)]
     questions.push({
       section: 'speaking',
       part: partNumber(index - translationEnd, format.speakingParts),
@@ -764,9 +749,13 @@ export default function App() {
   const [knownWords, setKnownWords] = useState<string[]>(() => readStored(KNOWN_WORDS_KEY, []))
   const [favoriteWordIds, setFavoriteWordIds] = useState<string[]>(() => readStored(FAVORITE_WORDS_KEY, []))
   const [activityDays, setActivityDays] = useState<string[]>(() => readStored(ACTIVITY_DAYS_KEY, []))
-  const [cardIndex, setCardIndex] = useState(0)
+  const [cardIndex, setCardIndex] = useState(() => Math.max(0, readStored<Record<string, any>>('hanzipath.progress', {}).cardIndex ?? 0))
   const [showAnswer, setShowAnswer] = useState(false)
-  const [listeningIndex, setListeningIndex] = useState(0)
+  const [listeningIndex, setListeningIndex] = useState(() => Math.max(0, readStored<Record<string, any>>('hanzipath.progress', {}).listeningIndex ?? 0))
+  const [practiceSystem, setPracticeSystem] = useState<CourseSystem>(() => readStored<Record<string, any>>('hanzipath.progress', {}).practiceSystem === '3.0' ? '3.0' : '2.0')
+  const [practiceLevel, setPracticeLevel] = useState<CourseLevel>(() => { const value = readStored<Record<string, any>>('hanzipath.progress', {}).practiceLevel; return Number.isInteger(value) && value >= 1 && value <= 9 ? value : 1 })
+  const [practiceUnitId, setPracticeUnitId] = useState<string | null>(() => readStored<Record<string, any>>('hanzipath.progress', {}).practiceUnitId ?? null)
+  const [grammarExpandedId, setGrammarExpandedId] = useState<string | null>(null)
   const [listeningChoice, setListeningChoice] = useState<string | null>(null)
   const [lessonListeningChoice, setLessonListeningChoice] = useState<string | null>(null)
   const [closingChoice, setClosingChoice] = useState<number | null>(null)
@@ -906,6 +895,10 @@ export default function App() {
         if (saved.courseSystem === '2.0' || saved.courseSystem === '3.0') setCourseSystem(saved.courseSystem)
         if (Number.isInteger(saved.courseLevel) && saved.courseLevel >= 1 && saved.courseLevel <= 9) setCourseLevel(saved.courseLevel)
         if (typeof saved.cardIndex === 'number') setCardIndex(Math.max(0, saved.cardIndex))
+        if (typeof saved.listeningIndex === 'number') setListeningIndex(Math.max(0, saved.listeningIndex))
+        if (saved.practiceSystem === '2.0' || saved.practiceSystem === '3.0') setPracticeSystem(saved.practiceSystem)
+        if (Number.isInteger(saved.practiceLevel) && saved.practiceLevel >= 1 && saved.practiceLevel <= 9) setPracticeLevel(saved.practiceLevel)
+        if (typeof saved.practiceUnitId === 'string' || saved.practiceUnitId === null) setPracticeUnitId(saved.practiceUnitId)
         if (typeof saved.section === 'number' && saved.section >= 0 && saved.section <= 7) setSection(saved.section)
         if (typeof saved.activeLessonId === 'string' || saved.activeLessonId === null) setActiveLessonId(saved.activeLessonId)
         if (typeof saved.lang === 'string' && isLocale(saved.lang)) setLang(saved.lang)
@@ -918,7 +911,7 @@ export default function App() {
   }, [authReady, userId])
 
   useEffect(() => {
-    const progress = { knownWords, favoriteWordIds, completedLessonIds, activityDays, done, courseSystem, courseLevel, cardIndex, section, activeLessonId, lang }
+    const progress = { knownWords, favoriteWordIds, completedLessonIds, activityDays, done, courseSystem, courseLevel, cardIndex, practiceSystem, practiceLevel, practiceUnitId, listeningIndex, section, activeLessonId, lang }
     try { window.localStorage.setItem('hanzipath.progress', JSON.stringify(progress)) } catch { /* optional local backup */ }
     if (!userId || !supabase || !progressReady || progressOwnerId !== userId) return
     const client = supabase
@@ -928,7 +921,7 @@ export default function App() {
       })
     }, 900)
     return () => window.clearTimeout(timer)
-  }, [knownWords, favoriteWordIds, completedLessonIds, activityDays, done, courseSystem, courseLevel, cardIndex, section, activeLessonId, lang, userId, progressReady, progressOwnerId])
+  }, [knownWords, favoriteWordIds, completedLessonIds, activityDays, done, courseSystem, courseLevel, cardIndex, practiceSystem, practiceLevel, practiceUnitId, listeningIndex, section, activeLessonId, lang, userId, progressReady, progressOwnerId])
 
   const submitAuth = async () => {
     if (!supabase) { setNotice({ text: t('auth.notConfigured'), kind: 'error' }); return }
@@ -1153,6 +1146,15 @@ export default function App() {
     return catalog
   }, [lessonEntries, lessonAssignments])
   const courseUnits = courseUnitCatalog[`${courseSystem}:${courseLevel}`] ?? []
+  const practiceUnits = courseUnitCatalog[`${practiceSystem}:${practiceLevel}`] ?? []
+  const practiceLessons = practiceUnits.flatMap(unit => unit.lessons)
+  const practiceSelectedLesson = practiceLessons.find(lesson => lesson.id === practiceUnitId) ?? practiceLessons[0]
+  const practiceUnit = practiceUnits.find(unit => unit.lessons.some(lesson => lesson.id === practiceSelectedLesson?.id))
+  const assignedPracticeWords = practiceSelectedLesson ? lessonAssignments[practiceSelectedLesson.id] : []
+  const practiceWords = [...new Map((assignedPracticeWords?.length ? assignedPracticeWords : practiceUnit?.words ?? []).map(word => [wordId(word), word])).values()]
+  const practiceLessonLabel = practiceSelectedLesson
+    ? `${practiceSelectedLesson.chapter}${practiceSelectedLesson.part > 1 ? `.${practiceSelectedLesson.part}` : ''} ${practiceSelectedLesson.title}`
+    : ''
   const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const activeUnit = courseUnits.find(unit => unit.id === activeLessonId)
   const activeLesson = activeUnit?.lessons[0]
@@ -1264,14 +1266,14 @@ export default function App() {
   const courseFallbackWords = wordsForCourseLevel(lessonEntries, courseSystem, courseLevel)
   const studyWords = activeLessonWords.length ? activeLessonWords : courseFallbackWords
   const knownInCurrentWords = knownWords.filter(id => currentWords.some(word => wordId(word) === id)).length
-  const activeCard = studyWords.length ? studyWords[cardIndex % studyWords.length] : undefined
-  const listeningWord = studyWords.length ? studyWords[listeningIndex % studyWords.length] : undefined
+  const activeCard = practiceWords.length ? practiceWords[cardIndex % practiceWords.length] : undefined
+  const listeningWord = practiceWords.length ? practiceWords[listeningIndex % practiceWords.length] : undefined
   const listeningOptions = useMemo(() => {
     if (!listeningWord) return []
-    const options = [listeningWord, ...studyWords.filter(word => wordId(word) !== wordId(listeningWord)).slice(0, 3)]
+    const options = [listeningWord, ...practiceWords.filter(word => wordId(word) !== wordId(listeningWord)).slice(0, 3)]
     const offset = listeningIndex % options.length
     return [...options.slice(offset), ...options.slice(0, offset)]
-  }, [studyWords, listeningIndex, listeningWord])
+  }, [practiceWords, listeningIndex, listeningWord])
   const recordActivity = () => {
     const today = localDateKey()
     setActivityDays(days => days.includes(today) ? days : [...days, today].slice(-400))
@@ -1977,9 +1979,15 @@ export default function App() {
         <section className="panel learning-page">
           <div className="panel-head">
             <div><span className="kicker">{t('flashcards.kicker')}</span><h2>{t('flashcards.title')}</h2></div>
-            <span className="demo-tag">HSK {courseSystem} · {courseLevel} · {activeLesson?.title}</span>
+            <span className="demo-tag">HSK {practiceSystem} · {practiceLevel}</span>
           </div>
           <p className="notice-text">{t('flashcards.notice')}</p>
+          <div className="practice-filters">
+            <label><span>{lang === 'ru' ? 'Стандарт' : lang === 'uz' ? 'Standart' : 'Standard'}</span><select value={practiceSystem} onChange={event => { const next = event.target.value as CourseSystem; setPracticeSystem(next); setPracticeLevel(1); setPracticeUnitId(null); setCardIndex(0); setShowAnswer(false); setListeningIndex(0); setListeningChoice(null) }}><option value="2.0">HSK 2.0</option><option value="3.0">HSK 3.0</option></select></label>
+            <label><span>HSK {lang === 'ru' ? 'уровень' : lang === 'uz' ? 'daraja' : 'level'}</span><select value={practiceLevel} onChange={event => { setPracticeLevel(Number(event.target.value) as CourseLevel); setPracticeUnitId(null); setCardIndex(0); setShowAnswer(false); setListeningIndex(0); setListeningChoice(null) }}>{(practiceSystem === '2.0' ? [1,2,3,4,5,6] : [1,2,3,4,5,6,7,8,9]).map(level => <option key={level} value={level}>{practiceSystem === '3.0' && level >= 7 ? `HSK 3.0 · ${level}` : `HSK ${practiceSystem} · ${level}`}</option>)}</select></label>
+            <label><span>{lang === 'ru' ? 'Урок' : lang === 'uz' ? 'Dars' : 'Lesson'}</span><select value={practiceSelectedLesson?.id ?? ''} onChange={event => { setPracticeUnitId(event.target.value || null); setCardIndex(0); setShowAnswer(false); setListeningIndex(0); setListeningChoice(null) }}>{practiceLessons.map(lesson => <option key={lesson.id} value={lesson.id}>{`${lesson.chapter}${lesson.part > 1 ? `.${lesson.part}` : ''} ${lesson.title}`}</option>)}</select></label>
+          </div>
+          <p className="practice-count">{practiceLessonLabel} · {practiceWords.length} {lang === 'ru' ? 'слов' : lang === 'uz' ? 'so‘z' : 'words'}</p>
           <article className="study-card">
             <span className="study-hanzi">{activeCard.hanzi}</span>
             {showAnswer && <div className="study-answer">
@@ -1991,20 +1999,20 @@ export default function App() {
           <div className="study-actions">
             {!showAnswer && <button className="primary" onClick={() => setShowAnswer(true)}>{t('flashcards.showAnswer')}</button>}
             {showAnswer && <>
-              <button className="outline" onClick={() => { setShowAnswer(false); setCardIndex(i => (i + 1) % studyWords.length) }}>{t('flashcards.again')}</button>
+              <button className="outline" onClick={() => { setShowAnswer(false); setCardIndex(i => (i + 1) % practiceWords.length) }}>{t('flashcards.again')}</button>
               <button className="primary" onClick={() => {
                 const id = wordId(activeCard)
                 setKnownWords(items => items.includes(id) ? items : [...items, id])
                 recordActivity()
                 setShowAnswer(false)
-                setCardIndex(i => (i + 1) % studyWords.length)
+                setCardIndex(i => (i + 1) % practiceWords.length)
               }}>{t('flashcards.markKnown')}</button>
             </>}
           </div>
           <div className="study-footer">
-            <button className="outline" aria-label={t('flashcards.previous')} onClick={() => { setShowAnswer(false); setCardIndex(i => (i + studyWords.length - 1) % studyWords.length) }}>‹</button>
-            <span>{t('flashcards.counter')} {cardIndex % studyWords.length + 1} / {studyWords.length} · {t('flashcards.knownCount')}: {studyWords.filter(word => knownWords.includes(wordId(word))).length}</span>
-            <button className="outline" aria-label={t('flashcards.next')} onClick={() => { setShowAnswer(false); setCardIndex(i => (i + 1) % studyWords.length) }}>›</button>
+            <button className="outline" aria-label={t('flashcards.previous')} onClick={() => { setShowAnswer(false); setCardIndex(i => (i + practiceWords.length - 1) % practiceWords.length) }}>‹</button>
+            <span>{t('flashcards.counter')} {cardIndex % practiceWords.length + 1} / {practiceWords.length} · {t('flashcards.knownCount')}: {practiceWords.filter(word => knownWords.includes(wordId(word))).length}</span>
+            <button className="outline" aria-label={t('flashcards.next')} onClick={() => { setShowAnswer(false); setCardIndex(i => (i + 1) % practiceWords.length) }}>›</button>
           </div>
         </section>
       )}
@@ -2015,8 +2023,14 @@ export default function App() {
 
       {section === 4 && listeningWord && (
         <section className="panel learning-page">
-          <div className="panel-head"><div><span className="kicker">{t('listening.kicker')}</span><h2>{t('listening.title')}</h2></div><span className="demo-tag">HSK {courseSystem} · {courseLevel} · {activeLesson?.title}</span></div>
+          <div className="panel-head"><div><span className="kicker">{t('listening.kicker')}</span><h2>{t('listening.title')}</h2></div><span className="demo-tag">HSK {practiceSystem} · {practiceLevel}</span></div>
           <p className="notice-text">{t('listening.notice')}</p>
+          <div className="practice-filters">
+            <label><span>{lang === 'ru' ? 'Стандарт' : lang === 'uz' ? 'Standart' : 'Standard'}</span><select value={practiceSystem} onChange={event => { const next = event.target.value as CourseSystem; setPracticeSystem(next); setPracticeLevel(1); setPracticeUnitId(null); setListeningIndex(0); setListeningChoice(null) }}><option value="2.0">HSK 2.0</option><option value="3.0">HSK 3.0</option></select></label>
+            <label><span>HSK {lang === 'ru' ? 'уровень' : lang === 'uz' ? 'daraja' : 'level'}</span><select value={practiceLevel} onChange={event => { setPracticeLevel(Number(event.target.value) as CourseLevel); setPracticeUnitId(null); setListeningIndex(0); setListeningChoice(null) }}>{(practiceSystem === '2.0' ? [1,2,3,4,5,6] : [1,2,3,4,5,6,7,8,9]).map(level => <option key={level} value={level}>{`HSK ${practiceSystem} · ${level}`}</option>)}</select></label>
+            <label><span>{lang === 'ru' ? 'Урок' : lang === 'uz' ? 'Dars' : 'Lesson'}</span><select value={practiceSelectedLesson?.id ?? ''} onChange={event => { setPracticeUnitId(event.target.value || null); setListeningIndex(0); setListeningChoice(null) }}>{practiceLessons.map(lesson => <option key={lesson.id} value={lesson.id}>{`${lesson.chapter}${lesson.part > 1 ? `.${lesson.part}` : ''} ${lesson.title}`}</option>)}</select></label>
+          </div>
+          <p className="practice-count">{practiceLessonLabel} · {practiceWords.length} {lang === 'ru' ? 'слов для практики' : lang === 'uz' ? 'ta mashq so‘zi' : 'practice words'}</p>
           <div className="practice-prompt">
             <p>{t('listening.prompt')}</p>
             <button className="primary" onClick={() => speak(listeningWord.hanzi)}><Volume2 size={18}/>{t('listening.play')}</button>
@@ -2032,7 +2046,7 @@ export default function App() {
             })}
           </div>
           {listeningChoice && <p className={`feedback ${listeningChoice === listeningWord.hanzi ? 'success' : 'error'}`}>{t(listeningChoice === listeningWord.hanzi ? 'listening.correct' : 'listening.incorrect')}</p>}
-          <button className="primary" onClick={() => { setListeningIndex(i => (i + 1) % studyWords.length); setListeningChoice(null) }}>{t('listening.next')}<ChevronRight size={16}/></button>
+          <button className="primary" onClick={() => { setListeningIndex(i => (i + 1) % practiceWords.length); setListeningChoice(null) }}>{t('listening.next')}<ChevronRight size={16}/></button>
         </section>
       )}
 
@@ -2058,7 +2072,8 @@ export default function App() {
                 <div className="lesson-example"><b>{lesson.grammar.example}</b><span>{lesson.grammar.pinyin}</span><small>{lesson.grammar.meaning}</small></div>
               </div>
               <button className="sound" aria-label={t('vocab.listen')} onClick={() => speak(lesson.grammar.example)}><Volume2 size={18}/></button>
-              <button className="outline grammar-open" onClick={() => { setActiveLessonId((courseUnitCatalog[`${courseSystem}:${courseLevel}`] ?? []).find(unit => unit.lessons.some(item => item.id === lesson.id))?.id ?? null); setSection(1) }}>{t('course.open')}</button>
+              <button className="outline grammar-open" onClick={() => setGrammarExpandedId(current => current === lesson.id ? null : lesson.id)}>{grammarExpandedId === lesson.id ? (lang === 'ru' ? 'Свернуть' : lang === 'uz' ? 'Yopish' : 'Collapse') : (lang === 'ru' ? 'Подробнее' : lang === 'uz' ? 'Batafsil' : 'Details')}</button>
+              {grammarExpandedId === lesson.id && <div className="grammar-expanded">{lesson.grammar.deepDive && <p>{lesson.grammar.deepDive}</p>}{lesson.grammar.extraExamples?.map(example => <div className="lesson-example" key={example.hanzi}><b>{example.hanzi}</b><span>{example.pinyin}</span><small>{example.meaning}</small></div>)}{lesson.grammar.commonMistakes?.length ? <><h4>{lang === 'ru' ? 'Частые ошибки' : lang === 'uz' ? 'Ko‘p uchraydigan xatolar' : 'Common mistakes'}</h4><ul>{lesson.grammar.commonMistakes.map(item => <li key={item}>{item}</li>)}</ul></> : null}{lesson.grammar.studySteps?.length ? <><h4>{lang === 'ru' ? 'Как освоить тему' : lang === 'uz' ? 'Mavzuni o‘zlashtirish' : 'Study steps'}</h4><ol>{lesson.grammar.studySteps.map(item => <li key={item}>{item}</li>)}</ol></> : null}</div>}
             </article>)}
           </div>
         </section>
