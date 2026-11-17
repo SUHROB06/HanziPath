@@ -458,7 +458,7 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
     write_json(hsk30_output,hsk30_document)
     write_json(hsk20_output,hsk20_document)
     write_json(translations_output,translations_document)
-    write_json(root/"public"/"vocabulary-examples-hsk20.json",hsk20_examples_document)
+    write_json(hsk20_output.parent/"vocabulary-examples-hsk20.json",hsk20_examples_document)
     copy_source_licenses(marpalo_root,zhongdex_root,hsk30_output.parent/"data-licenses")
     return stats
 
