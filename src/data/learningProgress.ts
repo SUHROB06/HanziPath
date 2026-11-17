@@ -69,7 +69,9 @@ export function mergeLearningProgress(
       : { date: today, done: [false, false, false] },
   }
 
-  const remoteTasks = remote.dailyTasks
+  const remoteTasks = remote.dailyTasks && typeof remote.dailyTasks === 'object'
+    ? remote.dailyTasks
+    : null
   const localTasks = local.dailyTasks
   const dailyTasks = remoteTasks?.date === today && localTasks.date === today
     ? { date: today, done: [0, 1, 2].map(index => Boolean(remoteTasks.done?.[index] || localTasks.done[index])) }
@@ -79,7 +81,9 @@ export function mergeLearningProgress(
         ? localTasks
         : { date: today, done: [false, false, false] }
 
-  const attempts = [...(local.examHistory ?? []), ...(remote.examHistory ?? [])]
+  const remoteAttempts = Array.isArray(remote.examHistory) ? remote.examHistory : []
+  const localAttempts = Array.isArray(local.examHistory) ? local.examHistory : []
+  const attempts = [...localAttempts, ...remoteAttempts]
     .filter(item => item && validDate(item.date))
   const uniqueAttempts = [...new Map(attempts.map(item => [
     [item.system, item.level, item.score, item.total, item.date].join('|'),
@@ -90,12 +94,27 @@ export function mergeLearningProgress(
 
   return {
     version: 1,
-    knownWords: union(local.knownWords ?? [], remote.knownWords ?? []),
-    favoriteWordIds: union(local.favoriteWordIds ?? [], remote.favoriteWordIds ?? []),
-    activityDays: union(local.activityDays ?? [], remote.activityDays ?? []).sort().slice(-730),
-    completedLessonIds: union(local.completedLessonIds ?? [], remote.completedLessonIds ?? []),
+    knownWords: union(
+      Array.isArray(local.knownWords) ? local.knownWords : [],
+      Array.isArray(remote.knownWords) ? remote.knownWords : [],
+    ),
+    favoriteWordIds: union(
+      Array.isArray(local.favoriteWordIds) ? local.favoriteWordIds : [],
+      Array.isArray(remote.favoriteWordIds) ? remote.favoriteWordIds : [],
+    ),
+    activityDays: union(
+      Array.isArray(local.activityDays) ? local.activityDays : [],
+      Array.isArray(remote.activityDays) ? remote.activityDays : [],
+    ).sort().slice(-730),
+    completedLessonIds: union(
+      Array.isArray(local.completedLessonIds) ? local.completedLessonIds : [],
+      Array.isArray(remote.completedLessonIds) ? remote.completedLessonIds : [],
+    ),
     examHistory: uniqueAttempts,
-    reviewSchedule: mergeReviewSchedule(local.reviewSchedule ?? {}, remote.reviewSchedule ?? {}),
+    reviewSchedule: mergeReviewSchedule(
+      local.reviewSchedule && typeof local.reviewSchedule === 'object' ? local.reviewSchedule : {},
+      remote.reviewSchedule && typeof remote.reviewSchedule === 'object' ? remote.reviewSchedule : {},
+    ),
     dailyTasks,
     dailyGoalWords: Number.isFinite(remote.dailyGoalWords)
       ? Math.max(5, Math.min(100, Number(remote.dailyGoalWords)))
@@ -103,8 +122,8 @@ export function mergeLearningProgress(
     dailyReviewCount: {
       date: today,
       count: Math.max(
-        remote.dailyReviewCount?.date === today ? Number(remote.dailyReviewCount.count) || 0 : 0,
-        local.dailyReviewCount?.date === today ? Number(local.dailyReviewCount.count) || 0 : 0,
+        remote.dailyReviewCount?.date === today ? Math.max(0, Number(remote.dailyReviewCount.count) || 0) : 0,
+        local.dailyReviewCount?.date === today ? Math.max(0, Number(local.dailyReviewCount.count) || 0) : 0,
       ),
     },
   }
