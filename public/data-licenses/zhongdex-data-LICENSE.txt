@@ -1,0 +1,103 @@
+Zhongdex data — Creative Commons Attribution-ShareAlike 4.0 International
+(CC BY-SA 4.0)
+
+Copyright (c) 2026 SayMei and the upstream sources listed in ../NOTICE
+(v0.1 sources: CC-CEDICT, and the vendored HSK 3.0 (2026) word list)
+
+Everything in this directory — the word canon, the sentence records, the packs,
+the manifests, and every artifact derived from them (Yomitan packs, Anki decks,
+CSV/TSV/JSONL/Parquet exports, Pleco files, API responses, and MCP tool
+responses) — is licensed under the Creative Commons
+Attribution-ShareAlike 4.0 International licence.
+
+  Human-readable summary: https://creativecommons.org/licenses/by-sa/4.0/
+  Full legal code:        https://creativecommons.org/licenses/by-sa/4.0/legalcode
+
+The full legal code at that URL is the licence. The summary below is not a
+substitute for it; it states plainly what this licence requires of you.
+
+--------------------------------------------------------------------------
+YOU ARE FREE TO
+--------------------------------------------------------------------------
+
+  Share    — copy and redistribute the material in any medium or format,
+             including by making it available over a network on demand.
+  Adapt    — remix, transform, and build upon the material.
+
+For any purpose, including commercially. These freedoms cannot be revoked so
+long as you follow the terms below.
+
+--------------------------------------------------------------------------
+UNDER THE FOLLOWING TERMS
+--------------------------------------------------------------------------
+
+1. ATTRIBUTION. You must give appropriate credit, provide a link to the
+   licence, and indicate if changes were made.
+
+   The attribution line to reproduce, matching what v0.1 actually contains:
+
+     Zhongdex by SayMei — https://zhongdex.org — CC BY-SA 4.0.
+     Contains data from CC-CEDICT (CC BY-SA 4.0) and the HSK 3.0 (2026)
+     word list.
+
+   ../NOTICE is always the current source list; later releases add to it.
+   Keep the per-record attribution that ships with the data: every record
+   carries `sourceIds`, and every gloss carries its own `source` and
+   `license`. When sentence records ship, Tatoeba rows will carry their
+   upstream id the same way; that field IS the attribution for those rows and
+   must survive your transformation.
+
+2. SHAREALIKE. If you remix, transform, or build upon the material, you must
+   distribute your contributions under CC BY-SA 4.0 or a
+   ShareAlike-compatible licence.
+
+   MIT and Apache-2.0 are NOT on Creative Commons' compatible-licence list.
+   You cannot relicense this data under them.
+
+   ShareAlike propagates through a merge: a database containing a substantial
+   portion of this data is Adapted Material under §4 (sui generis database
+   rights) and must itself be BY-SA.
+
+   "Share" is defined by the licence as making the material available such
+   that members of the public may access it from a place and at a time
+   individually chosen by them. That definition covers an HTTP API and an MCP
+   server exactly as it covers a download.
+
+3. NO ADDITIONAL RESTRICTIONS. You may not apply legal terms or technological
+   measures that legally restrict others from doing anything the licence
+   permits.
+
+--------------------------------------------------------------------------
+WHY THIS LICENCE, AND NOT A PERMISSIVE ONE
+--------------------------------------------------------------------------
+
+This is not a preference. Every gloss in the v0.1 canon comes from CC-CEDICT,
+which is CC BY-SA 4.0. ShareAlike propagates through the merge, so BY-SA is the
+only licence this corpus can carry. Wiktionary senses and Tatoeba sentences are
+planned and neither changes the outcome. The code that builds it is MIT
+(see ../LICENSE); the corpus cannot be.
+
+--------------------------------------------------------------------------
+WHAT IS NOT COVERED
+--------------------------------------------------------------------------
+
+  * The audio recordings. They are served from a separate host under their
+    own terms, are referenced by URL and never bundled here, and AS OF v0.1
+    ARE NOT PUBLISHED AT ALL — every audio field reports status "pending".
+    See the README.
+  * SayMei trademarks, the SayMei and Zhongdex names, and the logos. Licence
+    terms do not grant trademark rights.
+  * The build code in ../src and ../scripts, which is MIT.
+  * ../scripts/cedict.json, which is ALSO CC BY-SA 4.0 but is governed by
+    ../NOTICE §1a rather than by this file, because it is a verbatim
+    redistribution of CC-CEDICT rather than part of the derived corpus. The
+    licence is the same; the "changes were made" statement is not.
+
+--------------------------------------------------------------------------
+DISCLAIMER
+--------------------------------------------------------------------------
+
+Unless otherwise separately undertaken by the Licensor, to the extent
+possible, the Licensor offers the Licensed Material as-is and as-available,
+and makes no representations or warranties of any kind concerning the
+Licensed Material. See §5 of the full legal code.
