@@ -1394,6 +1394,8 @@ export default function App() {
         <button
           key={key}
           className={`navitem ${section === i ? 'active' : ''}`}
+          aria-label={t(key)}
+          title={t(key)}
           onClick={() => { setSection(i); setMenu(false) }}
         >
           {navIcons[i]}
@@ -1413,6 +1415,8 @@ export default function App() {
 
         <button
           className={`navitem profile-link ${section === 7 ? 'active' : ''}`}
+          aria-label={t('profile.settings')}
+          title={t('profile.settings')}
           onClick={() => { setSection(7); setMenu(false) }}
         >
           <Settings/>
