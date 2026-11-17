@@ -1,0 +1,617 @@
+
+import { supabase } from '../supabase'
+import type {
+  Example,
+  RepositoryError,
+  RepositoryResult,
+  StandardCode,
+  StandardLevel,
+  StandardMembership,
+  StandardVersion,
+  Translation,
+  VocabularyCounts,
+  VocabularyDetails,
+  VocabularyItem,
+  VocabularyReading,
+  VocabularySearchResult,
+} from '../types/vocabulary'
+
+const EMPTY_CATALOG_ERROR: RepositoryError = {
+  code: 'SUPABASE_NOT_CONFIGURED',
+  message: 'Vocabulary catalog is unavailable because Supabase is not configured.',
+}
+
+const PAGE_SIZE = 100
+const DEFAULT_SEARCH_LIMIT = 50
+const MAX_SEARCH_LIMIT = 100
+
+const INCOMPLETE_PAGE_ERROR: RepositoryError = {
+  code: 'INCOMPLETE_PAGINATED_RESULT',
+  message: 'The vocabulary query returned an incomplete or changing page; results may not be safely represented.',
+}
+
+function asRepositoryError(error: unknown): RepositoryError {
+  if (error && typeof error === 'object') {
+    const candidate = error as { code?: unknown; message?: unknown }
+
+    return {
+      code: typeof candidate.code === 'string'
+        ? candidate.code
+        : 'VOCABULARY_QUERY_FAILED',
+      message: typeof candidate.message === 'string'
+        ? candidate.message
+        : 'The vocabulary request failed.',
+    }
+  }
+
+  return {
+    code: 'VOCABULARY_QUERY_FAILED',
+    message: 'The vocabulary request failed.',
+  }
+}
+
+function failed<T>(data: T, error: unknown): RepositoryResult<T> {
+  return { data, error: asRepositoryError(error) }
+}
+
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_(),.]/g, character => `\\${character}`)
+}
+
+function normalizePinyin(value: string): string {
+  return value.toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[1-5\s]/g, '')
+}
+
+function unique<T extends { id: string }>(rows: T[]): T[] {
+  return [...new Map(rows.map(row => [row.id, row])).values()]
+}
+
+/**
+ * Fetches every page using keyset pagination.
+ * PostgREST exact count is the total count on every page,
+ * not the number of rows remaining.
+ */
+async function fetchAllPages<T extends { id: string }>(
+  queryPage: (cursor: string | null, limit: number) => any,
+): Promise<RepositoryResult<T[]>> {
+  const rows: T[] = []
+  let cursor: string | null = null
+  let expectedTotal: number | null = null
+
+  try {
+    while (true) {
+      const { data, error, count } = await queryPage(cursor, PAGE_SIZE)
+
+      if (error) return failed([], error)
+
+      if (typeof count !== 'number') {
+        return failed([], {
+          code: 'MISSING_EXACT_COUNT',
+          message: 'The database did not return an exact row count.',
+        })
+      }
+
+      if (expectedTotal === null) {
+        expectedTotal = count
+      } else if (count !== expectedTotal) {
+        return failed([], INCOMPLETE_PAGE_ERROR)
+      }
+
+      const page = (data ?? []) as T[]
+      const expectedPageSize = Math.min(
+        PAGE_SIZE,
+        Math.max(0, expectedTotal - rows.length),
+      )
+
+      if (page.length !== expectedPageSize) {
+        return failed([], INCOMPLETE_PAGE_ERROR)
+      }
+
+      if (page.length === 0) break
+
+      const pageIds = new Set(page.map(row => row.id))
+
+      if (
+        pageIds.size !== page.length ||
+        (cursor !== null && page[0].id <= cursor)
+      ) {
+        return failed([], INCOMPLETE_PAGE_ERROR)
+      }
+
+      rows.push(...page)
+      cursor = page[page.length - 1].id
+
+      if (rows.length >= expectedTotal) break
+    }
+
+    return { data: rows, error: null }
+  } catch (error) {
+    return failed([], error)
+  }
+}
+
+function keysetPage(
+  query: any,
+  cursor: string | null,
+  limit: number,
+): any {
+  const afterCursor = cursor === null
+    ? query
+    : query.gt('id', cursor)
+
+  return afterCursor
+    .order('id', { ascending: true })
+    .limit(limit)
+}
+
+/**
+ * Searches simplified/traditional characters, pinyin,
+ * and verified translations.
+ */
+export async function searchVocabulary(
+  searchText: string,
+  options: {
+    limit?: number
+    locale?: 'en' | 'ru' | 'uz'
+  } = {},
+): Promise<RepositoryResult<VocabularySearchResult[]>> {
+  if (!supabase) return failed([], EMPTY_CATALOG_ERROR)
+
+  const client = supabase
+  const term = searchText.trim()
+
+  if (!term) return { data: [], error: null }
+
+  try {
+    const pattern = `%${escapeLike(term)}%`
+    const normalizedTerm = normalizePinyin(term)
+
+    const requestedLimit = options.limit ?? DEFAULT_SEARCH_LIMIT
+
+    const resultLimit = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(Math.floor(requestedLimit), MAX_SEARCH_LIMIT))
+      : DEFAULT_SEARCH_LIMIT
+
+    const [itemMatches, readingMatches, translationMatches] =
+      await Promise.all([
+        fetchAllPages<VocabularyItem>((cursor, limit) =>
+          keysetPage(
+            client.from('vocabulary_items')
+              .select('*', { count: 'exact' })
+              .or(`simplified.ilike.${pattern},traditional.ilike.${pattern}`),
+            cursor,
+            limit,
+          ),
+        ),
+
+        fetchAllPages<VocabularyReading>((cursor, limit) =>
+          keysetPage(
+            client.from('vocabulary_readings')
+              .select('*', { count: 'exact' })
+              .eq('verification_status', 'verified'),
+            cursor,
+            limit,
+          ),
+        ),
+
+        fetchAllPages<Translation>((cursor, limit) => {
+          let query = client.from('translations')
+            .select('*', { count: 'exact' })
+            .eq('verification_status', 'verified')
+            .eq('content_kind', 'meaning')
+            .ilike('text', pattern)
+
+          if (options.locale) {
+            query = query.eq('locale', options.locale)
+          }
+
+          return keysetPage(query, cursor, limit)
+        }),
+      ])
+
+    const queryError =
+      itemMatches.error ??
+      readingMatches.error ??
+      translationMatches.error
+
+    if (queryError) return failed([], queryError)
+
+    const matchingReadings = normalizedTerm
+      ? readingMatches.data.filter(reading =>
+          normalizePinyin(reading.pinyin).includes(normalizedTerm),
+        )
+      : []
+
+    const matchedTranslations = translationMatches.data
+
+    const candidates = new Set<string>([
+      ...itemMatches.data.map(item => item.id),
+      ...matchingReadings.map(reading => reading.vocabulary_item_id),
+      ...matchedTranslations.map(translation => translation.vocabulary_item_id),
+    ])
+
+    const selectedIds = [...candidates]
+      .sort((a, b) => a.localeCompare(b))
+      .slice(0, resultLimit)
+
+    if (selectedIds.length === 0) {
+      return { data: [], error: null }
+    }
+
+    const detailRows: Array<VocabularyItem & {
+      vocabulary_readings?: VocabularyReading[] | null
+      translations?: Translation[] | null
+    }> = []
+
+    for (let offset = 0; offset < selectedIds.length; offset += PAGE_SIZE) {
+      const ids = selectedIds.slice(offset, offset + PAGE_SIZE)
+
+      const { data, error } = await client.from('vocabulary_items')
+        .select('*, vocabulary_readings(*), translations(*)')
+        .in('id', ids)
+        .order('id', { ascending: true })
+
+      if (error) return failed([], error)
+
+      const rows = (data ?? []) as typeof detailRows
+
+      if (rows.length !== ids.length) {
+        return failed([], INCOMPLETE_PAGE_ERROR)
+      }
+
+      detailRows.push(...rows)
+    }
+
+    const verifiedMatchesByItem = new Map<string, Translation[]>()
+
+    for (const translation of matchedTranslations) {
+      if (translation.verification_status !== 'verified') continue
+      if (translation.content_kind !== 'meaning') continue
+
+      const matches =
+        verifiedMatchesByItem.get(translation.vocabulary_item_id) ?? []
+
+      matches.push(translation)
+      verifiedMatchesByItem.set(translation.vocabulary_item_id, matches)
+    }
+
+    const detailsById = new Map(detailRows.map(row => [row.id, row]))
+    const results: VocabularySearchResult[] = []
+
+    for (const id of selectedIds) {
+      const row = detailsById.get(id)
+
+      if (!row) return failed([], INCOMPLETE_PAGE_ERROR)
+
+      const { translations, ...item } = row
+
+      const verifiedNestedTranslations = (translations ?? []).filter(
+        translation =>
+          translation.verification_status === 'verified' &&
+          translation.content_kind === 'meaning' &&
+          (!options.locale || translation.locale === options.locale),
+      )
+
+      results.push({
+        ...item,
+        vocabulary_readings: (row.vocabulary_readings ?? []).filter(
+          reading => reading.verification_status === 'verified',
+        ),
+        translations: verifiedNestedTranslations,
+        matched_translations: verifiedMatchesByItem.get(id) ?? [],
+      } as VocabularySearchResult)
+    }
+
+    return { data: results, error: null }
+  } catch (error) {
+    return failed([], error)
+  }
+}
+
+/**
+ * Returns the first catalog page for browsing.
+ * Only rows visible under Supabase RLS can be returned.
+ */
+export async function getVocabularyCatalog(
+  options: {
+    standardVersionId?: string
+    level?: StandardLevel
+    limit?: number
+  } = {},
+): Promise<RepositoryResult<Array<VocabularyDetails & {
+  level_category?: StandardLevel
+}>>> {
+  if (!supabase) return failed([], EMPTY_CATALOG_ERROR)
+
+  const client = supabase
+  const requestedLimit = options.limit ?? PAGE_SIZE
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.max(1, Math.min(Math.floor(requestedLimit), 3000))
+    : PAGE_SIZE
+
+  try {
+    let itemIds: string[] = []
+    const levelByItem = new Map<string, StandardLevel>()
+
+    if (options.standardVersionId) {
+      let membershipQuery = client.from('standard_memberships')
+        .select('vocabulary_item_id, level_category')
+        .eq('standard_version_id', options.standardVersionId)
+        .order('level_order', { ascending: true })
+
+      if (options.level) {
+        membershipQuery = membershipQuery.eq(
+          'level_category',
+          options.level,
+        )
+      }
+
+      const { data, error } = await membershipQuery.limit(limit)
+
+      if (error) return failed([], error)
+
+      for (const membership of data ?? []) {
+        const itemId = membership.vocabulary_item_id as string
+        itemIds.push(itemId)
+        levelByItem.set(
+          itemId,
+          membership.level_category as StandardLevel,
+        )
+      }
+    } else {
+      const { data, error } = await client.from('vocabulary_items')
+        .select('id')
+        .order('simplified', { ascending: true })
+        .limit(limit)
+
+      if (error) return failed([], error)
+
+      itemIds = (data ?? []).map(row => row.id as string)
+    }
+
+    itemIds = [...new Set(itemIds)]
+
+    if (itemIds.length === 0) {
+      return { data: [], error: null }
+    }
+
+    const details: Array<VocabularyDetails & {
+      level_category?: StandardLevel
+    }> = []
+
+    for (let offset = 0; offset < itemIds.length; offset += PAGE_SIZE) {
+      const ids = itemIds.slice(offset, offset + PAGE_SIZE)
+
+      const { data, error } = await client.from('vocabulary_items')
+        .select('*, vocabulary_readings(*), examples(*), translations(*)')
+        .in('id', ids)
+
+      if (error) return failed([], error)
+
+      const rows = (data ?? []) as Array<VocabularyItem & {
+        vocabulary_readings?: VocabularyReading[] | null
+        examples?: Example[] | null
+        translations?: Translation[] | null
+      }>
+
+      const rowsById = new Map(rows.map(row => [row.id, row]))
+
+      for (const id of ids) {
+        const row = rowsById.get(id)
+
+        if (!row) continue
+
+        details.push({
+          ...row,
+          vocabulary_readings: (row.vocabulary_readings ?? []).filter(
+            reading => reading.verification_status === 'verified',
+          ),
+          examples: (row.examples ?? []).filter(
+            example => example.verification_status === 'verified',
+          ),
+          translations: (row.translations ?? []).filter(
+            translation => translation.verification_status === 'verified',
+          ),
+          level_category: levelByItem.get(id),
+        })
+      }
+    }
+
+    return { data: details, error: null }
+  } catch (error) {
+    return failed([], error)
+  }
+}
+
+/**
+ * Retrieves a catalog item and its associated readings,
+ * examples, and translations.
+ */
+export async function getVocabularyDetails(
+  vocabularyItemId: string,
+): Promise<RepositoryResult<VocabularyDetails | null>> {
+  if (!supabase) return failed(null, EMPTY_CATALOG_ERROR)
+
+  if (!vocabularyItemId.trim()) {
+    return failed(null, {
+      code: 'INVALID_VOCABULARY_ID',
+      message: 'A vocabulary item ID is required.',
+    })
+  }
+
+  try {
+    const { data, error } = await supabase.from('vocabulary_items')
+      .select('*, vocabulary_readings(*), examples(*), translations(*)')
+      .eq('id', vocabularyItemId)
+      .maybeSingle()
+
+    if (error) return failed(null, error)
+    if (!data) return { data: null, error: null }
+
+    const row = data as VocabularyItem & {
+      vocabulary_readings?: VocabularyReading[] | null
+      examples?: Example[] | null
+      translations?: Translation[] | null
+    }
+
+    return {
+      data: {
+        ...row,
+        vocabulary_readings: row.vocabulary_readings ?? [],
+        examples: row.examples ?? [],
+        translations: row.translations ?? [],
+      },
+      error: null,
+    }
+  } catch (error) {
+    return failed(null, error)
+  }
+}
+
+/**
+ * Filters items through explicit membership
+ * in a selected standard version and level.
+ */
+export async function filterVocabularyByStandardAndLevel(
+  standardVersionId: string,
+  level?: StandardLevel,
+): Promise<RepositoryResult<VocabularyItem[]>> {
+  if (!supabase) return failed([], EMPTY_CATALOG_ERROR)
+
+  if (!standardVersionId.trim()) {
+    return failed([], {
+      code: 'INVALID_STANDARD_VERSION_ID',
+      message: 'A standard version ID is required.',
+    })
+  }
+
+  try {
+    let query = supabase.from('standard_memberships')
+      .select('vocabulary_items!inner(*)')
+      .eq('standard_version_id', standardVersionId)
+
+    if (level) {
+      query = query.eq('level_category', level)
+    }
+
+    const { data, error } = await query
+
+    if (error) return failed([], error)
+
+    const items = (data ?? []).flatMap(
+      (membership: {
+        vocabulary_items?: VocabularyItem | VocabularyItem[] | null
+      }) => {
+        if (!membership.vocabulary_items) return []
+
+        return Array.isArray(membership.vocabulary_items)
+          ? membership.vocabulary_items
+          : [membership.vocabulary_items]
+      },
+    )
+
+    return { data: unique(items), error: null }
+  } catch (error) {
+    return failed([], error)
+  }
+}
+
+/**
+ * Returns standard versions visible under Supabase RLS.
+ */
+export async function getStandardVersions(
+  standardCode?: StandardCode,
+): Promise<RepositoryResult<StandardVersion[]>> {
+  if (!supabase) return failed([], EMPTY_CATALOG_ERROR)
+
+  try {
+    let query = supabase.from('standard_versions')
+      .select('*')
+      .order('standard_code')
+      .order('version_key')
+
+    if (standardCode) {
+      query = query.eq('standard_code', standardCode)
+    }
+
+    const { data, error } = await query
+
+    if (error) return failed([], error)
+
+    return {
+      data: (data ?? []) as StandardVersion[],
+      error: null,
+    }
+  } catch (error) {
+    return failed([], error)
+  }
+}
+
+/**
+ * Counts catalog items and memberships grouped by stored level category.
+ */
+export async function getVocabularyCounts(
+  standardVersionId?: string,
+): Promise<RepositoryResult<VocabularyCounts>> {
+  const emptyCounts: VocabularyCounts = {
+    totalItems: 0,
+    totalMemberships: null,
+    byLevel: {},
+  }
+
+  if (!supabase) return failed(emptyCounts, EMPTY_CATALOG_ERROR)
+
+  const client = supabase
+
+  try {
+    const itemCountResponse = await client.from('vocabulary_items')
+      .select('id', { count: 'exact', head: true })
+
+    if (itemCountResponse.error) {
+      return failed(emptyCounts, itemCountResponse.error)
+    }
+
+    const counts: VocabularyCounts = {
+      totalItems: itemCountResponse.count ?? 0,
+      totalMemberships: null,
+      byLevel: {},
+    }
+
+    if (!standardVersionId) {
+      return { data: counts, error: null }
+    }
+
+    const memberships = await fetchAllPages<{
+      id: string
+      level_category: StandardLevel
+    }>((cursor, limit) =>
+      keysetPage(
+        client.from('standard_memberships')
+          .select('id, level_category', { count: 'exact' })
+          .eq('standard_version_id', standardVersionId),
+        cursor,
+        limit,
+      ),
+    )
+
+    if (memberships.error) {
+      return failed(emptyCounts, memberships.error)
+    }
+
+    counts.totalMemberships = memberships.data.length
+
+    for (const membership of memberships.data) {
+      counts.byLevel[membership.level_category] =
+        (counts.byLevel[membership.level_category] ?? 0) + 1
+    }
+
+    return { data: counts, error: null }
+  } catch (error) {
+    return failed(emptyCounts, error)
+  }
+}
+
+export type { StandardMembership }
