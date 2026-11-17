@@ -230,7 +230,7 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
                 "wordKey":f"{word}|{norm_pinyin_num(pinyin_num)}",
                 "hanzi":word,"traditional":row.get("traditional",word),
                 "pinyin":pinyin,"pinyinNum":pinyin_num,
-                "en":"; ".join(meanings),"enStatus":"source_verified",
+                "en":"; ".join(meanings),"enStatus":"source_verified" if meanings else "missing_translation",
                 "membershipStatus":"source_verified",
                 "level20":None,"level30":band,"level20Memberships":[],
                 "level30Memberships":[band] if band is not None else [],
