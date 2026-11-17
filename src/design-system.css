@@ -683,3 +683,56 @@ footer { color:#9a8772; }
   .study-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
   .study-actions button { width:100%; min-width:0; padding-inline:8px; }
 }
+
+
+/* Account profile and exam feedback: same burgundy / gold visual language. */
+.profile-page { max-width:1100px; display:grid; gap:18px; }
+.profile-page-heading { display:grid; justify-items:start; gap:6px; }
+.profile-page-heading h2 { margin:2px 0 0; color:#681923; }
+.profile-page-heading p { margin:0; color:#85766a; }
+.profile-account-card,.profile-goal-card,.profile-sync-card,.profile-exam-history,.profile-preferences {
+  border:1px solid #ead8bd; border-radius:16px; background:#fffaf1; padding:18px;
+}
+.profile-account-card { display:flex; align-items:center; justify-content:space-between; gap:18px; }
+.profile-account-copy h3 { margin:4px 0; color:#681923; overflow-wrap:anywhere; }
+.profile-account-copy p,.profile-sync-card p,.profile-goal-card p,.profile-goal-card small,.profile-preferences p { margin:4px 0 0; color:#85766a; font-size:13px; }
+.profile-account-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.profile-stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:10px; }
+.profile-stat-card { min-width:0; display:grid; gap:8px; padding:15px; border:1px solid #ead8bd; border-radius:14px; background:linear-gradient(145deg,#fffaf1,#f8efe1); }
+.profile-stat-card span { color:#827265; font-size:12px; line-height:1.4; }
+.profile-stat-card strong { color:#7d1d29; font-size:25px; line-height:1.15; font-variant-numeric:tabular-nums; }
+.profile-stat-card strong small { color:#9b8061; font-size:11px; font-weight:600; }
+.profile-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.profile-section-heading h3 { margin:3px 0 0; color:#681923; }
+.profile-section-heading > span { color:#8c765d; font-size:12px; }
+.profile-goal-select select { min-width:110px; border:1px solid #e4d1b3; border-radius:10px; background:#fffdf8; color:#5e1822; padding:8px 10px; }
+.profile-goal-progress { height:9px; margin:15px 0 9px; overflow:hidden; border-radius:999px; background:#efe3d2; }
+.profile-goal-progress i { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#8f1d27,#d8a94f); transition:width .35s ease; }
+.profile-sync-status { flex:0 0 auto; border:1px solid #e5d7c2; border-radius:999px; padding:5px 10px; color:#80643c; background:#f7eedf; font-size:11px; font-weight:700; }
+.profile-sync-status.ready { color:#49633f; background:#edf2e8; border-color:#d5e2ca; }
+.profile-exam-history .exam-history-row { display:grid; grid-template-columns:minmax(100px,1fr) auto auto; align-items:center; gap:12px; padding:10px 0; border-top:1px solid #efe3d2; }
+.profile-exam-history .exam-history-row span { color:#6b5748; font-size:13px; }
+.profile-exam-history .exam-history-row b { color:#7d1d29; font-size:13px; font-variant-numeric:tabular-nums; }
+.profile-exam-history .exam-history-row small { color:#978575; text-align:right; }
+.profile-preferences .setting-row { margin-top:8px; }
+.answer-option.selected { border-color:#a82b32; background:#f5e3df; color:#741c27; box-shadow:0 0 0 2px rgba(168,43,50,.07); }
+.exam-provenance-note { line-height:1.6; }
+.exam-provenance-note a { color:#8f1d27; text-decoration:underline; text-underline-offset:3px; }
+.exam-time-used { color:#8b6a3c; font-size:13px; font-weight:700; }
+.exam-section-results { display:grid; grid-template-columns:repeat(auto-fit,minmax(125px,1fr)); gap:9px; margin-top:16px; }
+.exam-section-result { display:grid; gap:5px; padding:12px; border:1px solid #ead8bd; border-radius:12px; background:#fffaf1; }
+.exam-section-result span { color:#806b59; font-size:12px; }
+.exam-section-result b { color:#7d1d29; font-size:19px; font-variant-numeric:tabular-nums; }
+.exam-section-result small,.exam-explanation { color:#8d7b69; font-size:11px; line-height:1.5; }
+.exam-explanation { display:block; margin-top:7px; padding:8px 10px; border-left:2px solid #d8a94f; background:#faf3e8; border-radius:0 8px 8px 0; }
+@media(max-width:700px) {
+  .profile-account-card { align-items:flex-start; flex-direction:column; }
+  .profile-account-actions { width:100%; }
+  .profile-account-actions button { flex:1; }
+  .profile-section-heading { align-items:flex-start; }
+  .profile-exam-history .exam-history-row { grid-template-columns:1fr auto; }
+  .profile-exam-history .exam-history-row small { grid-column:1/-1; text-align:left; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .profile-goal-progress i { transition:none; }
+}
