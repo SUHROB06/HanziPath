@@ -1169,3 +1169,48 @@ footer .ok {
 .auth-switches button{border:0;background:transparent;color:var(--accent,#286052);text-decoration:underline;cursor:pointer;font:inherit;font-size:13px}
 .auth-error{color:#b54d36;font-size:13px}
 @media(max-width:600px){.auth-dialog{padding:24px 20px}.auth-dialog h2{font-size:24px}.course-volumes{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+/* HanziPath classic red-burgundy identity */
+:root{color:#382027;background:#fbf7f6}
+body{background:#fbf7f6;color:#382027}
+.sidebar{background:#fffdfc;border-right-color:#eadcda}
+.brandmark{background:#7f1d35}
+.navitem{color:#765b62}
+.navitem.active{background:#f7e8eb;color:#8a1f3d}
+.side-label,.kicker{color:#9a6d78}
+.profile{border-top-color:#f0e3e1}
+.avatar{background:#f6e5e8;color:#8a1f3d}
+.main{color:#382027}
+.topbar{border-bottom-color:#eadcda}
+.signin,.hamb{color:#7f3046}
+.hero{background:linear-gradient(112deg,#64152d 0%,#8e2442 58%,#a74459 100%)}
+.eyebrow{color:#f2cbd2}
+.hero h1 em{color:#f2c1cb}
+.float-card{color:#781d37;box-shadow:0 10px 30px #40101e44}
+.primary,.coming-page .primary{background:#84213d;color:#fff}
+.hero .primary{background:#fff;color:#741c36}
+.outline{border-color:#e7cdd2;color:#84213d;background:#fffdfc}
+.navitem.active,.course-volume.selected,.course-level.selected{background:#f7e7eb;color:#84213d}
+.panel,.stat,.word,.lesson-card,.course-block{border-color:#eddfdf}
+.panel h2{color:#482632}
+.word-main>strong{color:#84213d}
+.level-pill,.date-chip,.demo-tag{background:#f7e9ec;color:#84213d}
+.blue,.stat-icon.blue,.review-icon{background:#f7e8eb;color:#8a2340}
+.green{background:#edf5ef;color:#47805c}
+.orange{background:#fbf0e4;color:#ad7130}
+.progress i{background:#9a2f4b}
+.task.checked .fakecheck{background:#8b2945;border-color:#8b2945}
+.course-volume{border-color:#ead6da}
+.course-volume.selected{border-color:#9c3a55;box-shadow:0 0 0 1px #9c3a55}
+.course-open{color:#8b2945}
+.auth-dialog{background:#fffaf9;border-color:#e8cfd3;color:#482632}
+.auth-dialog h2{color:#64182f}
+.auth-dialog input{border-color:#e5cfd2;background:#fff}
+.auth-submit{background:#84213d!important;color:#fff!important}
+.auth-switches button{color:#84213d}
+.auth-feedback{margin:0 0 14px!important;padding:11px 13px;border-radius:10px;font-size:12px!important;line-height:1.5}
+.auth-feedback.error{background:#fff0f0;color:#a02f3e!important;border:1px solid #edc9cd}
+.auth-feedback.success{background:#eff7ef;color:#356b4b!important;border:1px solid #d1e5d4}
+button:focus-visible,input:focus-visible,select:focus-visible{outline-color:#b34b65}
+@media(max-width:760px){.hero{background:linear-gradient(112deg,#64152d,#8e2442)}}
