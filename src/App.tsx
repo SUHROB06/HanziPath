@@ -512,11 +512,16 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
   const standardValue = (word: Word) => system === '2.0' ? word.level20 : word.level30
   const uniqueWords = (items: Word[]) => [...new Map(items
     .filter(word => word.hanzi && word.pinyin && (localeMeaning(word, locale) || word.en || word.ru))
-    .map(word => [word.hanzi + '|' + normalizePinyin(word.pinyin), word] as const)).values()]
+    .map(word => {
+      const pronunciation = word.pinyinNum
+        ? word.pinyinNum.toLowerCase().replaceAll(' ', '').replaceAll("'", '').replaceAll('’', '')
+        : normalizePinyin(word.pinyin)
+      return [word.hanzi + '|' + pronunciation, word] as const
+    })).values()]
   const wordPool = system === '3.0' && level >= 7
-    ? words.filter(word => String(word.level30 ?? '') === '7-9')
+    ? words.filter(word => ['7', '7-9'].includes(String(word.level30 ?? '')))
     : words.filter(word => Number(standardValue(word)) > 0 && Number(standardValue(word)) <= level)
-  const safeWords = shuffleWithSeed(uniqueWords(wordPool.length ? wordPool : words), attemptSeed + 31)
+  const safeWords = shuffleWithSeed(uniqueWords(wordPool), attemptSeed + 31)
   const lessonPool = lessonTemplates.filter(lesson => lesson.system === system && (
     system === '3.0' && level >= 7 ? lesson.level >= 7 : lesson.level <= level
   ))
@@ -555,6 +560,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
           answer,
           audio: lesson.grammar.example,
           pinyin: lesson.grammar.pinyin,
+          explanation: `${lesson.grammar.example} · ${lesson.grammar.pinyin} · ${lesson.grammar.meaning}`,
         })
       } else {
         const word = safeWords[(index - lessons.length) % safeWords.length]
@@ -567,6 +573,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
           answer,
           audio: word.hanzi,
           pinyin: word.pinyin,
+          explanation: `${word.hanzi} · ${word.pinyin} · ${meaningOf(word)}`,
         })
       }
       continue
@@ -583,6 +590,8 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
           prompt: locale === 'ru' ? 'Выбери значение слова ' + word.hanzi + ' (' + word.pinyin + ').' : locale === 'uz' ? word.hanzi + ' (' + word.pinyin + ') so‘zining ma’nosini tanlang.' : 'Choose the meaning of ' + word.hanzi + ' (' + word.pinyin + ').',
           options: makeOptions(answer, safeWords.filter(item => wordId(item) !== wordId(word)).map(meaningOf), seed),
           answer,
+          pinyin: word.pinyin,
+          explanation: `${word.hanzi} · ${word.pinyin} · ${answer}`,
         })
       } else {
         const lesson = lessons[readingLessonIndex++]
@@ -593,6 +602,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
           prompt: locale === 'ru' ? 'Прочитай фразу ' + lesson.grammar.example + ' и выбери её значение.' : locale === 'uz' ? lesson.grammar.example + ' gapini o‘qing va ma’nosini tanlang.' : 'Read ' + lesson.grammar.example + ' and choose its meaning.',
           options: makeOptions(answer, lessons.filter(item => item.id !== lesson.id).map(item => item.grammar.meaning), seed),
           answer,
+          explanation: `${lesson.grammar.example} · ${lesson.grammar.pinyin} · ${answer}`,
         })
       }
       continue
@@ -609,6 +619,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
           prompt: locale === 'ru' ? 'Запиши иероглифами слово: ' + word.pinyin + ' (' + meaning + ')' : locale === 'uz' ? word.pinyin + ' (' + meaning + ') so‘zini ierogliflar bilan yozing.' : 'Write the Chinese characters for ' + word.pinyin + ' (' + meaning + ').',
           options: [],
           answer: word.hanzi,
+          explanation: `${word.hanzi} · ${word.pinyin} · ${meaning}`,
         })
         continue
       }
@@ -619,6 +630,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
           prompt: locale === 'ru' ? 'Напиши короткий связный текст по теме «' + lesson.title + '». Используй фразу ' + lesson.grammar.example + ' как опору.' : locale === 'uz' ? '«' + lesson.title + '» mavzusida qisqa matn yozing. ' + lesson.grammar.example + ' gapidan foydalaning.' : 'Write a short text about “' + lesson.title + '”. Use ' + lesson.grammar.example + ' as a starting point.',
           options: [],
           answer: '',
+          explanation: locale === 'ru' ? 'Самопроверка: тема раскрыта, структура связная, грамматика и целевая конструкция использованы правильно.' : locale === 'uz' ? 'O‘zini tekshirish: mavzu yoritilgan, matn izchil, grammatika va kerakli tuzilma to‘g‘ri ishlatilgan.' : 'Self-check: address the topic, keep a clear structure, and use the target grammar accurately.',
           manualReview: true,
         })
         continue
@@ -632,6 +644,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
         prompt: locale === 'ru' ? 'Составь фразу из частей: ' + shuffledPieces.join(' / ') : locale === 'uz' ? 'Berilgan bo‘laklardan gap tuzing: ' + shuffledPieces.join(' / ') : 'Rebuild the sentence from these parts: ' + shuffledPieces.join(' / '),
         options: [],
         answer: lesson.grammar.example,
+        explanation: `${lesson.grammar.example} · ${lesson.grammar.pinyin} · ${lesson.grammar.meaning}`,
       })
       continue
     }
@@ -647,7 +660,8 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
             ? translateToChinese ? 'Quyidagi ma’noni xitoy tilida ifodalang: «' + lesson.grammar.meaning + '»' : 'Gapni o‘zbekchaga tarjima qiling: ' + lesson.grammar.example
             : translateToChinese ? 'Express this meaning in Chinese: “' + lesson.grammar.meaning + '”' : 'Translate into English: ' + lesson.grammar.example,
         options: [],
-        answer: '',
+        answer: translateToChinese ? lesson.grammar.example : lesson.grammar.meaning,
+        explanation: locale === 'ru' ? `Ориентир для самопроверки: ${translateToChinese ? lesson.grammar.example : lesson.grammar.meaning}` : locale === 'uz' ? `O‘zini tekshirish uchun namuna: ${translateToChinese ? lesson.grammar.example : lesson.grammar.meaning}` : `Reference for self-review: ${translateToChinese ? lesson.grammar.example : lesson.grammar.meaning}`,
         manualReview: true,
       })
       continue
@@ -658,7 +672,8 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       part: partNumber(index - translationEnd, format.speakingParts),
       prompt: locale === 'ru' ? 'Ответь вслух, затем запиши ключевые мысли: ' + lesson.grammar.meaning : locale === 'uz' ? 'Javobni ovoz chiqarib ayting, so‘ng asosiy fikrlarni yozing: ' + lesson.grammar.meaning : 'Answer aloud, then write your key points: ' + lesson.grammar.meaning,
       options: [],
-      answer: '',
+      answer: lesson.grammar.example,
+      explanation: locale === 'ru' ? `Самопроверка: ответ по теме, понятная структура и корректное произношение. Пример: ${lesson.grammar.example} (${lesson.grammar.pinyin}).` : locale === 'uz' ? `O‘zini tekshirish: mavzuga mos javob, aniq tuzilma va to‘g‘ri talaffuz. Namuna: ${lesson.grammar.example} (${lesson.grammar.pinyin}).` : `Self-check: stay on topic, speak clearly, and use accurate pronunciation. Example: ${lesson.grammar.example} (${lesson.grammar.pinyin}).`,
       manualReview: true,
     })
   }
