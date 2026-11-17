@@ -2481,7 +2481,17 @@ export default function App() {
         <section className="panel learning-page exam-page">
           <div className="panel-head"><div><span className="kicker">{t('exam.kicker')}</span><h2>{t('exam.title')}</h2></div><span className="demo-tag">HSK {examSystem}</span></div>
           <p className="notice-text">{t('exam.intro')}</p>
-          {examHistory.length > 0 && <p className="notice-text">{lang === 'ru' ? 'Сохранённые попытки' : lang === 'uz' ? 'Saqlangan urinishlar' : 'Saved attempts'}: {examHistory.length} · {lang === 'ru' ? 'последний результат' : lang === 'uz' ? 'oxirgi natija' : 'latest score'}: {examHistory[0].score}/{examHistory[0].total}</p>}
+          {examHistory.length > 0 && <section className="exam-history">
+            <div className="section-heading">
+              <h3>{lang === 'ru' ? 'История экзаменов' : lang === 'uz' ? 'Imtihonlar tarixi' : 'Exam history'}</h3>
+              <span>{examHistory.length} {lang === 'ru' ? 'попыток' : lang === 'uz' ? 'urinish' : 'attempts'}</span>
+            </div>
+            {examHistory.slice(0, 5).map((attempt, index) => <div className="exam-history-row" key={`${attempt.date}-${attempt.system}-${attempt.level}-${index}`}>
+              <span>HSK {attempt.system} · {attempt.system === '3.0' && attempt.level === 7 ? '7–9' : attempt.level}</span>
+              <b>{attempt.score}/{attempt.total} · {attempt.total ? Math.round(attempt.score / attempt.total * 100) : 0}%</b>
+              <small>{new Date(attempt.date).toLocaleDateString(lang)}</small>
+            </div>)}
+          </section>}
 
           {!examStarted && <>
             <div className="standard-switch" role="group" aria-label={t('vocab.system')}>
@@ -2519,6 +2529,30 @@ export default function App() {
             <strong>{examCorrectCount} / {examScoredCount}</strong>
             <p>{examCorrectCount >= Math.ceil(examScoredCount * .6) ? t('exam.pass') : t('exam.notPass')}</p>
             {examManualTotal > 0 && <p className="notice-text">{examManualCount} / {examManualTotal} · {t('exam.manualTasks')}</p>}
+            <section className="exam-answer-review">
+              <h3>{lang === 'ru' ? 'Разбор ответов' : lang === 'uz' ? 'Javoblar tahlili' : 'Answer review'}</h3>
+              {examQuestionsState.map((question, index) => {
+                const response = examAnswers[index] ?? ''
+                const correct = !question.manualReview && (
+                  question.section === 'writing'
+                    ? normalizeWrittenAnswer(response) === normalizeWrittenAnswer(question.answer)
+                    : response === question.answer
+                )
+                return <article className={`exam-review-row ${question.manualReview ? 'manual' : correct ? 'correct' : 'incorrect'}`} key={question.id}>
+                  <div className="exam-review-title">
+                    <b>{index + 1}. {t(`exam.${question.section}` as TranslationKey)}</b>
+                    <span>{question.manualReview
+                      ? (lang === 'ru' ? 'Проверка вручную' : lang === 'uz' ? 'Qo‘lda tekshiriladi' : 'Manual review')
+                      : correct
+                        ? (lang === 'ru' ? 'Верно' : lang === 'uz' ? 'To‘g‘ri' : 'Correct')
+                        : (lang === 'ru' ? 'Ошибка' : lang === 'uz' ? 'Xato' : 'Incorrect')}</span>
+                  </div>
+                  <p>{question.prompt}</p>
+                  <small>{lang === 'ru' ? 'Твой ответ' : lang === 'uz' ? 'Sizning javobingiz' : 'Your answer'}: {response || '—'}</small>
+                  {!question.manualReview && !correct && <small>{lang === 'ru' ? 'Правильный ответ' : lang === 'uz' ? 'To‘g‘ri javob' : 'Correct answer'}: {question.answer}</small>}
+                </article>
+              })}
+            </section>
             <button className="primary" onClick={startExam}>{t('exam.retry')}</button>
           </div>}
 
