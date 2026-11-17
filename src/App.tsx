@@ -52,7 +52,7 @@ type Word = {
 }
 
 type Notice = { text: string; kind: 'success' | 'error' | 'info' }
-type DisplayLesson = LessonTemplate & { volume: number; volumeLesson: number }
+type DisplayLesson = LessonTemplate & { volume: number; volumeLesson: number; mergedLessons?: LessonTemplate[] }
 
 function normalizePinyin(value: string): string {
   return value.toLowerCase()
@@ -1172,7 +1172,7 @@ export default function App() {
         const id = `${base.id}-unit-${index + 1}`
         const volume = Math.floor(index / 15) + 1
         const volumeLesson = index % 15 + 1
-        display.push({ ...base, id, title, volume, volumeLesson })
+        display.push({ ...base, id, title, volume, volumeLesson, mergedLessons: groupedTemplates })
         assignmentMap[id] = chunk
       }
       volumeSizes[`${system}-${level}`] = Math.ceil(unitCount / 15)
@@ -1639,6 +1639,13 @@ export default function App() {
               <p>{activeLesson.grammar.explanation}</p>
               <code>{activeLesson.grammar.pattern}</code>
               <div className="lesson-example"><b>{activeLesson.grammar.example}</b><span>{activeLesson.grammar.pinyin}</span><small>{activeLesson.grammar.meaning}</small></div>
+              {activeLesson.mergedLessons && activeLesson.mergedLessons.length > 1 && <div className="grammar-extra-examples">
+                <h4>{lang === 'ru' ? 'Дополнительные грамматические темы' : lang === 'uz' ? 'Qo‘shimcha grammatika mavzulari' : 'Additional grammar topics'}</h4>
+                {activeLesson.mergedLessons.slice(1).map(item => <article className="lesson-example" key={item.id}>
+                  <b>{item.grammar.title}</b><code>{item.grammar.pattern}</code><p>{item.grammar.explanation}</p>
+                  <strong>{item.grammar.example}</strong><span>{item.grammar.pinyin}</span><small>{item.grammar.meaning}</small>
+                </article>)}
+              </div>}
             </section>
 
             <section className="course-block lesson-listening">
