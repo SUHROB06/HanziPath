@@ -1495,6 +1495,7 @@ export default function App() {
             {(['2.0', '3.0'] as const).map(standard => <button key={standard} className={`outline ${courseSystem === standard ? 'selected' : ''}`} onClick={() => {
               setCourseSystem(standard)
               setCourseLevel(1)
+              setSelectedVolume(1)
               setActiveLessonId(null)
               setLessonListeningChoice(null)
               setClosingChoice(null)
@@ -1927,7 +1928,7 @@ export default function App() {
             {(['2.0', '3.0'] as const).map(standard => <button key={standard} className={`outline ${courseSystem === standard ? 'selected' : ''}`} onClick={() => { setCourseSystem(standard); setCourseLevel(1); setSelectedVolume(1); setActiveLessonId(null) }}>HSK {standard}</button>)}
           </div>
           <div className="course-levels" role="group" aria-label={t('course.level')}>
-            {(courseSystem === '2.0' ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 7, 8, 9]).map(course => <button key={course} className={`course-level ${courseLevel === course ? 'selected' : ''}`} onClick={() => { setCourseLevel(course as CourseLevel); setActiveLessonId(null) }}><b>HSK {courseSystem} · {course}</b><span>{expandedLessonData.lessons.filter(item => item.system === courseSystem && item.level === course).length} {t('course.lessonCount')}</span></button>)}
+            {(courseSystem === '2.0' ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 7, 8, 9]).map(course => <button key={course} className={`course-level ${courseLevel === course ? 'selected' : ''}`} onClick={() => { setCourseLevel(course as CourseLevel); setSelectedVolume(1); setActiveLessonId(null) }}><b>HSK {courseSystem} · {course}</b><span>{expandedLessonData.lessons.filter(item => item.system === courseSystem && item.level === course).length} {t('course.lessonCount')}</span></button>)}
           </div>
           {courseSystem === '3.0' && courseLevel >= 7 && <p className="notice-text shared-band-note">{t('course.sharedBandNote')}</p>}
           <div className="lesson-list">
