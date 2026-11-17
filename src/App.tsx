@@ -968,25 +968,33 @@ export default function App() {
 
     const loadReviewDataset = async () => {
       try {
-        const [hsk30Response, hsk20Response, translationsResponse] = await Promise.all([
+        const [hsk30Response, hsk20Response, translationsResponse, hsk20ExamplesResponse] = await Promise.all([
           fetch('/vocabulary-catalog-hsk30.json'),
           fetch('/vocabulary-catalog-hsk20.json'),
           fetch('/vocabulary-translations-ru-uz.json'),
+          fetch('/vocabulary-examples-hsk20.json'),
         ])
 
         let entries: unknown[] = []
         if (hsk30Response.ok && hsk20Response.ok) {
-          const [hsk30Payload, hsk20Payload, translationsPayload] = await Promise.all([
+          const [hsk30Payload, hsk20Payload, translationsPayload, hsk20ExamplesPayload] = await Promise.all([
             hsk30Response.json() as Promise<{ entries?: unknown[] }>,
             hsk20Response.json() as Promise<{ entries?: unknown[] }>,
             translationsResponse.ok
               ? translationsResponse.json() as Promise<{ entries?: unknown[] }>
               : Promise.resolve({ entries: [] as unknown[] }),
+            hsk20ExamplesResponse.ok
+              ? hsk20ExamplesResponse.json() as Promise<{ entries?: unknown[] }>
+              : Promise.resolve({ entries: [] as unknown[] }),
           ])
           const translationsByWordKey = new Map(
             (translationsPayload.entries ?? []).map((entry: any) => [entry.wordKey, entry]),
           )
+          const hsk20ExamplesByWordKey = new Map(
+            (hsk20ExamplesPayload.entries ?? []).map((entry: any) => [entry.wordKey, entry]),
+          )
           entries = [...(hsk30Payload.entries ?? []), ...(hsk20Payload.entries ?? [])].map((entry: any) => ({
+            ...(hsk20ExamplesByWordKey.get(entry.wordKey) ?? {}),
             ...entry,
             ...(translationsByWordKey.get(entry.wordKey) ?? {}),
           }))
