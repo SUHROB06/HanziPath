@@ -829,6 +829,7 @@ export default function App() {
   const [catalogCandidateCount, setCatalogCandidateCount] = useState(0)
 
   const localeChangeRef = useRef(0)
+  const dictionaryLegacyIdsRef = useRef<Map<string, string>>(new Map())
   const wordDialogRef = useRef<HTMLDialogElement>(null)
   const t = (key: TranslationKey) => translate(lang, key)
 
@@ -883,6 +884,7 @@ export default function App() {
               legacyToCanonical.set(legacyId, wordId(word))
             }
           }
+          dictionaryLegacyIdsRef.current = legacyToCanonical
 
           setKnownWords(current => [...new Set(current.map(id => legacyToCanonical.get(id) ?? id))])
           setFavoriteWordIds(current => [...new Set(current.map(id => legacyToCanonical.get(id) ?? id))])
@@ -1239,12 +1241,24 @@ export default function App() {
           localDateKey(),
         )
 
-        setKnownWords(merged.knownWords)
-        setFavoriteWordIds(merged.favoriteWordIds)
+        const migrateIds = (ids: string[]) => [...new Set(
+          ids.map(id => dictionaryLegacyIdsRef.current.get(id) ?? id),
+        )]
+        const migratedSchedule: Record<string, ReviewState> = {}
+        for (const [id, review] of Object.entries(merged.reviewSchedule)) {
+          const canonicalId = dictionaryLegacyIdsRef.current.get(id) ?? id
+          const existing = migratedSchedule[canonicalId]
+          if (!existing || Date.parse(review.updatedAt) > Date.parse(existing.updatedAt)) {
+            migratedSchedule[canonicalId] = review
+          }
+        }
+
+        setKnownWords(migrateIds(merged.knownWords))
+        setFavoriteWordIds(migrateIds(merged.favoriteWordIds))
         setActivityDays(merged.activityDays)
         setCompletedLessonIds(merged.completedLessonIds)
         setExamHistory(merged.examHistory)
-        setReviewSchedule(merged.reviewSchedule)
+        setReviewSchedule(migratedSchedule)
         setDone(merged.dailyTasks.done)
         setDailyGoalWords(merged.dailyGoalWords)
         setDailyReviewCount(merged.dailyReviewCount)
