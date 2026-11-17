@@ -767,6 +767,10 @@ export default function App() {
   const [cardIndex, setCardIndex] = useState(0)
   const [showAnswer, setShowAnswer] = useState(false)
   const [listeningIndex, setListeningIndex] = useState(0)
+  const [practiceSystem, setPracticeSystem] = useState<CourseSystem>('2.0')
+  const [practiceLevel, setPracticeLevel] = useState<CourseLevel>(1)
+  const [practiceUnitId, setPracticeUnitId] = useState<string | null>(null)
+  const [grammarExpandedId, setGrammarExpandedId] = useState<string | null>(null)
   const [listeningChoice, setListeningChoice] = useState<string | null>(null)
   const [lessonListeningChoice, setLessonListeningChoice] = useState<string | null>(null)
   const [closingChoice, setClosingChoice] = useState<number | null>(null)
@@ -906,6 +910,9 @@ export default function App() {
         if (saved.courseSystem === '2.0' || saved.courseSystem === '3.0') setCourseSystem(saved.courseSystem)
         if (Number.isInteger(saved.courseLevel) && saved.courseLevel >= 1 && saved.courseLevel <= 9) setCourseLevel(saved.courseLevel)
         if (typeof saved.cardIndex === 'number') setCardIndex(Math.max(0, saved.cardIndex))
+        if (saved.practiceSystem === '2.0' || saved.practiceSystem === '3.0') setPracticeSystem(saved.practiceSystem)
+        if (Number.isInteger(saved.practiceLevel) && saved.practiceLevel >= 1 && saved.practiceLevel <= 9) setPracticeLevel(saved.practiceLevel)
+        if (typeof saved.practiceUnitId === 'string' || saved.practiceUnitId === null) setPracticeUnitId(saved.practiceUnitId)
         if (typeof saved.section === 'number' && saved.section >= 0 && saved.section <= 7) setSection(saved.section)
         if (typeof saved.activeLessonId === 'string' || saved.activeLessonId === null) setActiveLessonId(saved.activeLessonId)
         if (typeof saved.lang === 'string' && isLocale(saved.lang)) setLang(saved.lang)
@@ -918,7 +925,7 @@ export default function App() {
   }, [authReady, userId])
 
   useEffect(() => {
-    const progress = { knownWords, favoriteWordIds, completedLessonIds, activityDays, done, courseSystem, courseLevel, cardIndex, section, activeLessonId, lang }
+    const progress = { knownWords, favoriteWordIds, completedLessonIds, activityDays, done, courseSystem, courseLevel, cardIndex, practiceSystem, practiceLevel, practiceUnitId, listeningIndex, section, activeLessonId, lang }
     try { window.localStorage.setItem('hanzipath.progress', JSON.stringify(progress)) } catch { /* optional local backup */ }
     if (!userId || !supabase || !progressReady || progressOwnerId !== userId) return
     const client = supabase
@@ -928,7 +935,7 @@ export default function App() {
       })
     }, 900)
     return () => window.clearTimeout(timer)
-  }, [knownWords, favoriteWordIds, completedLessonIds, activityDays, done, courseSystem, courseLevel, cardIndex, section, activeLessonId, lang, userId, progressReady, progressOwnerId])
+  }, [knownWords, favoriteWordIds, completedLessonIds, activityDays, done, courseSystem, courseLevel, cardIndex, practiceSystem, practiceLevel, practiceUnitId, listeningIndex, section, activeLessonId, lang, userId, progressReady, progressOwnerId])
 
   const submitAuth = async () => {
     if (!supabase) { setNotice({ text: t('auth.notConfigured'), kind: 'error' }); return }
@@ -1153,6 +1160,10 @@ export default function App() {
     return catalog
   }, [lessonEntries, lessonAssignments])
   const courseUnits = courseUnitCatalog[`${courseSystem}:${courseLevel}`] ?? []
+  const practiceUnits = courseUnitCatalog[`${practiceSystem}:${practiceLevel}`] ?? []
+  const practiceUnit = practiceUnits.find(unit => unit.id === practiceUnitId) ?? practiceUnits[0]
+  const practiceWords = practiceUnit?.words ?? []
+  const practiceLessonLabel = practiceUnit?.lessons.map(lesson => `${lesson.chapter}${lesson.part > 1 ? `.${lesson.part}` : ''} ${lesson.title}`).join(' · ') ?? ''
   const courseLessons = lessonTemplates.filter(lesson => lesson.system === courseSystem && lesson.level === courseLevel)
   const activeUnit = courseUnits.find(unit => unit.id === activeLessonId)
   const activeLesson = activeUnit?.lessons[0]
@@ -1264,14 +1275,14 @@ export default function App() {
   const courseFallbackWords = wordsForCourseLevel(lessonEntries, courseSystem, courseLevel)
   const studyWords = activeLessonWords.length ? activeLessonWords : courseFallbackWords
   const knownInCurrentWords = knownWords.filter(id => currentWords.some(word => wordId(word) === id)).length
-  const activeCard = studyWords.length ? studyWords[cardIndex % studyWords.length] : undefined
-  const listeningWord = studyWords.length ? studyWords[listeningIndex % studyWords.length] : undefined
+  const activeCard = practiceWords.length ? practiceWords[cardIndex % practiceWords.length] : undefined
+  const listeningWord = practiceWords.length ? practiceWords[listeningIndex % practiceWords.length] : undefined
   const listeningOptions = useMemo(() => {
     if (!listeningWord) return []
-    const options = [listeningWord, ...studyWords.filter(word => wordId(word) !== wordId(listeningWord)).slice(0, 3)]
+    const options = [listeningWord, ...practiceWords.filter(word => wordId(word) !== wordId(listeningWord)).slice(0, 3)]
     const offset = listeningIndex % options.length
     return [...options.slice(offset), ...options.slice(0, offset)]
-  }, [studyWords, listeningIndex, listeningWord])
+  }, [practiceWords, listeningIndex, listeningWord])
   const recordActivity = () => {
     const today = localDateKey()
     setActivityDays(days => days.includes(today) ? days : [...days, today].slice(-400))
@@ -1977,9 +1988,15 @@ export default function App() {
         <section className="panel learning-page">
           <div className="panel-head">
             <div><span className="kicker">{t('flashcards.kicker')}</span><h2>{t('flashcards.title')}</h2></div>
-            <span className="demo-tag">HSK {courseSystem} · {courseLevel} · {activeLesson?.title}</span>
+            <span className="demo-tag">HSK {practiceSystem} · {practiceLevel}</span>
           </div>
           <p className="notice-text">{t('flashcards.notice')}</p>
+          <div className="practice-filters">
+            <label><span>{lang === 'ru' ? 'Стандарт' : lang === 'uz' ? 'Standart' : 'Standard'}</span><select value={practiceSystem} onChange={event => { const next = event.target.value as CourseSystem; setPracticeSystem(next); setPracticeLevel(1); setPracticeUnitId(null); setCardIndex(0); setShowAnswer(false); setListeningIndex(0); setListeningChoice(null) }}><option value="2.0">HSK 2.0</option><option value="3.0">HSK 3.0</option></select></label>
+            <label><span>HSK {lang === 'ru' ? 'уровень' : lang === 'uz' ? 'daraja' : 'level'}</span><select value={practiceLevel} onChange={event => { setPracticeLevel(Number(event.target.value) as CourseLevel); setPracticeUnitId(null); setCardIndex(0); setShowAnswer(false); setListeningIndex(0); setListeningChoice(null) }}>{(practiceSystem === '2.0' ? [1,2,3,4,5,6] : [1,2,3,4,5,6,7,8,9]).map(level => <option key={level} value={level}>{practiceSystem === '3.0' && level >= 7 ? `HSK 3.0 · ${level}` : `HSK ${practiceSystem} · ${level}`}</option>)}</select></label>
+            <label><span>{lang === 'ru' ? 'Урок' : lang === 'uz' ? 'Dars' : 'Lesson'}</span><select value={practiceUnit?.id ?? ''} onChange={event => { setPracticeUnitId(event.target.value || null); setCardIndex(0); setShowAnswer(false); setListeningIndex(0); setListeningChoice(null) }}>{practiceUnits.map(unit => <option key={unit.id} value={unit.id}>{unit.lessons.map(lesson => `${lesson.chapter}${lesson.part > 1 ? `.${lesson.part}` : ''} ${lesson.title}`).join(' · ')}</option>)}</select></label>
+          </div>
+          <p className="practice-count">{practiceLessonLabel} · {practiceWords.length} {lang === 'ru' ? 'слов' : lang === 'uz' ? 'so‘z' : 'words'}</p>
           <article className="study-card">
             <span className="study-hanzi">{activeCard.hanzi}</span>
             {showAnswer && <div className="study-answer">
@@ -1991,7 +2008,7 @@ export default function App() {
           <div className="study-actions">
             {!showAnswer && <button className="primary" onClick={() => setShowAnswer(true)}>{t('flashcards.showAnswer')}</button>}
             {showAnswer && <>
-              <button className="outline" onClick={() => { setShowAnswer(false); setCardIndex(i => (i + 1) % studyWords.length) }}>{t('flashcards.again')}</button>
+              <button className="outline" onClick={() => { setShowAnswer(false); setCardIndex(i => (i + 1) % practiceWords.length) }}>{t('flashcards.again')}</button>
               <button className="primary" onClick={() => {
                 const id = wordId(activeCard)
                 setKnownWords(items => items.includes(id) ? items : [...items, id])
@@ -2002,8 +2019,8 @@ export default function App() {
             </>}
           </div>
           <div className="study-footer">
-            <button className="outline" aria-label={t('flashcards.previous')} onClick={() => { setShowAnswer(false); setCardIndex(i => (i + studyWords.length - 1) % studyWords.length) }}>‹</button>
-            <span>{t('flashcards.counter')} {cardIndex % studyWords.length + 1} / {studyWords.length} · {t('flashcards.knownCount')}: {studyWords.filter(word => knownWords.includes(wordId(word))).length}</span>
+            <button className="outline" aria-label={t('flashcards.previous')} onClick={() => { setShowAnswer(false); setCardIndex(i => (i + practiceWords.length - 1) % practiceWords.length) }}>‹</button>
+            <span>{t('flashcards.counter')} {cardIndex % practiceWords.length + 1} / {practiceWords.length} · {t('flashcards.knownCount')}: {practiceWords.filter(word => knownWords.includes(wordId(word))).length}</span>
             <button className="outline" aria-label={t('flashcards.next')} onClick={() => { setShowAnswer(false); setCardIndex(i => (i + 1) % studyWords.length) }}>›</button>
           </div>
         </section>
@@ -2015,8 +2032,14 @@ export default function App() {
 
       {section === 4 && listeningWord && (
         <section className="panel learning-page">
-          <div className="panel-head"><div><span className="kicker">{t('listening.kicker')}</span><h2>{t('listening.title')}</h2></div><span className="demo-tag">HSK {courseSystem} · {courseLevel} · {activeLesson?.title}</span></div>
+          <div className="panel-head"><div><span className="kicker">{t('listening.kicker')}</span><h2>{t('listening.title')}</h2></div><span className="demo-tag">HSK {practiceSystem} · {practiceLevel}</span></div>
           <p className="notice-text">{t('listening.notice')}</p>
+          <div className="practice-filters">
+            <label><span>{lang === 'ru' ? 'Стандарт' : lang === 'uz' ? 'Standart' : 'Standard'}</span><select value={practiceSystem} onChange={event => { const next = event.target.value as CourseSystem; setPracticeSystem(next); setPracticeLevel(1); setPracticeUnitId(null); setListeningIndex(0); setListeningChoice(null) }}><option value="2.0">HSK 2.0</option><option value="3.0">HSK 3.0</option></select></label>
+            <label><span>HSK {lang === 'ru' ? 'уровень' : lang === 'uz' ? 'daraja' : 'level'}</span><select value={practiceLevel} onChange={event => { setPracticeLevel(Number(event.target.value) as CourseLevel); setPracticeUnitId(null); setListeningIndex(0); setListeningChoice(null) }}>{(practiceSystem === '2.0' ? [1,2,3,4,5,6] : [1,2,3,4,5,6,7,8,9]).map(level => <option key={level} value={level}>{`HSK ${practiceSystem} · ${level}`}</option>)}</select></label>
+            <label><span>{lang === 'ru' ? 'Урок' : lang === 'uz' ? 'Dars' : 'Lesson'}</span><select value={practiceUnit?.id ?? ''} onChange={event => { setPracticeUnitId(event.target.value || null); setListeningIndex(0); setListeningChoice(null) }}>{practiceUnits.map(unit => <option key={unit.id} value={unit.id}>{unit.lessons.map(lesson => `${lesson.chapter}${lesson.part > 1 ? `.${lesson.part}` : ''} ${lesson.title}`).join(' · ')}</option>)}</select></label>
+          </div>
+          <p className="practice-count">{practiceLessonLabel} · {practiceWords.length} {lang === 'ru' ? 'слов для практики' : lang === 'uz' ? 'ta mashq so‘zi' : 'practice words'}</p>
           <div className="practice-prompt">
             <p>{t('listening.prompt')}</p>
             <button className="primary" onClick={() => speak(listeningWord.hanzi)}><Volume2 size={18}/>{t('listening.play')}</button>
@@ -2032,7 +2055,7 @@ export default function App() {
             })}
           </div>
           {listeningChoice && <p className={`feedback ${listeningChoice === listeningWord.hanzi ? 'success' : 'error'}`}>{t(listeningChoice === listeningWord.hanzi ? 'listening.correct' : 'listening.incorrect')}</p>}
-          <button className="primary" onClick={() => { setListeningIndex(i => (i + 1) % studyWords.length); setListeningChoice(null) }}>{t('listening.next')}<ChevronRight size={16}/></button>
+          <button className="primary" onClick={() => { setListeningIndex(i => (i + 1) % practiceWords.length); setListeningChoice(null) }}>{t('listening.next')}<ChevronRight size={16}/></button>
         </section>
       )}
 
@@ -2058,7 +2081,8 @@ export default function App() {
                 <div className="lesson-example"><b>{lesson.grammar.example}</b><span>{lesson.grammar.pinyin}</span><small>{lesson.grammar.meaning}</small></div>
               </div>
               <button className="sound" aria-label={t('vocab.listen')} onClick={() => speak(lesson.grammar.example)}><Volume2 size={18}/></button>
-              <button className="outline grammar-open" onClick={() => { setActiveLessonId((courseUnitCatalog[`${courseSystem}:${courseLevel}`] ?? []).find(unit => unit.lessons.some(item => item.id === lesson.id))?.id ?? null); setSection(1) }}>{t('course.open')}</button>
+              <button className="outline grammar-open" onClick={() => setGrammarExpandedId(current => current === lesson.id ? null : lesson.id)}>{grammarExpandedId === lesson.id ? (lang === 'ru' ? 'Свернуть' : lang === 'uz' ? 'Yopish' : 'Collapse') : (lang === 'ru' ? 'Подробнее' : lang === 'uz' ? 'Batafsil' : 'Details')}</button>
+              {grammarExpandedId === lesson.id && <div className="grammar-expanded">{lesson.grammar.deepDive && <p>{lesson.grammar.deepDive}</p>}{lesson.grammar.extraExamples?.map(example => <div className="lesson-example" key={example.hanzi}><b>{example.hanzi}</b><span>{example.pinyin}</span><small>{example.meaning}</small></div>)}{lesson.grammar.commonMistakes?.length ? <><h4>{lang === 'ru' ? 'Частые ошибки' : lang === 'uz' ? 'Ko‘p uchraydigan xatolar' : 'Common mistakes'}</h4><ul>{lesson.grammar.commonMistakes.map(item => <li key={item}>{item}</li>)}</ul></> : null}{lesson.grammar.studySteps?.length ? <><h4>{lang === 'ru' ? 'Как освоить тему' : lang === 'uz' ? 'Mavzuni o‘zlashtirish' : 'Study steps'}</h4><ol>{lesson.grammar.studySteps.map(item => <li key={item}>{item}</li>)}</ol></> : null}</div>}
             </article>)}
           </div>
         </section>
