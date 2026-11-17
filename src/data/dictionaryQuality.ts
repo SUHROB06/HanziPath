@@ -18,10 +18,9 @@ export type DictionaryQualityEntry = {
 }
 
 export function normalizeDictionaryPinyin(value: string): string {
-  return value.toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .replace(/[1-5\s]/g, '')
+  // Tone marks are phonemic in Mandarin. Keep them in the identity key so
+  // words such as mǎi and mài are never collapsed into one dictionary entry.
+  return value.toLowerCase().normalize('NFC').replace(/\s+/g, '')
 }
 
 function mergeText(a: string | null | undefined, b: string | null | undefined): string {
