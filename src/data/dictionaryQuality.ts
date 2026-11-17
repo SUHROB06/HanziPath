@@ -66,7 +66,11 @@ export function mergeDictionaryEntries<T extends DictionaryQualityEntry>(entries
   const merged = new Map<string, T>()
 
   for (const entry of entries) {
-    const key = `${entry.hanzi.trim()}|${normalizeDictionaryPinyin(entry.pinyin)}`
+    const legacyDictionaryKey = `dictionary:${entry.hanzi.trim()}|${normalizeDictionaryPinyin(entry.pinyin)}`
+    const pronunciationKey = entry.pinyinNum
+      ? entry.pinyinNum.toLowerCase().replace(/[\\s'’]+/g, '')
+      : normalizeDictionaryPinyin(entry.pinyin)
+    const key = `${entry.hanzi.trim()}|${pronunciationKey}`
     const previous = merged.get(key)
 
     if (!previous) {
@@ -77,7 +81,7 @@ export function mergeDictionaryEntries<T extends DictionaryQualityEntry>(entries
         sourceEntryKey: `dictionary:${key}`,
         level20Memberships,
         level30Memberships,
-        legacyIds: [...new Set([...(entry.legacyIds ?? []), ...(entry.sourceEntryKey ? [entry.sourceEntryKey] : [])])],
+        legacyIds: [...new Set([...(entry.legacyIds ?? []), ...(entry.sourceEntryKey ? [entry.sourceEntryKey] : []), legacyDictionaryKey])],
       })
       continue
     }
@@ -127,6 +131,7 @@ export function mergeDictionaryEntries<T extends DictionaryQualityEntry>(entries
         ...(previous.legacyIds ?? []),
         ...(entry.legacyIds ?? []),
         ...(entry.sourceEntryKey ? [entry.sourceEntryKey] : []),
+        legacyDictionaryKey,
       ])],
     })
   }
