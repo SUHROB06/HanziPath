@@ -311,6 +311,7 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
         if zitou_rows:
             ru_values=unique_text([row.get("russian","") for row in zitou_rows])
             uz_values=unique_text([row.get("uzbek","") for row in zitou_rows])
+            traditional_values=unique_text([row.get("traditional","") for row in zitou_rows])
             source="Maqsudjonpolatov / Zitou HSK Chinese–Uzbek–Russian"
             license_name="CC BY 4.0"
             status="ai_assisted_unverified"
@@ -320,6 +321,7 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
         elif old_rows:
             ru_values=unique_text([row.get("ru","") for row in old_rows])
             uz_values=unique_text([row.get("uz","") for row in old_rows])
+            traditional_values=unique_text([row.get("traditional","") for row in old_rows])
             source="Zitou HSK Chinese–Uzbek–Russian candidate bundle"
             license_name="CC BY 4.0 (publisher-declared)"
             status="source_unverified"
@@ -333,6 +335,7 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
             continue
         translations.append({
             "wordKey":primary["wordKey"],"hanzi":word,"pinyinNum":primary.get("pinyinNum",""),
+            "traditional":traditional_values[0] if traditional_values else primary.get("traditional",word),
             "ru":ru,"uz":uz,
             "ruStatus":status if ru else "missing_translation",
             "uzStatus":status if uz else "missing_translation",
