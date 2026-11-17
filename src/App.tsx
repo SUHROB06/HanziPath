@@ -468,6 +468,10 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     system === '3.0' && level >= 7 ? lesson.level >= 7 : lesson.level <= level
   ))
   const safeWords = wordPool.length >= 4 ? wordPool : words
+  // Shuffle once per attempt so a question set uses each lesson/word before cycling.
+  const shuffledLessons = shuffleWithSeed([...lessons], attemptSeed ^ 0x51f15e)
+  const shuffledWords = shuffleWithSeed([...safeWords], attemptSeed ^ 0x2a91c3)
+  const uniqueListeningLessons = [...new Map(shuffledLessons.map(lesson => [lesson.grammar.example, lesson])).values()]
   const questions: ExamQuestion[] = []
   if (!lessons.length || !safeWords.length) return questions
   const writingEnd = format.listening + format.reading + format.writing
@@ -478,7 +482,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     const seed = (attemptSeed + (level + 1) * 1009 + index * 97) >>> 0
 
     if (index < format.listening) {
-      const lesson = lessons[(index * 7 + level + (attemptSeed % lessons.length)) % lessons.length]
+      const lesson = uniqueListeningLessons[(index % Math.max(1, uniqueListeningLessons.length))] ?? shuffledLessons[index % shuffledLessons.length]
       const grammar = lesson.grammar
       const distractors = lessons
         .filter(candidate => candidate.id !== lesson.id)
@@ -502,7 +506,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
 
     if (index < format.listening + format.reading) {
       if (index % 2 === 0) {
-      const word = safeWords[(index * 11 + level * 5) % safeWords.length]
+      const word = shuffledWords[((index - format.listening) % shuffledWords.length)]
       const answer = localeMeaning(word, locale) || word.en || word.ru
       const distractors = safeWords
         .filter(candidate => candidate.hanzi !== word.hanzi)
@@ -521,7 +525,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       continue
       }
 
-      const lesson = lessons[(index * 3 + level + (attemptSeed % lessons.length)) % lessons.length]
+      const lesson = shuffledLessons[((index - format.listening) % shuffledLessons.length)]
       const answer = lesson.grammar.meaning
       const distractors = lessons
         .filter(candidate => candidate.id !== lesson.id)
@@ -538,10 +542,10 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     }
 
     if (index < writingEnd) {
-      const lesson = lessons[(index * 5 + level + (attemptSeed % lessons.length)) % lessons.length]
+      const lesson = shuffledLessons[((index - format.listening - format.reading) % shuffledLessons.length)]
       const writingIndex = index - format.listening - format.reading
       if ((system === '2.0' || system === '3.0') && level === 3 && writingIndex < 5) {
-        const word = safeWords[(writingIndex * 19 + level * 7 + (attemptSeed % safeWords.length)) % safeWords.length]
+        const word = shuffledWords[writingIndex % shuffledWords.length]
         const meaning = localeMeaning(word, locale) || word.en || word.ru
         questions.push({
           section: 'writing',
@@ -591,7 +595,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     }
 
     if (index < translationEnd) {
-      const lesson = lessons[(index * 7 + level + (attemptSeed % lessons.length)) % lessons.length]
+      const lesson = shuffledLessons[((index - writingEnd) % shuffledLessons.length)]
       const translateToChinese = (index - writingEnd) % 2 === 1
       questions.push({
         section: 'translation',
@@ -608,7 +612,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       continue
     }
 
-    const lesson = lessons[(index * 11 + level + (attemptSeed % lessons.length)) % lessons.length]
+    const lesson = shuffledLessons[((index - translationEnd) % shuffledLessons.length)]
     questions.push({
       section: 'speaking',
       part: partNumber(index - translationEnd, format.speakingParts),
@@ -910,6 +914,7 @@ export default function App() {
         if (saved.courseSystem === '2.0' || saved.courseSystem === '3.0') setCourseSystem(saved.courseSystem)
         if (Number.isInteger(saved.courseLevel) && saved.courseLevel >= 1 && saved.courseLevel <= 9) setCourseLevel(saved.courseLevel)
         if (typeof saved.cardIndex === 'number') setCardIndex(Math.max(0, saved.cardIndex))
+        if (typeof saved.listeningIndex === 'number') setListeningIndex(Math.max(0, saved.listeningIndex))
         if (saved.practiceSystem === '2.0' || saved.practiceSystem === '3.0') setPracticeSystem(saved.practiceSystem)
         if (Number.isInteger(saved.practiceLevel) && saved.practiceLevel >= 1 && saved.practiceLevel <= 9) setPracticeLevel(saved.practiceLevel)
         if (typeof saved.practiceUnitId === 'string' || saved.practiceUnitId === null) setPracticeUnitId(saved.practiceUnitId)
