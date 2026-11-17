@@ -2012,7 +2012,7 @@ export default function App() {
           <div className="study-footer">
             <button className="outline" aria-label={t('flashcards.previous')} onClick={() => { setShowAnswer(false); setCardIndex(i => (i + practiceWords.length - 1) % practiceWords.length) }}>‹</button>
             <span>{t('flashcards.counter')} {cardIndex % practiceWords.length + 1} / {practiceWords.length} · {t('flashcards.knownCount')}: {practiceWords.filter(word => knownWords.includes(wordId(word))).length}</span>
-            <button className="outline" aria-label={t('flashcards.next')} onClick={() => { setShowAnswer(false); setCardIndex(i => (i + 1) % studyWords.length) }}>›</button>
+            <button className="outline" aria-label={t('flashcards.next')} onClick={() => { setShowAnswer(false); setCardIndex(i => (i + 1) % practiceWords.length) }}>›</button>
           </div>
         </section>
       )}
