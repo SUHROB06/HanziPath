@@ -1437,8 +1437,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline-color:#b34
 .app.sidebar-collapsed .navitem > span:nth-child(2),
 .app.sidebar-collapsed .navcount,
 .app.sidebar-collapsed .streak > div,
-.app.sidebar-collapsed .profile-name,
-.app.sidebar-collapsed .profile-action { display: none; }
+.app.sidebar-collapsed .profile-name { display: none; }
+.app.sidebar-collapsed .profile-action { display: grid; place-items: center; margin-left: 0; }
 .app.sidebar-collapsed .brandmark { flex: none; }
 .app.sidebar-collapsed .sidebar-collapse { margin: 12px auto 0; }
 .app.sidebar-collapsed .navitem { justify-content: center; padding: 11px 8px; }
@@ -1470,8 +1470,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline-color:#b34
   .app.sidebar-collapsed .navitem > span:nth-child(2),
   .app.sidebar-collapsed .navcount,
   .app.sidebar-collapsed .streak > div,
-  .app.sidebar-collapsed .profile-name,
-  .app.sidebar-collapsed .profile-action { display: initial; }
+  .app.sidebar-collapsed .profile-name { display: initial; }
+  .app.sidebar-collapsed .profile-action { display: grid; }
   .app.sidebar-collapsed .sidebar .navitem { justify-content: flex-start; }
   .app.sidebar-collapsed .streak { justify-content: flex-start; }
   .app.sidebar-collapsed .profile { justify-content: flex-start; }
