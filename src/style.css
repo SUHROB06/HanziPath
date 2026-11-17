@@ -1751,3 +1751,246 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline-color:#b34
 @media (prefers-reduced-motion: reduce) {
   .app .quick-card { transition: none; }
 }
+
+
+/* HanziPath crimson identity — stronger Chinese red across every appearance mode. */
+.app {
+  --ink: #35151d;
+  --ink-soft: #76515a;
+  --muted: #986f76;
+  --paper: #fbf6f1;
+  --paper-light: #fffaf5;
+  --surface: #fffdf9;
+  --line: #ead8d1;
+  --jade: #a51f35;
+  --jade-dark: #761327;
+  --jade-pale: #f6e5e2;
+  --seal: #a51f35;
+  --seal-pale: #f6e5e2;
+  --gold: #b88a42;
+}
+.app[data-theme="dark"] {
+  --ink: #fff0e9;
+  --ink-soft: #e4c7bf;
+  --muted: #bd9990;
+  --paper: #191114;
+  --paper-light: #26171b;
+  --surface: #302025;
+  --line: #57313a;
+  --jade: #e04b4d;
+  --jade-dark: #ff7770;
+  --jade-pale: #49252b;
+  --seal: #e04b4d;
+  --seal-pale: #49252b;
+  --gold: #d8b36c;
+}
+.app[data-theme="burgundy"] {
+  --ink: #fff3eb;
+  --ink-soft: #f0d0c4;
+  --muted: #d8a99d;
+  --paper: #310b13;
+  --paper-light: #48101d;
+  --surface: #571525;
+  --line: #803043;
+  --jade: #f0524e;
+  --jade-dark: #ff8b78;
+  --jade-pale: #70202c;
+  --seal: #e43d42;
+  --seal-pale: #70202c;
+  --gold: #e4bd72;
+}
+.app .sidebar {
+  background: linear-gradient(180deg, #64101f 0%, #7c1426 55%, #4d0d19 100%);
+  border-right: 1px solid #8f3540;
+  box-shadow: 8px 0 28px rgba(72, 10, 22, .08);
+}
+.app .brandmark {
+  color: #fff7e8;
+  background: linear-gradient(145deg, #d94b45, #9e172d);
+  border: 1px solid rgba(255, 230, 190, .24);
+  box-shadow: 0 5px 15px rgba(34, 0, 7, .25);
+}
+.app .brand b { color: #fff4e8; }
+.app .brand small { color: #e8b9a8; }
+.app .side-label { color: #e0a9a0; }
+.app .sidebar .navitem { color: #f0d7cd; }
+.app .sidebar .navitem:hover { color: #fff8ef; background: rgba(255, 238, 215, .1); }
+.app .sidebar .navitem.active {
+  color: #6e1224;
+  background: linear-gradient(100deg, #fff0d9, #f3d6c3);
+  box-shadow: 0 5px 15px rgba(33, 0, 8, .16);
+}
+.app .sidebar .navitem.active::before { background: #d13b3d; }
+.app .sidebar .navcount { color: #a52a36; }
+.app .sidebar .streak {
+  color: #f2c16e;
+  background: rgba(255, 225, 190, .12);
+  border: 1px solid rgba(255, 225, 190, .14);
+}
+.app .sidebar .streak b { color: #fff0df; }
+.app .sidebar .streak small { color: #e7b8a7; }
+.app .sidebar .profile { border-top-color: rgba(255, 230, 220, .2); }
+.app .sidebar .profile-name b { color: #fff4e8; }
+.app .sidebar .profile-name small { color: #e5b7aa; }
+.app .sidebar .avatar { color: #711326; background: #f5d9c6; }
+.app .sidebar .profile-action { color: #f8d9ca; }
+.app .sidebar .sidebar-collapse { color: #f6e0d4; background: #751729; border-color: #9b4650; }
+.app .sidebar .sidebar-collapse:hover { background: #9e2637; color: white; }
+.app .topbar { border-bottom-color: var(--line); }
+.app .crumb { color: var(--muted); }
+.app .hamb { color: var(--jade-dark); }
+.app .signin { color: var(--jade-dark); }
+.app .hero {
+  background:
+    radial-gradient(circle at 78% 20%, rgba(255, 225, 173, .94) 0 8%, transparent 8.2%),
+    linear-gradient(108deg, #fff0df 0%, #f5d6c4 44%, #e9a69a 100%);
+  border-color: #d6a58e;
+}
+.app .hero h1 { color: #411923; }
+.app .hero h1 em { color: #a51f35; }
+.app .hero .eyebrow { color: #8d2638; }
+.app .hero .eyebrow span { background: #c8323e; }
+.app .hero p { color: #75454a; }
+.app .hero .primary,
+.app .primary,
+.app .auth-submit,
+.app .study-actions .primary,
+.app .learning-page > .primary,
+.app .practice-prompt .primary,
+.app .study-footer .primary {
+  background: linear-gradient(135deg, #b32638, #811328);
+  color: #fff8ee;
+  box-shadow: 0 6px 16px rgba(112, 15, 34, .18);
+}
+.app .hero .primary:hover,
+.app .primary:hover,
+.app .study-actions .primary:hover { background: linear-gradient(135deg, #cf3540, #95162b); }
+.app .outline { color: var(--jade-dark); border-color: #dcbfba; }
+.app .navitem.active { color: var(--jade-dark); }
+.app .navitem.active::before { background: #b32638; }
+.app .stat-icon.blue { background: #f5e0df; color: #a51f35; }
+.app .stat-icon.orange { background: #f7e8d2; color: #a95a32; }
+.app .stat-icon.green { background: #f0e8d7; color: #8a5d35; }
+.app .quick-vocab,
+.app .quick-grammar,
+.app .quick-listen,
+.app .quick-cards,
+.app .quick-tests,
+.app .quick-course {
+  border-color: #e8d1c8;
+  background: linear-gradient(145deg, var(--surface), var(--paper-light));
+}
+.app .quick-vocab { color: #a51f35; }
+.app .quick-vocab .quick-icon { background: #f4dfdc; color: #a51f35; }
+.app .quick-grammar { color: #a05b32; }
+.app .quick-grammar .quick-icon { background: #f5e5d2; color: #a05b32; }
+.app .quick-listen { color: #9b3a3a; }
+.app .quick-listen .quick-icon { background: #f2dfdc; color: #9b3a3a; }
+.app .quick-cards { color: #8d2638; }
+.app .quick-cards .quick-icon { background: #f2dfe0; color: #8d2638; }
+.app .quick-tests { color: #a33a2d; }
+.app .quick-tests .quick-icon { background: #f6e2d7; color: #a33a2d; }
+.app .quick-course { color: #95602f; }
+.app .quick-course .quick-icon { background: #f2e6d4; color: #95602f; }
+.app .quick-card:hover { border-color: #b32638; }
+.app .study-card {
+  position: relative;
+  min-height: 300px;
+  overflow: hidden;
+  border: 1px solid #d9b7aa;
+  border-radius: 18px 18px 18px 5px;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(229, 185, 130, .18) 0 11%, transparent 11.5%),
+    linear-gradient(145deg, #fffaf2 0%, #f9eee5 58%, #f2ded6 100%);
+  box-shadow: 0 12px 28px rgba(93, 25, 37, .08);
+}
+.app .study-card::before {
+  content: '汉字记忆';
+  position: absolute;
+  top: 16px;
+  left: 18px;
+  padding: 5px 9px;
+  border: 1px solid rgba(157, 36, 54, .2);
+  border-radius: 4px;
+  color: #9d2436;
+  background: rgba(255, 249, 237, .72);
+  font: 600 10px 'Noto Sans SC', sans-serif;
+  letter-spacing: 1px;
+}
+.app .study-card::after {
+  content: '汉';
+  position: absolute;
+  right: 20px;
+  bottom: -54px;
+  color: rgba(157, 36, 54, .055);
+  font: 800 210px 'Noto Sans SC', sans-serif;
+  pointer-events: none;
+}
+.app .study-hanzi {
+  position: relative;
+  z-index: 1;
+  color: #8c172d;
+  font-size: 88px;
+  text-shadow: 0 3px 0 rgba(157, 36, 54, .06);
+}
+.app .study-answer { position: relative; z-index: 1; color: #5a2931; }
+.app .study-answer b { color: #9b1d32; }
+.app .study-answer small { color: #8b6660; }
+.app .notice-text {
+  color: var(--ink-soft);
+  background: linear-gradient(100deg, var(--jade-pale), var(--paper-light));
+  border-left: 3px solid var(--gold);
+}
+.app .lesson-card,
+.app .word,
+.app .panel,
+.app .course-block,
+.app .course-volume,
+.app .course-level {
+  box-shadow: 0 5px 18px rgba(86, 20, 32, .045);
+}
+.app .lesson-card code,
+.app .level-pill,
+.app .dictionary-summary > div {
+  color: #8d1b30;
+  background: #f8e9e3;
+  border-color: #ecd3c8;
+}
+.app .lesson-example b,
+.app .word-main > strong { color: #94172e; }
+.app .progress i,
+.app .exam-progress i { background: linear-gradient(90deg, #a51f35, #d34a43); }
+.app .answer-option:hover:not(:disabled) { border-color: #b32638; background: #fbefea; }
+.app .answer-option.correct { border-color: #82a17c; background: #eef4e8; color: #426a45; }
+.app .answer-option.incorrect { border-color: #c34a4b; background: #fff0ed; color: #9e2637; }
+.app .notice.info,
+.app .feedback.info { background: var(--jade-pale); color: var(--jade-dark); }
+.app[data-theme="dark"] .hero,
+.app[data-theme="burgundy"] .hero {
+  background:
+    radial-gradient(circle at 78% 20%, rgba(237, 194, 132, .32) 0 8%, transparent 8.2%),
+    linear-gradient(108deg, #57101e 0%, #8a172c 52%, #b63a3e 100%);
+  border-color: #a4484c;
+}
+.app[data-theme="dark"] .hero h1,
+.app[data-theme="burgundy"] .hero h1 { color: #fff0e6; }
+.app[data-theme="dark"] .hero h1 em,
+.app[data-theme="burgundy"] .hero h1 em { color: #ffb58f; }
+.app[data-theme="dark"] .hero p,
+.app[data-theme="burgundy"] .hero p,
+.app[data-theme="dark"] .hero .eyebrow,
+.app[data-theme="burgundy"] .hero .eyebrow { color: #f4d1c4; }
+.app[data-theme="dark"] .study-card,
+.app[data-theme="burgundy"] .study-card {
+  background: linear-gradient(145deg, #3a2024, #4b222b);
+  border-color: #87404a;
+}
+.app[data-theme="dark"] .study-hanzi,
+.app[data-theme="burgundy"] .study-hanzi { color: #ff8a78; }
+.app[data-theme="dark"] .study-answer,
+.app[data-theme="burgundy"] .study-answer { color: #f4d9ce; }
+@media (max-width: 700px) {
+  .app .sidebar { box-shadow: 14px 0 40px rgba(50, 0, 12, .28); }
+  .app .study-card { min-height: 245px; padding: 28px 18px; }
+  .app .study-hanzi { font-size: 72px; }
+}
