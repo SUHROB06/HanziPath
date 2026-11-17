@@ -1305,13 +1305,10 @@ export default function App() {
 
     const timeout = window.setTimeout(async () => {
       try {
-        const { error } = await supabase!
-          .from('user_learning_progress')
-          .upsert({
-            user_id: authUser.id,
-            progress: payload,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'user_id' })
+        const { error } = await (supabase as any).rpc(
+          'merge_user_learning_progress',
+          { p_progress: payload },
+        )
         if (error) throw error
       } catch {
         if (!cancelled) {
