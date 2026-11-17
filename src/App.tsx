@@ -1839,17 +1839,68 @@ export default function App() {
     question.manualReview && Boolean(examAnswers[index]?.trim()) ? 1 : 0
   ), 0)
   const examManualTotal = examQuestionsState.filter(question => question.manualReview).length
+  const examTotalSeconds = examFormat(examSystem, examLevel).minutes * 60
+  const examElapsedSeconds = examStarted
+    ? Math.max(0, examTotalSeconds - examSecondsLeft)
+    : 0
+  const examSectionStats = (['listening', 'reading', 'writing', 'translation', 'speaking'] as const)
+    .map(section => {
+      const items = examQuestionsState
+        .map((question, index) => ({ question, index }))
+        .filter(item => item.question.section === section)
+      if (items.length === 0) return null
+      const scored = items.filter(item => !item.question.manualReview)
+      const correct = scored.filter(({ question, index }) => {
+        const response = examAnswers[index] ?? ''
+        return question.section === 'writing'
+          ? normalizeWrittenAnswer(response) === normalizeWrittenAnswer(question.answer)
+          : response === question.answer
+      }).length
+      const manual = items.filter(item => item.question.manualReview)
+      const manualAnswered = manual.filter(({ index }) => Boolean(examAnswers[index]?.trim())).length
+      return { section, total: items.length, scored: scored.length, correct, manual: manual.length, manualAnswered }
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
 
   useEffect(() => {
     if (!examStarted || !examFinished || examSavedRef.current) return
     examSavedRef.current = true
-    setExamHistory(items => [{ system: examSystem, level: examLevel, score: examCorrectCount, total: examScoredCount, date: new Date().toISOString() }, ...items].slice(0, 30))
-  }, [examStarted, examFinished, examSystem, examLevel, examCorrectCount, examScoredCount])
+    setExamHistory(items => [{
+      system: examSystem,
+      level: examLevel,
+      score: examCorrectCount,
+      total: examScoredCount,
+      date: new Date().toISOString(),
+      manualAnswered: examManualCount,
+      manualTotal: examManualTotal,
+      durationSeconds: examElapsedSeconds,
+    }, ...items].slice(0, 30))
+  }, [examStarted, examFinished, examSystem, examLevel, examCorrectCount, examScoredCount, examManualCount, examManualTotal, examElapsedSeconds])
 
 
   const startExam = () => {
+    const sourceWords = reviewWords?.length
+      ? reviewWords
+      : databaseWords?.length
+        ? databaseWords
+        : null
+    if (!sourceWords) {
+      setNotice({
+        text: lang === 'ru' ? 'Сначала дождись загрузки полного словаря.' : lang === 'uz' ? 'Avval to‘liq lug‘at yuklanishini kuting.' : 'Wait for the full vocabulary to finish loading first.',
+        kind: 'error',
+      })
+      return
+    }
+    const generated = examQuestions(examSystem, examLevel, sourceWords, lang)
+    if (generated.length === 0) {
+      setNotice({
+        text: lang === 'ru' ? 'Не удалось сформировать экзамен для этого уровня. Проверь загрузку словаря и уроков.' : lang === 'uz' ? 'Bu daraja uchun imtihon tuzilmadi. Lug‘at va darslar yuklanganini tekshiring.' : 'Could not generate this exam. Check that the vocabulary and lessons have loaded.',
+        kind: 'error',
+      })
+      return
+    }
     examSavedRef.current = false
-    const generated = examQuestions(examSystem, examLevel, reviewWords?.length ? reviewWords : availableWords, lang)
+    setNotice(null)
     setExamQuestionsState(generated)
     setExamAnswers(Array(generated.length).fill(''))
     setExamIndex(0)
