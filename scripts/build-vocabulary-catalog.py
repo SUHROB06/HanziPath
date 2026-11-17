@@ -187,6 +187,20 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
 
     # HSK 3.0 (2026) with CC-CEDICT definitions and graded examples: CC BY-SA.
     hsk3_rows = json.loads((zhongdex_root/"data"/"hsk_bands.json").read_text(encoding="utf-8"))
+    # A small number of HSK 3.0 rows have no CC-CEDICT gloss in the Zhongdex
+    # snapshot. Fill only those gaps from the same licensed CC-CEDICT field.
+    cedict_fallback = collections.defaultdict(list)
+    for file in sorted((marpalo_root/"data").glob("hsk30-words-*.json")):
+        payload = json.loads(file.read_text(encoding="utf-8"))
+        for item in payload.get("items", []):
+            word = clean_word(item.get("word", ""))
+            for definition in item.get("full_definitions", []):
+                pinyin_num = norm_pinyin_num(definition.get("pinyin_num", ""))
+                if word and pinyin_num:
+                    cedict_fallback[(word, pinyin_num)] = unique_text(
+                        cedict_fallback[(word, pinyin_num)] + list(definition.get("meanings", []))
+                    )
+
     hsk30 = {}
     for row in hsk3_rows:
         word = row.get("simplified","").strip()
@@ -194,14 +208,19 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
         pinyin_num = row.get("pinyin",{}).get("numbered","")
         if not word or not pinyin:
             continue
-        key = (word, norm_pinyin(pinyin))
+        key = (word, norm_pinyin_num(pinyin_num) or norm_pinyin(pinyin))
         band = row.get("hsk",{}).get("band2026")
         meanings = unique_text([d.get("text","") for d in row.get("definitions",[])])
+        fallback_meanings = cedict_fallback.get((word, norm_pinyin_num(pinyin_num)), [])
+        if not meanings and fallback_meanings:
+            meanings = fallback_meanings
         pos = normalize_pos(row.get("pos",[]))
         attribution = [
             {"source":d.get("source",""),"sourceKey":d.get("sourceKey",""),"license":d.get("license","")}
             for d in row.get("definitions",[]) if d.get("source") or d.get("license")
         ]
+        if not attribution and fallback_meanings:
+            attribution = [{"source":"CC-CEDICT","sourceKey":f"{word}|{norm_pinyin_num(pinyin_num)}","license":"CC BY-SA 4.0"}]
         example = best_example(examples_by_id.get(row.get("id",""),[]))
         if key not in hsk30:
             hsk30[key] = {
@@ -258,7 +277,7 @@ def build_catalog(marpalo_root, zhongdex_root, zitou_csv, old_path, hsk30_output
                 pinyin_num=definition.get("pinyin_num","")
                 if not word or not pinyin:
                     continue
-                key=(word,norm_pinyin(pinyin))
+                key=(word,norm_pinyin_num(pinyin_num) or norm_pinyin(pinyin))
                 meanings=unique_text(definition.get("meanings",[]))
                 pos=normalize_pos([definition.get("pos","")])
                 attribution=[{"source":"Marpalo HSK Vocabulary Dataset","sourceKey":str(item.get("id","")),"license":"CC BY 4.0"}]
