@@ -1,4 +1,7 @@
-import { normalizeDictionaryPinyin } from './dictionaryQuality'
+function normalizeCardPinyin(value: string): string {
+  // Keep in sync with dictionaryQuality.normalizeDictionaryPinyin.
+  return value.toLowerCase().normalize('NFC').replace(/\\s+/g, '')
+}
 
 export type LessonCardWord = { hanzi: string; pinyin: string }
 
@@ -11,7 +14,7 @@ export function uniqueLessonCards<T extends LessonCardWord>(words: T[]): T[] {
   const result: T[] = []
   for (const word of words) {
     const hanzi = word.hanzi.trim().normalize('NFKC')
-    const pinyin = normalizeDictionaryPinyin(word.pinyin)
+    const pinyin = normalizeCardPinyin(word.pinyin)
     if (!hanzi || !pinyin) continue
     const key = hanzi + '|' + pinyin
     if (seen.has(key)) continue
