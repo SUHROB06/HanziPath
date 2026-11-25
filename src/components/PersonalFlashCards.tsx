@@ -83,6 +83,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
   const [draft, setDraft] = useState<Draft>(emptyDraft())
   const [editingId, setEditingId] = useState<string | null>(null)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [againQueue, setAgainQueue] = useState<string[]>([])
   const [showAnswer, setShowAnswer] = useState(false)
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
@@ -131,7 +132,15 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
     () => cards.filter(card => !deck || card.deck_name === deck),
     [cards, deck],
   )
-  const activeCard = visibleCards.length ? visibleCards[Math.min(activeIndex, visibleCards.length - 1)] : null
+  const studyQueue = useMemo(
+    () => [...visibleCards, ...againQueue.map(id => visibleCards.find(card => card.id === id)).filter((card): card is CustomCard => Boolean(card))],
+    [visibleCards, againQueue],
+  )
+  const activeCard = studyQueue.length ? studyQueue[activeIndex % studyQueue.length] : null
+
+  useEffect(() => {
+    if (activeIndex >= studyQueue.length) setActiveIndex(0)
+  }, [activeIndex, studyQueue.length])
 
   const resetDraft = (defaultDeck = deck) => {
     setDraft({ ...emptyDraft(), deck_name: defaultDeck || t.emptyDeck })
@@ -165,6 +174,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
         ? current.map(card => card.id === editingId ? result.data as CustomCard : card)
         : [result.data as CustomCard, ...current])
       setDeck(payload.deck_name)
+      setAgainQueue([])
       setActiveIndex(0)
       setNotice(t.saved)
       resetDraft(payload.deck_name)
@@ -191,6 +201,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
     if (error) setNotice(error.message)
     else {
       setCards(current => current.filter(item => item.id !== card.id))
+      setAgainQueue(queue => queue.filter(id => id !== card.id))
       setActiveIndex(0)
       setShowAnswer(false)
       if (editingId === card.id) resetDraft()
@@ -198,8 +209,22 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
   }
 
   const move = (step: number) => {
-    if (!visibleCards.length) return
-    setActiveIndex(index => (index + step + visibleCards.length) % visibleCards.length)
+    if (!studyQueue.length) return
+    setActiveIndex(index => (index + step + studyQueue.length) % studyQueue.length)
+    setShowAnswer(false)
+  }
+
+  const markKnown = () => {
+    if (!activeCard) return
+    setAgainQueue(queue => queue.filter(id => id !== activeCard.id))
+    setActiveIndex(index => index + 1)
+    setShowAnswer(false)
+  }
+
+  const reviewAgain = () => {
+    if (!activeCard) return
+    setAgainQueue(queue => [...queue, activeCard.id])
+    setActiveIndex(index => index + 1)
     setShowAnswer(false)
   }
 
@@ -229,7 +254,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
         </form>
         <div className="personal-flashcards-study">
           <div className="filters">
-            <label>{t.deck}<select value={deck} onChange={event => { setDeck(event.target.value); setActiveIndex(0); setShowAnswer(false) }}>
+            <label>{t.deck}<select value={deck} onChange={event => { setDeck(event.target.value); setAgainQueue([]); setActiveIndex(0); setShowAnswer(false) }}>
               <option value="">{t.all}</option>
               {decks.map(name => <option key={name} value={name}>{name}</option>)}
             </select></label>
@@ -240,12 +265,14 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
               {showAnswer && <div className="study-answer"><b>{activeCard.pinyin}</b><span>{activeCard.translation}</span>{activeCard.example && <small>{activeCard.example}</small>}{activeCard.notes && <small>{activeCard.notes}</small>}</div>}
             </article>
             <div className="study-actions">
-              {!showAnswer ? <button className="primary" onClick={() => setShowAnswer(true)}>{t.front}</button> : <button className="primary" onClick={() => move(1)}><Check size={15}/>{t.known}</button>}
-              <button className="outline" onClick={() => move(1)}><RotateCcw size={15}/>{t.again}</button>
+              {!showAnswer ? <button className="primary" onClick={() => setShowAnswer(true)}>{t.front}</button> : <>
+                <button className="primary" onClick={markKnown}><Check size={15}/>{t.known}</button>
+                <button className="outline" onClick={reviewAgain}><RotateCcw size={15}/>{t.again}</button>
+              </>}
             </div>
             <div className="study-footer">
               <button className="outline" onClick={() => move(-1)}>{t.previous}</button>
-              <span>{activeIndex + 1} / {visibleCards.length}</span>
+              <span>{activeIndex % Math.max(1, studyQueue.length) + 1} / {studyQueue.length}</span>
               <button className="outline" onClick={() => move(1)}>{t.next}</button>
             </div>
             <div className="personal-card-list">
