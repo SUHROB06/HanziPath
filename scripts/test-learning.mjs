@@ -42,6 +42,27 @@ const strongSchedule = Object.fromEntries(Array.from({ length: 5 }, (_, index) =
 ]))
 assert.equal(spaced.adaptiveDifficulty(strongSchedule), 3)
 
+const lessonCards = await loadTypeScriptModule('../src/data/lessonCards.ts')
+const lessonWords = Array.from({ length: 24 }, (_, index) => ({
+  sourceEntryKey: `row-${index}`,
+  hanzi: `词${index}`,
+  pinyin: `ci2${index}`,
+}))
+const distinctLessonCards = lessonCards.uniqueLessonCards(lessonWords)
+assert.equal(distinctLessonCards.length, 24, 'all 24 distinct lesson words must become cards')
+const duplicateAliases = lessonCards.uniqueLessonCards([
+  { sourceEntryKey: 'row-a', hanzi: '学习', pinyin: 'xué xí' },
+  { sourceEntryKey: 'row-b', hanzi: '学习', pinyin: 'xuéxí' },
+  { sourceEntryKey: 'row-c', hanzi: '学习', pinyin: 'xuéxí ' },
+  { sourceEntryKey: 'row-d', hanzi: '银行', pinyin: 'yín háng' },
+])
+assert.deepEqual(duplicateAliases.map(word => word.hanzi), ['学习', '银行'])
+assert.equal(lessonCards.uniqueLessonCards([
+  { hanzi: '行', pinyin: 'xíng' },
+  { hanzi: '行', pinyin: 'háng' },
+]).length, 2, 'different pronunciations must remain distinct')
+assert.equal(lessonCards.uniqueLessonCards(lessonWords).length, 24)
+
 const progress = await loadTypeScriptModule('../src/data/learningProgress.ts')
 const today = '2026-11-17'
 const local = progress.emptyLearningProgress(today)
@@ -106,7 +127,7 @@ const missing = Object.fromEntries(['hanzi', 'pinyin', 'ru', 'en', 'uz'].map(key
 ]))
 const unverified = entries.filter(entry => entry.membershipStatus !== 'verified').length
 
-console.log('Learning logic and dictionary deduplication tests passed.')
+console.log('Learning logic, lesson-card uniqueness and dictionary deduplication tests passed.')
 console.log(JSON.stringify({
   dictionaryAudit: audit,
   missingCoreFields: missing,
