@@ -255,7 +255,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!userId || !supabase || busy) return
+    if (!editingId || !userId || !supabase || busy) return
     if (!draft.hanzi.trim() || !draft.pinyin.trim() || !draft.translation.trim()) {
       setNotice(t.required)
       return
