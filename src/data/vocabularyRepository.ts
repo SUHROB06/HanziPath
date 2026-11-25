@@ -173,7 +173,9 @@ export async function searchVocabulary(
   try {
     const pattern = `%${escapeLike(term)}%`
     const normalizedTerm = normalizePinyin(term)
-    // Tone marks are stored in the pinyin field (e.g. wán), while students often type wan.\n    // Replace vowels with single-character wildcards, then rank/filter candidates in JS.\n    const pinyinPattern = `%${escapeLike(normalizedTerm.replace(/[aeiou]/g, '_'))}%`
+    // Tone marks are stored in the pinyin field (e.g. wán), while students often type wan.
+    // Replace vowels with single-character wildcards, then rank/filter candidates in JS.
+    const pinyinPattern = `%${escapeLike(normalizedTerm.replace(/[aeiou]/g, '_'))}%`
 
     // Search only matching rows. Downloading every reading and translation
     // before filtering made each keystroke slow as the catalog grew.
@@ -205,7 +207,9 @@ export async function searchVocabulary(
     if (queryError) return failed([], queryError)
 
     const itemMatches = (itemResponse.data ?? []) as VocabularyItem[]
-    const readingMatches = ((readingResponse.data ?? []) as VocabularyReading[]).filter(\n      reading => normalizePinyin(reading.pinyin).includes(normalizedTerm),\n    )
+    const readingMatches = ((readingResponse.data ?? []) as VocabularyReading[]).filter(
+      reading => normalizePinyin(reading.pinyin).includes(normalizedTerm),
+    )
     const translationMatches = (translationResponse.data ?? []) as Translation[]
 
     const candidateIds = new Set<string>([
