@@ -189,7 +189,7 @@ export async function searchVocabulary(
         .select('*')
         .neq('verification_status', 'rejected')
         .or(`pinyin.ilike.${pinyinPattern},pinyin_numeric.ilike.${pattern}`)
-        .limit(resultLimit * 4),
+        .limit(500),
 
       (() => {
         let query = client.from('translations')
