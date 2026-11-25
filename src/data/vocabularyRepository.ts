@@ -242,11 +242,11 @@ export async function searchVocabulary(
       if (!row) continue
 
       const verifiedReadings = (row.vocabulary_readings ?? []).filter(
-        reading => reading.verification_status === 'verified',
+        reading => reading.verification_status !== 'rejected',
       )
       const verifiedTranslations = (row.translations ?? []).filter(
         translation =>
-          translation.verification_status === 'verified' &&
+          translation.verification_status !== 'rejected' &&
           translation.content_kind === 'meaning',
       )
 
