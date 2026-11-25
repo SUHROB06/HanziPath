@@ -14,6 +14,6 @@ export function buildPersonalFlashcardQueue<T extends PersonalFlashcardQueueItem
   const retrySet = new Set(retryIds)
   const byId = new Map(visibleCards.map(card => [card.id, card]))
   const unseen = visibleCards.filter(card => !completed.has(card.id) && !retrySet.has(card.id))
-  const retries = retryIds.map(id => byId.get(id)).filter((card): card is T => Boolean(card) && !completed.has(card.id))
+  const retries = retryIds.map(id => byId.get(id)).filter((card): card is T => card !== undefined && !completed.has(card.id))
   return [...unseen, ...retries]
 }
