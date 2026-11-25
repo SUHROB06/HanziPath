@@ -90,9 +90,10 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
   useEffect(() => {
     let cancelled = false
     if (!supabase) { setLoading(false); return }
+    const client = supabase
     const loadCards = async (id: string) => {
       setLoading(true)
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('user_custom_flashcards')
         .select('id,deck_name,hanzi,pinyin,translation,example,notes,created_at')
         .eq('user_id', id)
@@ -102,7 +103,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
       else setCards((data ?? []) as CustomCard[])
       setLoading(false)
     }
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = client.auth.onAuthStateChange((_event, session) => {
       const id = session?.user?.id ?? null
       setUserId(id)
       if (id) void loadCards(id)
@@ -112,7 +113,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
         setLoading(false)
       }
     })
-    void supabase.auth.getUser().then(({ data }) => {
+    void client.auth.getUser().then(({ data }) => {
       if (cancelled) return
       const id = data.user?.id ?? null
       setUserId(id)
