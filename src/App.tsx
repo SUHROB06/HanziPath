@@ -2786,6 +2786,7 @@ export default function App() {
                 : (lang === 'ru' ? 'Это тренировочная симуляция по структуре экзамена, а не официальный вариант прошлых лет. Открытые письменные задания могут требовать ручной проверки.'
                   : lang === 'uz' ? 'Bu imtihon tuzilishiga asoslangan mashq simulyatsiyasi, rasmiy oldingi imtihon varianti emas. Ochiq yozma topshiriqlar qo‘lda tekshirilishi mumkin.'
                     : 'This is a practice simulation aligned to the test structure, not an official past paper. Open-ended writing tasks may require manual review.')}
+            {examSystem === '3.0' && examLevel >= 3 && examLevel <= 6 && <span>{' · '}{lang === 'ru' ? 'Отдельная устная работа HSK 3–6 (15–23 минуты) пока не включена в эту письменную симуляцию.' : lang === 'uz' ? 'HSK 3–6 uchun alohida og‘zaki imtihon (15–23 daqiqa) hozircha ushbu yozma sinovga kiritilmagan.' : 'The separate HSK 3–6 speaking paper (15–23 minutes) is not included in this written mock yet.'}</span>}
             {' · '}<a href="https://www.chinesetest.cn/HSK" target="_blank" rel="noreferrer">{lang === 'ru' ? 'Официальная структура HSK' : lang === 'uz' ? 'HSK rasmiy tuzilishi' : 'Official HSK structure'}</a>
           </p>
           {examHistory.length > 0 && <section className="exam-history">
