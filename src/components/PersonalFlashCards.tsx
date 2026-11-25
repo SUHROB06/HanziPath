@@ -89,13 +89,9 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
 
   useEffect(() => {
     let cancelled = false
-    const load = async () => {
-      if (!supabase) { setLoading(false); return }
-      const { data: auth } = await supabase.auth.getUser()
-      if (cancelled) return
-      const id = auth.user?.id ?? null
-      setUserId(id)
-      if (!id) { setLoading(false); return }
+    if (!supabase) { setLoading(false); return }
+    const loadCards = async (id: string) => {
+      setLoading(true)
       const { data, error } = await supabase
         .from('user_custom_flashcards')
         .select('id,deck_name,hanzi,pinyin,translation,example,notes,created_at')
@@ -106,8 +102,27 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
       else setCards((data ?? []) as CustomCard[])
       setLoading(false)
     }
-    void load()
-    return () => { cancelled = true }
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const id = session?.user?.id ?? null
+      setUserId(id)
+      if (id) void loadCards(id)
+      else {
+        setCards([])
+        setDeck('')
+        setLoading(false)
+      }
+    })
+    void supabase.auth.getUser().then(({ data }) => {
+      if (cancelled) return
+      const id = data.user?.id ?? null
+      setUserId(id)
+      if (id) void loadCards(id)
+      else setLoading(false)
+    })
+    return () => {
+      cancelled = true
+      authListener.subscription.unsubscribe()
+    }
   }, [t.error])
 
   const decks = useMemo(() => [...new Set(cards.map(card => card.deck_name))].sort(), [cards])
