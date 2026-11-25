@@ -3,6 +3,7 @@ import { Check, Pencil, Plus, RotateCcw, Save, Trash2, X } from 'lucide-react'
 import { supabase } from '../supabase'
 import type { Locale } from '../i18n'
 import { buildPersonalFlashcardQueue } from '../data/personalFlashcardQueue'
+import { getVocabularyDetails, searchVocabulary } from '../data/vocabularyRepository'
 
 type CustomCard = {
   id: string
@@ -45,7 +46,7 @@ const copy: Record<Locale, Record<string, string>> = {
     front: 'Показать ответ', again: 'Повторить', known: 'Знаю', previous: 'Назад', next: 'Далее',
     count: 'карточек', error: 'Не удалось загрузить карточки. Попробуй ещё раз.',
     required: 'Заполни иероглиф, произношение и перевод.', saved: 'Карточка сохранена.',
-    deleteConfirm: 'Удалить эту карточку?', emptyDeck: 'Мой набор', suggestions: 'Подходящие слова', suggestionsLoading: 'Ищем слова…', noSuggestions: 'Подходящих слов не найдено.',
+    deleteConfirm: 'Удалить эту карточку?', emptyDeck: 'Мой набор', suggestions: 'Результаты поиска', suggestionsLoading: 'Ищем в словаре…', noSuggestions: 'Ничего не найдено. Попробуй другой язык или написание.', searchPlaceholder: 'Введи перевод, pinyin или иероглиф…', adding: 'Добавляем карточку…', alreadyAdded: 'Это слово уже есть в выбранном наборе.', added: 'Карточка добавлена в набор.',
   },
   en: {
     title: 'Personal Flash Cards', subtitle: 'Create your own cards and review them at your pace.',
@@ -58,7 +59,7 @@ const copy: Record<Locale, Record<string, string>> = {
     front: 'Show answer', again: 'Review again', known: 'I know it', previous: 'Previous', next: 'Next',
     count: 'cards', error: 'Could not load cards. Please try again.',
     required: 'Enter the Chinese word, pronunciation and translation.', saved: 'Card saved.',
-    deleteConfirm: 'Delete this card?', emptyDeck: 'My deck', suggestions: 'Suggested words', suggestionsLoading: 'Finding words…', noSuggestions: 'No matching words found.',
+    deleteConfirm: 'Delete this card?', emptyDeck: 'My deck', suggestions: 'Search results', suggestionsLoading: 'Searching the dictionary…', noSuggestions: 'No results. Try another language or spelling.', searchPlaceholder: 'Enter a translation, pinyin or Chinese character…', adding: 'Adding flashcard…', alreadyAdded: 'This word is already in the selected deck.', added: 'Flashcard added to your deck.',
   },
   uz: {
     title: 'Personal Flash Cards', subtitle: 'O‘z kartochkalaringizni yarating va qulay vaqtda takrorlang.',
@@ -71,7 +72,7 @@ const copy: Record<Locale, Record<string, string>> = {
     front: 'Javobni ko‘rsatish', again: 'Qayta takrorlash', known: 'Bilaman', previous: 'Orqaga', next: 'Keyingi',
     count: 'ta kartochka', error: 'Kartochkalarni yuklab bo‘lmadi. Qayta urinib ko‘ring.',
     required: 'Xitoycha so‘z, talaffuz va tarjimani kiriting.', saved: 'Kartochka saqlandi.',
-    deleteConfirm: 'Bu kartochka o‘chirilsinmi?', emptyDeck: 'Mening to‘plamim', suggestions: 'Mos so‘zlar', suggestionsLoading: 'So‘zlar qidirilmoqda…', noSuggestions: 'Mos so‘zlar topilmadi.',
+    deleteConfirm: 'Bu kartochka o‘chirilsinmi?', emptyDeck: 'Mening to‘plamim', suggestions: 'Qidiruv natijalari', suggestionsLoading: 'Lug‘atdan qidirilmoqda…', noSuggestions: 'Natija topilmadi. Boshqa til yoki yozuvda qidiring.', searchPlaceholder: 'Tarjima, pinyin yoki ieroglif kiriting…', adding: 'Kartochka qo‘shilmoqda…', alreadyAdded: 'Bu so‘z tanlangan to‘plamda allaqachon bor.', added: 'Kartochka to‘plamga qo‘shildi.',
   },
 } satisfies Record<Locale, Record<string, string>>
 
@@ -92,6 +93,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
   const [suggestions, setSuggestions] = useState<Array<{ hanzi: string; pinyin: string; translation: string; example: string }>>([])
   const [suggestionsLoading, setSuggestionsLoading] = useState(false)
   const [dismissedSuggestionFor, setDismissedSuggestionFor] = useState('')
+  const [searchText, setSearchText] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -137,9 +139,8 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
   }, [t.error])
 
   useEffect(() => {
-    const term = draft.hanzi.trim()
-    const client = supabase
-    if (!client || !term || term === dismissedSuggestionFor) {
+    const term = searchText.trim()
+    if (!term || term.length < 1) {
       setSuggestions([])
       setSuggestionsLoading(false)
       return
@@ -148,59 +149,50 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
     let cancelled = false
     const timer = window.setTimeout(async () => {
       setSuggestionsLoading(true)
-      const { data, error } = await client
-        .from('vocabulary_items')
-        .select('id,simplified,vocabulary_readings(pinyin,verification_status),examples(id,sentence_hanzi,verification_status),translations(locale,content_kind,text,example_id,verification_status)')
-        .ilike('simplified', `%${term}%`)
-        .limit(40)
-
+      const result = await searchVocabulary(term, { limit: 12 })
       if (cancelled) return
-      if (error || !data) {
+
+      if (result.error || !result.data.length) {
         setSuggestions([])
         setSuggestionsLoading(false)
         return
       }
 
-      const ranked = data.flatMap((row: any) => {
-        const hanzi = String(row.simplified ?? '')
-        if (!hanzi || hanzi === term) return []
-        const reading = (row.vocabulary_readings ?? []).find(
-          (item: any) => item.verification_status === 'verified' && item.pinyin,
-        )
-        const translations = (row.translations ?? []).filter(
-          (item: any) => item.verification_status === 'verified',
-        )
-        const meaning = translations.find(
-          (item: any) => item.content_kind === 'meaning' && item.locale === locale,
-        ) ?? translations.find((item: any) => item.content_kind === 'meaning')
-        const example = (row.examples ?? []).find(
-          (item: any) => item.verification_status === 'verified' && item.sentence_hanzi,
-        )
-        if (!reading || !meaning || !example) return []
-        const exampleMeaning = translations.find(
-          (item: any) => item.content_kind === 'example_translation' && item.example_id === example.id && item.locale === locale,
-        ) ?? translations.find(
-          (item: any) => item.content_kind === 'example_translation' && item.example_id === example.id,
-        )
-        return [{
-          hanzi,
-          pinyin: String(reading.pinyin),
-          translation: String(meaning.text),
-          example: exampleMeaning
-            ? `${example.sentence_hanzi} — ${exampleMeaning.text}`
-            : String(example.sentence_hanzi),
-        }]
-      }).sort((a: { hanzi: string }, b: { hanzi: string }) => a.hanzi.length - b.hanzi.length)
+      const enriched = await Promise.all(result.data.map(async item => {
+        const detailResult = await getVocabularyDetails(item.id)
+        const detail = detailResult.data
+        const readings = detail?.vocabulary_readings ?? item.vocabulary_readings ?? []
+        const translations = detail?.translations ?? []
+        const preferredMeaning =
+          translations.find(value => value.content_kind === 'meaning' && value.locale === locale) ??
+          item.matched_translations[0] ??
+          translations.find(value => value.content_kind === 'meaning')
+        const example = detail?.examples?.find(value => value.sentence_hanzi)
+        const exampleTranslation = example
+          ? translations.find(value => value.content_kind === 'example_translation' && value.example_id === example.id && value.locale === locale) ??
+            translations.find(value => value.content_kind === 'example_translation' && value.example_id === example.id)
+          : undefined
 
-      setSuggestions(ranked.slice(0, 8))
+        return {
+          hanzi: item.simplified,
+          pinyin: readings[0]?.pinyin ?? '',
+          translation: preferredMeaning?.text ?? '',
+          example: example
+            ? `${example.sentence_hanzi}${exampleTranslation ? ` — ${exampleTranslation.text}` : ''}`
+            : '',
+        }
+      }))
+
+      if (cancelled) return
+      setSuggestions(enriched.filter(item => item.hanzi && item.pinyin && item.translation))
       setSuggestionsLoading(false)
-    }, 280)
+    }, 300)
 
     return () => {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [draft.hanzi, dismissedSuggestionFor, locale])
+  }, [searchText, locale])
 
   const decks = useMemo(() => [...new Set(cards.map(card => card.deck_name))].sort(), [cards])
   const visibleCards = useMemo(
@@ -220,6 +212,46 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
   const resetDraft = (defaultDeck = deck) => {
     setDraft({ ...emptyDraft(), deck_name: defaultDeck || t.emptyDeck })
     setEditingId(null)
+  }
+
+  const addSuggestedCard = async (item: { hanzi: string; pinyin: string; translation: string; example: string }) => {
+    if (!userId || !supabase || busy) return
+    const deckName = draft.deck_name.trim() || t.emptyDeck
+    if (cards.some(card => card.deck_name === deckName && card.hanzi === item.hanzi)) {
+      setNotice(t.alreadyAdded)
+      return
+    }
+
+    setBusy(true)
+    setNotice('')
+    const payload = {
+      user_id: userId,
+      deck_name: deckName,
+      hanzi: item.hanzi,
+      pinyin: item.pinyin,
+      translation: item.translation,
+      example: item.example || null,
+      notes: null,
+    }
+    const { data, error } = await supabase
+      .from('user_custom_flashcards')
+      .insert(payload)
+      .select('id,deck_name,hanzi,pinyin,translation,example,notes,created_at')
+      .single()
+
+    if (error) setNotice(error.message)
+    else if (data) {
+      setCards(current => [data as CustomCard, ...current])
+      setDeck(deckName)
+      setAgainQueue([])
+      setCompletedIds([])
+      setActiveIndex(0)
+      setShowAnswer(false)
+      setNotice(t.added)
+      setSearchText('')
+      setSuggestions([])
+    }
+    setBusy(false)
   }
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -322,23 +354,37 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
         <form className="personal-flashcards-form" onSubmit={submit}>
           <h4>{editingId ? t.edit : t.add}</h4>
           <label>{t.newDeck}<input value={draft.deck_name} onChange={event => setDraft(value => ({ ...value, deck_name: event.target.value }))} maxLength={80}/></label>
-          <label>{t.hanzi}<input value={draft.hanzi} onChange={event => { setDismissedSuggestionFor(''); setDraft(value => ({ ...value, hanzi: event.target.value })) }} required maxLength={120}/></label>
-          {(suggestionsLoading || suggestions.length > 0) && <div className="personal-flashcard-suggestions" role="list" aria-label={t.suggestions}>
-            <strong>{t.suggestions}</strong>
-            {suggestionsLoading && <small>{t.suggestionsLoading}</small>}
-            {suggestions.map(item => <button className="personal-flashcard-suggestion" type="button" key={item.hanzi + item.pinyin} onClick={() => {
-              setDraft(value => ({ ...value, hanzi: item.hanzi, pinyin: item.pinyin, translation: item.translation, example: item.example }))
-              setSuggestions([])
-              setDismissedSuggestionFor(item.hanzi)
-            }}>
-              <span><b>{item.hanzi}</b><small>{item.pinyin} · {item.translation}</small><small>{item.example}</small></span>
-              <Plus size={15}/>
-            </button>)}
-          </div>}
+          {!editingId ? <>
+            <label>{t.hanzi}<input
+              value={searchText}
+              onChange={event => setSearchText(event.target.value)}
+              placeholder={t.searchPlaceholder}
+              autoComplete="off"
+              maxLength={120}
+            /></label>
+            {(searchText.trim().length > 0) && <div className="personal-flashcard-suggestions" aria-label={t.suggestions}>
+              <strong>{t.suggestions}</strong>
+              {suggestionsLoading && <small>{t.suggestionsLoading}</small>}
+              {!suggestionsLoading && suggestions.length === 0 && <small>{t.noSuggestions}</small>}
+              {suggestions.map(item => <button
+                className="personal-flashcard-suggestion"
+                type="button"
+                key={item.hanzi + item.pinyin}
+                disabled={busy}
+                onClick={() => void addSuggestedCard(item)}
+              >
+                <span><b>{item.hanzi}</b><small>{item.pinyin} · {item.translation}</small>{item.example && <small>{item.example}</small>}</span>
+                <Plus size={15}/>
+              </button>)}
+            </div>}
+            {busy && <small>{t.adding}</small>}
+          </> : <>
+            <label>{t.hanzi}<input value={draft.hanzi} onChange={event => setDraft(value => ({ ...value, hanzi: event.target.value }))} required maxLength={120}/></label>
           <label>{t.pinyin}<input value={draft.pinyin} onChange={event => setDraft(value => ({ ...value, pinyin: event.target.value }))} required maxLength={160}/></label>
           <label>{t.translation}<input value={draft.translation} onChange={event => setDraft(value => ({ ...value, translation: event.target.value }))} required maxLength={240}/></label>
           <label>{t.example}<textarea value={draft.example} onChange={event => setDraft(value => ({ ...value, example: event.target.value }))} rows={2} maxLength={500}/></label>
           <label>{t.notes}<textarea value={draft.notes} onChange={event => setDraft(value => ({ ...value, notes: event.target.value }))} rows={2} maxLength={500}/></label>
+          </>}
           <div className="personal-flashcards-form-actions">
             <button className="primary" type="submit" disabled={busy}>{editingId ? <Save size={15}/> : <Plus size={15}/>} {editingId ? t.save : t.add}</button>
             {editingId && <button className="outline" type="button" onClick={() => resetDraft()}><X size={15}/>{t.cancel}</button>}
