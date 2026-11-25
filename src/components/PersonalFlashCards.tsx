@@ -117,8 +117,8 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
   )
   const activeCard = visibleCards.length ? visibleCards[Math.min(activeIndex, visibleCards.length - 1)] : null
 
-  const resetDraft = () => {
-    setDraft({ ...emptyDraft(), deck_name: deck || t.emptyDeck })
+  const resetDraft = (defaultDeck = deck) => {
+    setDraft({ ...emptyDraft(), deck_name: defaultDeck || t.emptyDeck })
     setEditingId(null)
   }
 
@@ -151,7 +151,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
       setDeck(payload.deck_name)
       setActiveIndex(0)
       setNotice(t.saved)
-      resetDraft()
+      resetDraft(payload.deck_name)
     }
     setBusy(false)
   }
