@@ -29,6 +29,10 @@ import type { StandardLevel } from './types/vocabulary'
 import { mergeLearningProgress, type LearningProgressSnapshot } from './data/learningProgress'
 import { adaptiveDifficulty, dueReviewIds, scheduleReview, type ReviewQuality, type ReviewState } from './data/spacedRepetition'
 import { mergeDictionaryEntries, normalizeDictionaryPinyin } from './data/dictionaryQuality'
+import { uniqueLessonCards } from './data/lessonCards'
+import { examFormat, type ExamFormat } from './data/examFormats'
+import { examListeningBank } from './data/examListeningBank'
+import PersonalFlashCards from './components/PersonalFlashCards'
 
 type System = '2.0' | '3.0'
 
@@ -297,36 +301,6 @@ type ExamQuestion = {
   manualReview?: boolean
 }
 
-type ExamFormat = {
-  listening: number; listeningParts: number[]
-  reading: number; readingParts: number[]
-  writing: number; writingParts: number[]
-  translation: number; translationParts: number[]
-  speaking: number; speakingParts: number[]
-  minutes: number
-}
-
-const examFormats: Record<string, ExamFormat> = {
-  '2.0:1': { listening: 20, listeningParts: [5, 5, 5, 5], reading: 20, readingParts: [5, 5, 5, 5], writing: 0, writingParts: [], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 35 },
-  '2.0:2': { listening: 35, listeningParts: [10, 10, 10, 5], reading: 25, readingParts: [5, 5, 5, 10], writing: 0, writingParts: [], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 50 },
-  '2.0:3': { listening: 40, listeningParts: [10, 10, 10, 10], reading: 30, readingParts: [10, 10, 10], writing: 10, writingParts: [5, 5], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 85 },
-  '2.0:4': { listening: 45, listeningParts: [10, 15, 20], reading: 40, readingParts: [10, 10, 20], writing: 15, writingParts: [10, 5], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 100 },
-  '2.0:5': { listening: 45, listeningParts: [20, 25], reading: 45, readingParts: [15, 10, 20], writing: 10, writingParts: [8, 2], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 120 },
-  '2.0:6': { listening: 50, listeningParts: [15, 15, 20], reading: 50, readingParts: [10, 10, 10, 20], writing: 1, writingParts: [1], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 135 },
-  '3.0:1': { listening: 20, listeningParts: [5, 5, 5, 5], reading: 20, readingParts: [5, 5, 5, 5], writing: 0, writingParts: [], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 35 },
-  '3.0:2': { listening: 35, listeningParts: [10, 10, 10, 5], reading: 25, readingParts: [5, 5, 5, 10], writing: 0, writingParts: [], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 50 },
-  '3.0:3': { listening: 40, listeningParts: [10, 10, 10, 10], reading: 30, readingParts: [10, 10, 10], writing: 10, writingParts: [5, 5], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 85 },
-  '3.0:4': { listening: 45, listeningParts: [10, 15, 20], reading: 40, readingParts: [10, 10, 20], writing: 15, writingParts: [10, 5], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 100 },
-  '3.0:5': { listening: 45, listeningParts: [20, 25], reading: 45, readingParts: [15, 10, 20], writing: 10, writingParts: [8, 2], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 120 },
-  '3.0:6': { listening: 50, listeningParts: [15, 15, 20], reading: 50, readingParts: [10, 10, 10, 20], writing: 1, writingParts: [1], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 135 },
-  '3.0:7-9': { listening: 40, listeningParts: [10, 12, 18], reading: 40, readingParts: [21, 5, 14], writing: 2, writingParts: [1, 1], translation: 4, translationParts: [2, 2], speaking: 5, speakingParts: [1, 3, 1], minutes: 200 },
-}
-
-function examFormat(system: CourseSystem, level: CourseLevel): ExamFormat {
-  const key = system === '3.0' && level >= 7 ? '3.0:7-9' : `${system}:${level}`
-  return examFormats[key]
-}
-
 function localDateKey(date = new Date()): string {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -529,6 +503,21 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     .filter(lesson => lesson.grammar.example && lesson.grammar.meaning)
     .map(lesson => [lesson.grammar.example + '|' + lesson.grammar.meaning, lesson] as const)).values()]
   const lessons = shuffleWithSeed(uniqueLessons, attemptSeed + 71)
+  const dialogueItems = examListeningBank
+    .filter(item => system === '3.0' && level >= 7 ? true : item.level <= level)
+    .map(item => ({
+      text: item.audio, pinyin: item.pinyin, meaning: item.answer,
+      prompt: item.prompt[locale], options: item.options, explanation: item.explanation[locale],
+    }))
+  const sentenceItems = [...new Map(lessons.flatMap(lesson => [
+    { text: lesson.grammar.example, pinyin: lesson.grammar.pinyin, meaning: lesson.grammar.meaning, prompt: undefined as string | undefined, options: undefined as string[] | undefined, explanation: undefined as string | undefined },
+    ...(lesson.grammar.extraExamples ?? []).map(example => ({
+      text: example.hanzi, pinyin: example.pinyin, meaning: example.meaning,
+      prompt: undefined as string | undefined, options: undefined as string[] | undefined, explanation: undefined as string | undefined,
+    })),
+  ]).filter(item => item.text?.trim() && item.pinyin?.trim() && item.meaning?.trim())
+    .map(item => [item.text.trim() + '|' + item.pinyin.trim().toLocaleLowerCase(), item] as const)).values()]
+  const listeningItems = shuffleWithSeed([...dialogueItems, ...sentenceItems], attemptSeed + 17)
   const questions: ExamQuestion[] = []
   if (!lessons.length || !safeWords.length) return questions
   const writingEnd = format.listening + format.reading + format.writing
@@ -538,6 +527,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
   const makeOptions = (answer: string, distractors: string[], seed: number) =>
     shuffleWithSeed([answer, ...[...new Set(distractors.filter(value => value && value !== answer))].slice(0, 3)], seed)
   let listeningIndex = 0
+  let listeningWordIndex = 0
   let readingWordIndex = 0
   let readingLessonIndex = 0
   let writingWordIndex = 0
@@ -548,41 +538,49 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
   for (let index = 0; index < total; index += 1) {
     const seed = (attemptSeed + (level + 1) * 1009 + index * 97) >>> 0
     if (index < format.listening) {
-      const lesson = lessons[listeningIndex]
-      if (lesson) {
+      const item = listeningItems[listeningIndex]
+      if (item) {
         listeningIndex += 1
-        const answer = lesson.grammar.meaning
+        const answer = item.meaning
+        const distractors = [
+          ...listeningItems.filter(candidate => candidate.text !== item.text).map(candidate => candidate.meaning),
+          ...safeWords.map(meaningOf),
+        ]
         questions.push({
           section: 'listening',
           part: partNumber(index, format.listeningParts),
-          prompt: locale === 'ru' ? 'Прослушай фразу и выбери её значение.' : locale === 'uz' ? 'Gapni tinglang va uning ma’nosini tanlang.' : 'Listen to the sentence and choose its meaning.',
-          options: makeOptions(answer, lessons.filter(item => item.id !== lesson.id).map(item => item.grammar.meaning), seed),
+          prompt: item.prompt ?? (locale === 'ru' ? 'Прослушай фразу и выбери её значение.' : locale === 'uz' ? 'Gapni tinglang va uning ma’nosini tanlang.' : 'Listen to the sentence and choose its meaning.'),
+          options: item.options ?? makeOptions(answer, distractors, seed),
           answer,
-          audio: lesson.grammar.example,
-          pinyin: lesson.grammar.pinyin,
-          explanation: `${lesson.grammar.example} · ${lesson.grammar.pinyin} · ${lesson.grammar.meaning}`,
+          audio: item.text,
+          pinyin: item.pinyin,
+          explanation: item.explanation ?? `${item.text} · ${item.pinyin} · ${item.meaning}`,
         })
       } else {
-        const word = safeWords[(index - lessons.length) % safeWords.length]
-        const answer = meaningOf(word)
-        questions.push({
-          section: 'listening',
-          part: partNumber(index, format.listeningParts),
-          prompt: locale === 'ru' ? 'Прослушай слово и выбери его перевод.' : locale === 'uz' ? 'So‘zni tinglang va tarjimasini tanlang.' : 'Listen to the word and choose its meaning.',
-          options: makeOptions(answer, safeWords.filter(item => wordId(item) !== wordId(word)).map(meaningOf), seed),
-          answer,
-          audio: word.hanzi,
-          pinyin: word.pinyin,
-          explanation: `${word.hanzi} · ${word.pinyin} · ${meaningOf(word)}`,
-        })
+        const word = safeWords[listeningWordIndex++]
+        if (!word) return []
+        if (word) {
+          const answer = meaningOf(word)
+          questions.push({
+            section: 'listening',
+            part: partNumber(index, format.listeningParts),
+            prompt: locale === 'ru' ? 'Прослушай слово и выбери его перевод.' : locale === 'uz' ? 'So‘zni tinglang va tarjimasini tanlang.' : 'Listen to the word and choose its meaning.',
+            options: makeOptions(answer, safeWords.filter(item => wordId(item) !== wordId(word)).map(meaningOf), seed),
+            answer,
+            audio: word.hanzi,
+            pinyin: word.pinyin,
+            explanation: `${word.hanzi} · ${word.pinyin} · ${meaningOf(word)}`,
+          })
+        }
       }
       continue
     }
     if (index < format.listening + format.reading) {
       const offset = index - format.listening
       if (offset % 2 === 0 || readingLessonIndex >= lessons.length) {
-        const word = safeWords[readingWordIndex % safeWords.length]
+        const word = safeWords[readingWordIndex]
         readingWordIndex += 1
+        if (!word) return []
         const answer = meaningOf(word)
         questions.push({
           section: 'reading',
@@ -609,25 +607,95 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     }
     if (index < writingEnd) {
       const writingIndex = index - format.listening - format.reading
-      const lesson = lessons[writingLessonIndex++ % lessons.length]
-      if (level === 3 && writingIndex < Math.min(5, format.writing)) {
-        const word = safeWords[writingWordIndex++ % safeWords.length]
-        const meaning = meaningOf(word)
+      const lesson = lessons[writingLessonIndex++]
+      if (!lesson) return []
+      if (system === '3.0' && level === 2 && writingIndex < 5) {
+        const word = safeWords[writingWordIndex++]
+        if (!word) return []
         questions.push({
-          section: 'writing',
-          part: partNumber(writingIndex, format.writingParts),
-          prompt: locale === 'ru' ? 'Запиши иероглифами слово: ' + word.pinyin + ' (' + meaning + ')' : locale === 'uz' ? word.pinyin + ' (' + meaning + ') so‘zini ierogliflar bilan yozing.' : 'Write the Chinese characters for ' + word.pinyin + ' (' + meaning + ').',
-          options: [],
+          section: 'writing', part: partNumber(writingIndex, format.writingParts),
+          prompt: locale === 'ru' ? 'Выбери правильный иероглиф для pinyin: ' + word.pinyin + ' (' + meaningOf(word) + ')' : locale === 'uz' ? 'Quyidagi pinyin uchun to‘g‘ri ieroglifni tanlang: ' + word.pinyin + ' (' + meaningOf(word) + ')' : 'Choose the correct Chinese character for: ' + word.pinyin + ' (' + meaningOf(word) + ')',
+          options: makeOptions(word.hanzi, safeWords.filter(item => wordId(item) !== wordId(word)).map(item => item.hanzi), seed),
           answer: word.hanzi,
-          explanation: `${word.hanzi} · ${word.pinyin} · ${meaning}`,
+          explanation: word.hanzi + ' · ' + word.pinyin + ' · ' + meaningOf(word),
         })
         continue
       }
-      if (level >= 5 || (system === '3.0' && level === 4 && writingIndex >= format.writing - 2)) {
+      const characterWriting = system === '3.0'
+        ? (level === 2 && writingIndex >= 5) || (level === 3 && writingIndex < 5)
+        : level === 3 && writingIndex < 5
+      if (characterWriting) {
+        const word = safeWords[writingWordIndex++]
+        if (!word) return []
+        if (word) {
+          const meaning = meaningOf(word)
+          questions.push({
+            section: 'writing',
+            part: partNumber(writingIndex, format.writingParts),
+            prompt: locale === 'ru' ? 'Запиши иероглифами слово: ' + word.pinyin + ' (' + meaning + ')' : locale === 'uz' ? word.pinyin + ' (' + meaning + ') so‘zini ierogliflar bilan yozing.' : 'Write the Chinese characters for ' + word.pinyin + ' (' + meaning + ').',
+            options: [], answer: word.hanzi, explanation: word.hanzi + ' · ' + word.pinyin + ' · ' + meaning,
+          })
+        }
+        continue
+      }
+      if (system === '3.0' && level === 3) {
+        const word = safeWords[writingWordIndex++]
+        const cue = word ? word.hanzi + ' (' + word.pinyin + ')' : lesson.grammar.example
+        questions.push({
+          section: 'writing', part: partNumber(writingIndex, format.writingParts),
+          prompt: locale === 'ru' ? 'Составь полное предложение, используя слово: ' + cue : locale === 'uz' ? 'Quyidagi so‘zdan foydalanib to‘liq gap tuzing: ' + cue : 'Write a complete Chinese sentence using: ' + cue,
+          options: [], answer: '',
+          explanation: locale === 'ru' ? 'Самопроверка: предложение раскрывает смысл слова и грамматически завершено.' : locale === 'uz' ? 'O‘zini tekshirish: gap so‘z ma’nosini ochib beradi va grammatik jihatdan to‘liq.' : 'Self-check: the sentence uses the word meaningfully and is grammatically complete.',
+          manualReview: true,
+        })
+        continue
+      }
+      if (system === '3.0' && level === 4) {
+        const word = writingIndex < 5 ? safeWords[writingWordIndex++] : undefined
+        const cue = word ? word.hanzi + ' (' + word.pinyin + ') · ' + meaningOf(word) : lesson.grammar.example
+        const prompt = writingIndex < 5
+          ? (locale === 'ru' ? 'Составь естественное предложение, используя слово: ' + cue : locale === 'uz' ? 'Quyidagi so‘zdan foydalanib tabiiy gap tuzing: ' + cue : 'Write a natural Chinese sentence using: ' + cue)
+          : (locale === 'ru' ? 'Напиши связный текст не менее чем из 80 китайских иероглифов на тему «' + lesson.title + '».' : locale === 'uz' ? '«' + lesson.title + '» mavzusida kamida 80 ta xitoy ieroglifidan iborat matn yozing.' : 'Write a coherent text of at least 80 Chinese characters about “' + lesson.title + '”.')
+        questions.push({
+          section: 'writing', part: partNumber(writingIndex, format.writingParts), prompt, options: [], answer: '',
+          explanation: locale === 'ru' ? 'Самопроверка: раскрой тему, соблюдай порядок слов, грамматику и связность.' : locale === 'uz' ? 'O‘zini tekshirish: mavzuni yoritish, so‘z tartibi va grammatikaga e’tibor bering.' : 'Self-check: develop the topic, use natural word order, and check grammar and coherence.',
+          manualReview: true,
+        })
+        continue
+      }
+      if (system === '3.0' && level >= 5 && level <= 6) {
+        const sourceText = [lesson.grammar.example, ...(lesson.grammar.extraExamples ?? []).map(example => example.hanzi)].join(' ')
+        const prompt = level === 5 && writingIndex === 0
+          ? (locale === 'ru' ? 'Напиши связный рассказ по последовательности событий на тему «' + lesson.title + '». Используй фразу: ' + lesson.grammar.example : locale === 'uz' ? '«' + lesson.title + '» mavzusida voqealar ketma-ketligi asosida hikoya yozing. ' + lesson.grammar.example : 'Write a coherent story about “' + lesson.title + '”, using this detail: ' + lesson.grammar.example)
+          : level === 5
+            ? (locale === 'ru' ? 'Напиши эссе не менее 200 китайских иероглифов на тему «' + lesson.title + '».' : locale === 'uz' ? '«' + lesson.title + '» mavzusida kamida 200 ta xitoy ieroglifidan iborat esse yozing.' : 'Write an essay of at least 200 Chinese characters about “' + lesson.title + '”.')
+            : writingIndex === 0
+              ? (locale === 'ru' ? 'Кратко изложи основную мысль текста своими словами: «' + sourceText + '»' : locale === 'uz' ? 'Matnning asosiy mazmunini qisqacha bayon qiling: «' + sourceText + '»' : 'Summarize the main idea in your own words: “' + sourceText + '”')
+              : (locale === 'ru' ? 'Напиши аргументированное эссе на тему «' + lesson.title + '», приведи доводы и пример.' : locale === 'uz' ? '«' + lesson.title + '» mavzusida dalillar va misol bilan esse yozing.' : 'Write an argumentative essay about “' + lesson.title + '”, with reasons and an example.')
+        questions.push({
+          section: 'writing', part: partNumber(writingIndex, format.writingParts), prompt, options: [], answer: '',
+          explanation: locale === 'ru' ? 'Самопроверка: структура, связность, точность языка, раскрытие темы и требуемый объём.' : locale === 'uz' ? 'O‘zini tekshirish: tuzilma, izchillik, til aniqligi va mavzuning yoritilishi.' : 'Self-check: structure, coherence, language accuracy, topic development, and required length.',
+          manualReview: true,
+        })
+        continue
+      }
+      if (system === '2.0' && level === 4 && writingIndex >= 10) {
+        const word = safeWords[writingWordIndex++]
+        const cue = word ? word.hanzi + ' (' + word.pinyin + ')' : lesson.grammar.example
+        questions.push({
+          section: 'writing', part: partNumber(writingIndex, format.writingParts),
+          prompt: locale === 'ru' ? 'Составь грамматически правильное предложение со словом: ' + cue : locale === 'uz' ? 'Quyidagi so‘z bilan grammatik jihatdan to‘g‘ri gap tuzing: ' + cue : 'Write a grammatically correct Chinese sentence using: ' + cue,
+          options: [], answer: '',
+          explanation: locale === 'ru' ? 'Самопроверка: значение слова, порядок слов и грамматическая конструкция использованы правильно.' : locale === 'uz' ? 'O‘zini tekshirish: so‘z ma’nosi, tartib va grammatika to‘g‘ri ishlatilgan.' : 'Self-check: use the word accurately and check word order and grammar.',
+          manualReview: true,
+        })
+        continue
+      }
+      if (level >= 5 && !(system === '2.0' && level === 5 && writingIndex < 8)) {
         questions.push({
           section: 'writing',
           part: partNumber(writingIndex, format.writingParts),
-          prompt: locale === 'ru' ? 'Напиши короткий связный текст по теме «' + lesson.title + '». Используй фразу ' + lesson.grammar.example + ' как опору.' : locale === 'uz' ? '«' + lesson.title + '» mavzusida qisqa matn yozing. ' + lesson.grammar.example + ' gapidan foydalaning.' : 'Write a short text about “' + lesson.title + '”. Use ' + lesson.grammar.example + ' as a starting point.',
+          prompt: system === '2.0' && level === 5 ? (locale === 'ru' ? 'Напиши связный текст примерно из 80 иероглифов на тему «' + lesson.title + '». Используй фразу ' + lesson.grammar.example + ' как опору.' : locale === 'uz' ? '«' + lesson.title + '» mavzusida taxminan 80 ta ieroglifdan iborat matn yozing. ' + lesson.grammar.example + ' gapidan foydalaning.' : 'Write a coherent composition of about 80 Chinese characters on “' + lesson.title + '”. Use ' + lesson.grammar.example + ' as a starting point.') : locale === 'ru' ? 'Напиши короткий связный текст по теме «' + lesson.title + '». Используй фразу ' + lesson.grammar.example + ' как опору.' : locale === 'uz' ? '«' + lesson.title + '» mavzusida qisqa matn yozing. ' + lesson.grammar.example + ' gapidan foydalaning.' : 'Write a short text about “' + lesson.title + '”. Use ' + lesson.grammar.example + ' as a starting point.',
           options: [],
           answer: '',
           explanation: locale === 'ru' ? 'Самопроверка: тема раскрыта, структура связная, грамматика и целевая конструкция использованы правильно.' : locale === 'uz' ? 'O‘zini tekshirish: mavzu yoritilgan, matn izchil, grammatika va kerakli tuzilma to‘g‘ri ishlatilgan.' : 'Self-check: address the topic, keep a clear structure, and use the target grammar accurately.',
@@ -649,7 +717,8 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       continue
     }
     if (index < translationEnd) {
-      const lesson = lessons[translationIndex++ % lessons.length]
+      const lesson = lessons[translationIndex++]
+      if (!lesson) return []
       const translateToChinese = (translationIndex - 1) % 2 === 1
       questions.push({
         section: 'translation',
@@ -666,7 +735,8 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       })
       continue
     }
-    const lesson = lessons[speakingIndex++ % lessons.length]
+    const lesson = lessons[speakingIndex++]
+    if (!lesson) return []
     questions.push({
       section: 'speaking',
       part: partNumber(index - translationEnd, format.speakingParts),
@@ -677,7 +747,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       manualReview: true,
     })
   }
-  return questions
+  return questions.length === total ? questions : []
 }
 function normalizeWrittenAnswer(value: string): string {
   return value.replace(/[\s，。！？、,.!?;；:：]/g, '').toLocaleLowerCase()
@@ -867,6 +937,7 @@ export default function App() {
     const saved = readStored<{ date: string; count: number }>(DAILY_REVIEW_COUNT_KEY, { date: '', count: 0 })
     return saved.date === localDateKey() ? saved : { date: localDateKey(), count: 0 }
   })
+  const [cardsMode, setCardsMode] = useState<'lesson' | 'personal'>('lesson')
   const [cardsSystem, setCardsSystem] = useState<CourseSystem>(() => readStored<CourseSystem>('hanzipath.cards.system', '2.0'))
   const [cardsLevel, setCardsLevel] = useState<CourseLevel>(() => readStored<CourseLevel>('hanzipath.cards.level', 1))
   const [cardsLessonId, setCardsLessonId] = useState<string>(() => readStored<string>('hanzipath.cards.lesson', ''))
@@ -1625,7 +1696,10 @@ export default function App() {
   const cardsLessons = expandedLessonData.lessons.filter(lesson => lesson.system === cardsSystem && lesson.level === cardsLevel)
   const selectedCardsLesson = cardsLessons.find(lesson => lesson.id === cardsLessonId) ?? cardsLessons[0]
   const cardStudyWords = useMemo(() => {
-    const base = selectedCardsLesson ? expandedLessonData.assignments[selectedCardsLesson.id] ?? [] : []
+    const assigned = selectedCardsLesson ? expandedLessonData.assignments[selectedCardsLesson.id] ?? [] : []
+    // Source IDs can differ for duplicate vocabulary rows; compare the actual
+    // headword + pronunciation so one lesson never repeats the same card.
+    const base = uniqueLessonCards(assigned)
     const dueIds = new Set(dueReviewIds(reviewSchedule))
     return [...base].sort((a, b) => {
       const aId = wordId(a)
@@ -2581,6 +2655,11 @@ export default function App() {
             <span className="demo-tag">HSK {cardsSystem} · {cardsLevel} · {selectedCardsLesson?.title ?? ''}</span>
           </div>
           <p className="notice-text">{t('flashcards.notice')}</p>
+          <div className="standard-switch personal-flashcards-tabs" role="tablist" aria-label={lang === 'ru' ? 'Режим карточек' : lang === 'uz' ? 'Kartochka rejimi' : 'Flashcard mode'}>
+            <button type="button" role="tab" aria-selected={cardsMode === 'lesson'} className={cardsMode === 'lesson' ? 'selected' : ''} onClick={() => setCardsMode('lesson')}>{lang === 'ru' ? 'Карточки уроков' : lang === 'uz' ? 'Dars kartochkalari' : 'Lesson cards'}</button>
+            <button type="button" role="tab" aria-selected={cardsMode === 'personal'} className={cardsMode === 'personal' ? 'selected' : ''} onClick={() => setCardsMode('personal')}>Personal Flash Cards</button>
+          </div>
+          {cardsMode === 'personal' ? <PersonalFlashCards locale={lang}/> : <>
           <div className="filters study-filters">
             <label>{lang === 'ru' ? 'Стандарт' : lang === 'uz' ? 'Standart' : 'Standard'}
               <select value={cardsSystem} onChange={event => { setCardsSystem(event.target.value as CourseSystem); setCardsLevel(1); setCardsLessonId(''); setCardIndex(0); setShowAnswer(false) }}>
@@ -2619,6 +2698,7 @@ export default function App() {
               <button className="outline" aria-label={t('flashcards.next')} onClick={() => { setShowAnswer(false); setCardIndex(i => (i + 1) % cardStudyWords.length) }}>›</button>
             </div>
           </> : <div className="empty">{t('course.noWords')}</div>}
+          </>}
         </section>
       )}
       {section === 4 && (
@@ -2699,9 +2779,14 @@ export default function App() {
               ? (lang === 'ru' ? 'Формат соответствует пяти разделам HSK 7–9. Автоматически оцениваются только объективные задания; письмо, перевод и устная речь требуют самостоятельной или преподавательской проверки. Официальный экзамен использует отдельные баллы по пяти навыкам и модель IRT.'
                 : lang === 'uz' ? 'Format HSK 7–9 ning besh bo‘limiga mos. Faqat test savollari avtomatik baholanadi; yozish, tarjima va nutq mustaqil yoki o‘qituvchi tomonidan tekshiriladi. Rasmiy imtihon besh ko‘nikma bo‘yicha alohida IRT ballarini beradi.'
                   : 'The format follows the five HSK 7–9 sections. Only objective questions are auto-graded; writing, translation and speaking need self- or teacher review. The official test reports five skill scores using IRT.')
-              : (lang === 'ru' ? 'Это тренировочная симуляция по структуре экзамена, а не официальный вариант прошлых лет. Открытые письменные задания могут требовать ручной проверки.'
-                : lang === 'uz' ? 'Bu imtihon tuzilishiga asoslangan mashq simulyatsiyasi, rasmiy oldingi imtihon varianti emas. Ochiq yozma topshiriqlar qo‘lda tekshirilishi mumkin.'
-                  : 'This is a practice simulation aligned to the test structure, not an official past paper. Open-ended writing tasks may require manual review.')}
+              : examSystem === '3.0'
+                ? (lang === 'ru' ? 'Количество заданий и разделы HSK 3.0 уровней 1–6 сверены с опубликованными CTI образцами 2026 года. Задания HanziPath созданы для тренировки и не являются официальными экзаменационными материалами.'
+                  : lang === 'uz' ? 'HSK 3.0 1–6 darajalari bo‘yicha savollar soni va bo‘limlar CTI tomonidan e’lon qilingan 2026-yil namunalariga moslashtirilgan. HanziPath topshiriqlari mashq uchun yaratilgan, rasmiy imtihon materiallari emas.'
+                    : 'Question counts and sections for HSK 3.0 levels 1–6 follow CTI’s published 2026 sample structure. HanziPath questions are original practice material, not official exam papers.')
+                : (lang === 'ru' ? 'Это тренировочная симуляция по структуре экзамена, а не официальный вариант прошлых лет. Открытые письменные задания могут требовать ручной проверки.'
+                  : lang === 'uz' ? 'Bu imtihon tuzilishiga asoslangan mashq simulyatsiyasi, rasmiy oldingi imtihon varianti emas. Ochiq yozma topshiriqlar qo‘lda tekshirilishi mumkin.'
+                    : 'This is a practice simulation aligned to the test structure, not an official past paper. Open-ended writing tasks may require manual review.')}
+            {examSystem === '3.0' && examLevel >= 3 && examLevel <= 6 && <span>{' · '}{lang === 'ru' ? 'Отдельная устная работа HSK 3–6 (15–23 минуты) пока не включена в эту письменную симуляцию.' : lang === 'uz' ? 'HSK 3–6 uchun alohida og‘zaki imtihon (15–23 daqiqa) hozircha ushbu yozma sinovga kiritilmagan.' : 'The separate HSK 3–6 speaking paper (15–23 minutes) is not included in this written mock yet.'}</span>}
             {' · '}<a href="https://www.chinesetest.cn/HSK" target="_blank" rel="noreferrer">{lang === 'ru' ? 'Официальная структура HSK' : lang === 'uz' ? 'HSK rasmiy tuzilishi' : 'Official HSK structure'}</a>
           </p>
           {examHistory.length > 0 && <section className="exam-history">

@@ -42,6 +42,73 @@ const strongSchedule = Object.fromEntries(Array.from({ length: 5 }, (_, index) =
 ]))
 assert.equal(spaced.adaptiveDifficulty(strongSchedule), 3)
 
+const lessonCards = await loadTypeScriptModule('../src/data/lessonCards.ts')
+const lessonWords = Array.from({ length: 24 }, (_, index) => ({
+  sourceEntryKey: `row-${index}`,
+  hanzi: `词${index}`,
+  pinyin: `ci2${index}`,
+}))
+const distinctLessonCards = lessonCards.uniqueLessonCards(lessonWords)
+assert.equal(distinctLessonCards.length, 24, 'all 24 distinct lesson words must become cards')
+const duplicateAliases = lessonCards.uniqueLessonCards([
+  { sourceEntryKey: 'row-a', hanzi: '学习', pinyin: 'xué xí' },
+  { sourceEntryKey: 'row-b', hanzi: '学习', pinyin: 'xuéxí' },
+  { sourceEntryKey: 'row-c', hanzi: '学习', pinyin: 'xuéxí ' },
+  { sourceEntryKey: 'row-d', hanzi: '银行', pinyin: 'yín háng' },
+])
+assert.deepEqual(duplicateAliases.map(word => word.hanzi), ['学习', '银行'])
+assert.equal(lessonCards.uniqueLessonCards([
+  { hanzi: '行', pinyin: 'xíng' },
+  { hanzi: '行', pinyin: 'háng' },
+]).length, 2, 'different pronunciations must remain distinct')
+assert.equal(lessonCards.uniqueLessonCards(lessonWords).length, 24)
+assert.equal(lessonCards.uniqueLessonCards([
+  { hanzi: '西安', pinyin: 'xī ān' },
+  { hanzi: '西安', pinyin: 'xī' + String.fromCharCode(39) + 'ān' },
+]).length, 2, 'syllable boundaries must not be collapsed')
+
+const personalQueue = await loadTypeScriptModule('../src/data/personalFlashcardQueue.ts')
+const queueCards = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+assert.deepEqual(personalQueue.buildPersonalFlashcardQueue(queueCards, [], []).map(card => card.id), ['a', 'b', 'c'])
+assert.deepEqual(personalQueue.buildPersonalFlashcardQueue(queueCards, [], ['a']).map(card => card.id), ['b', 'c', 'a'])
+assert.deepEqual(personalQueue.buildPersonalFlashcardQueue(queueCards, ['b'], ['a', 'a']).map(card => card.id), ['c', 'a'])
+assert.deepEqual(personalQueue.buildPersonalFlashcardQueue(queueCards, ['a', 'b', 'c'], []).map(card => card.id), [])
+
+const examFormats = await loadTypeScriptModule('../src/data/examFormats.ts')
+const legacy1 = examFormats.examFormat('2.0', 1)
+assert.equal(examFormats.examQuestionCount(legacy1), 40)
+assert.equal(legacy1.minutes, 40)
+const legacy6 = examFormats.examFormat('2.0', 6)
+assert.equal(examFormats.examQuestionCount(legacy6), 101)
+assert.equal(legacy6.minutes, 140)
+const newHsk1 = examFormats.examFormat('3.0', 1)
+assert.equal(examFormats.examQuestionCount(newHsk1), 40)
+const newHsk2 = examFormats.examFormat('3.0', 2)
+assert.equal(examFormats.examQuestionCount(newHsk2), 60)
+assert.equal(newHsk2.writing, 10)
+const newHsk3 = examFormats.examFormat('3.0', 3)
+assert.equal(examFormats.examQuestionCount(newHsk3), 70)
+const newHsk4 = examFormats.examFormat('3.0', 4)
+assert.equal(examFormats.examQuestionCount(newHsk4), 70)
+const newHsk5 = examFormats.examFormat('3.0', 5)
+assert.equal(examFormats.examQuestionCount(newHsk5), 72)
+const newHsk6 = examFormats.examFormat('3.0', 6)
+assert.equal(examFormats.examQuestionCount(newHsk6), 82)
+const newHsk79 = examFormats.examFormat('3.0', 7)
+assert.equal(examFormats.examQuestionCount(newHsk79), 91)
+assert.equal(newHsk79.minutes, 200)
+
+const listeningBank = await loadTypeScriptModule('../src/data/examListeningBank.ts')
+assert.equal(new Set(listeningBank.examListeningBank.map(item => item.audio)).size, listeningBank.examListeningBank.length)
+for (const item of listeningBank.examListeningBank) {
+  assert.ok(item.options.includes(item.answer), 'each listening question must include its answer')
+  assert.equal(new Set(item.options).size, item.options.length, 'listening distractors must be unique')
+  assert.ok(item.audio.length > 8, 'dialogue and monologue audio should contain context')
+}
+for (let level = 1; level <= 6; level += 1) {
+  assert.ok(listeningBank.examListeningBank.filter(item => item.level === level).length >= 3)
+}
+
 const progress = await loadTypeScriptModule('../src/data/learningProgress.ts')
 const today = '2026-11-17'
 const local = progress.emptyLearningProgress(today)
@@ -106,7 +173,7 @@ const missing = Object.fromEntries(['hanzi', 'pinyin', 'ru', 'en', 'uz'].map(key
 ]))
 const unverified = entries.filter(entry => entry.membershipStatus !== 'verified').length
 
-console.log('Learning logic and dictionary deduplication tests passed.')
+console.log('Learning logic, lesson-card uniqueness, HSK formats, listening bank and dictionary tests passed.')
 console.log(JSON.stringify({
   dictionaryAudit: audit,
   missingCoreFields: missing,

@@ -163,150 +163,118 @@ export async function searchVocabulary(
 
   const client = supabase
   const term = searchText.trim()
-
   if (!term) return { data: [], error: null }
+
+  const requestedLimit = options.limit ?? DEFAULT_SEARCH_LIMIT
+  const resultLimit = Number.isFinite(requestedLimit)
+    ? Math.max(1, Math.min(Math.floor(requestedLimit), MAX_SEARCH_LIMIT))
+    : DEFAULT_SEARCH_LIMIT
 
   try {
     const pattern = `%${escapeLike(term)}%`
     const normalizedTerm = normalizePinyin(term)
+    const pinyinPattern = `%${escapeLike(normalizedTerm)}%`
 
-    const requestedLimit = options.limit ?? DEFAULT_SEARCH_LIMIT
+    // Indexed substring queries cover every HSK catalog membership, including
+    // the combined HSK 3.0 advanced 7-9 band. Pinyin is normalized in SQL so
+    // students can search "wan" and still find "wán".
+    const [itemResponse, readingResponse, translationResponse] = await Promise.all([
+      client.from('vocabulary_items')
+        .select('id,simplified,traditional,source_id,verification_status')
+        .or(`simplified.ilike.${pattern},traditional.ilike.${pattern}`)
+        .limit(resultLimit * 4),
 
-    const resultLimit = Number.isFinite(requestedLimit)
-      ? Math.max(1, Math.min(Math.floor(requestedLimit), MAX_SEARCH_LIMIT))
-      : DEFAULT_SEARCH_LIMIT
+      normalizedTerm.length >= 2
+        ? client.from('vocabulary_readings')
+            .select('id,vocabulary_item_id,pinyin,verification_status')
+            .neq('verification_status', 'rejected')
+            .ilike('pinyin_search', pinyinPattern)
+            .limit(resultLimit * 4)
+        : Promise.resolve({ data: [], error: null }),
 
-    const [itemMatches, readingMatches, translationMatches] =
-      await Promise.all([
-        fetchAllPages<VocabularyItem>((cursor, limit) =>
-          keysetPage(
-            client.from('vocabulary_items')
-              .select('*', { count: 'exact' })
-              .or(`simplified.ilike.${pattern},traditional.ilike.${pattern}`),
-            cursor,
-            limit,
-          ),
-        ),
+      (() => {
+        let query = client.from('translations')
+          .select('id,vocabulary_item_id,locale,text,content_kind,example_id,reading_id,verification_status')
+          .neq('verification_status', 'rejected')
+          .eq('content_kind', 'meaning')
+          .ilike('text', pattern)
 
-        fetchAllPages<VocabularyReading>((cursor, limit) =>
-          keysetPage(
-            client.from('vocabulary_readings')
-              .select('*', { count: 'exact' })
-              .eq('verification_status', 'verified'),
-            cursor,
-            limit,
-          ),
-        ),
-
-        fetchAllPages<Translation>((cursor, limit) => {
-          let query = client.from('translations')
-            .select('*', { count: 'exact' })
-            .eq('verification_status', 'verified')
-            .eq('content_kind', 'meaning')
-            .ilike('text', pattern)
-
-          if (options.locale) {
-            query = query.eq('locale', options.locale)
-          }
-
-          return keysetPage(query, cursor, limit)
-        }),
-      ])
-
-    const queryError =
-      itemMatches.error ??
-      readingMatches.error ??
-      translationMatches.error
-
-    if (queryError) return failed([], queryError)
-
-    const matchingReadings = normalizedTerm
-      ? readingMatches.data.filter(reading =>
-          normalizePinyin(reading.pinyin).includes(normalizedTerm),
-        )
-      : []
-
-    const matchedTranslations = translationMatches.data
-
-    const candidates = new Set<string>([
-      ...itemMatches.data.map(item => item.id),
-      ...matchingReadings.map(reading => reading.vocabulary_item_id),
-      ...matchedTranslations.map(translation => translation.vocabulary_item_id),
+        if (options.locale) query = query.eq('locale', options.locale)
+        return query.limit(resultLimit * 8)
+      })(),
     ])
 
-    const selectedIds = [...candidates]
-      .sort((a, b) => a.localeCompare(b))
-      .slice(0, resultLimit)
+    const queryError = itemResponse.error ?? readingResponse.error ?? translationResponse.error
+    if (queryError) return failed([], queryError)
 
-    if (selectedIds.length === 0) {
-      return { data: [], error: null }
-    }
+    const itemMatches = (itemResponse.data ?? []) as Array<{ id: string }>
+    const readingMatches = (readingResponse.data ?? []) as VocabularyReading[]
+    const translationMatches = (translationResponse.data ?? []) as Translation[]
 
-    const detailRows: Array<VocabularyItem & {
+    // Keep the most relevant groups first instead of truncating an unordered
+    // mixed set before relevance sorting.
+    const candidateIds = [
+      ...new Set([
+        ...itemMatches.map(item => item.id),
+        ...readingMatches.map(reading => reading.vocabulary_item_id),
+        ...translationMatches.map(translation => translation.vocabulary_item_id),
+      ]),
+    ].slice(0, resultLimit)
+
+    if (candidateIds.length === 0) return { data: [], error: null }
+
+    const itemIds = candidateIds
+    const { data: detailData, error: detailError } = await client.from('vocabulary_items')
+      .select('*, vocabulary_readings(*), translations(*)')
+      .in('id', itemIds)
+
+    if (detailError) return failed([], detailError)
+
+    const detailRows = (detailData ?? []) as Array<VocabularyItem & {
       vocabulary_readings?: VocabularyReading[] | null
       translations?: Translation[] | null
-    }> = []
-
-    for (let offset = 0; offset < selectedIds.length; offset += PAGE_SIZE) {
-      const ids = selectedIds.slice(offset, offset + PAGE_SIZE)
-
-      const { data, error } = await client.from('vocabulary_items')
-        .select('*, vocabulary_readings(*), translations(*)')
-        .in('id', ids)
-        .order('id', { ascending: true })
-
-      if (error) return failed([], error)
-
-      const rows = (data ?? []) as typeof detailRows
-
-      if (rows.length !== ids.length) {
-        return failed([], INCOMPLETE_PAGE_ERROR)
-      }
-
-      detailRows.push(...rows)
-    }
-
-    const verifiedMatchesByItem = new Map<string, Translation[]>()
-
-    for (const translation of matchedTranslations) {
-      if (translation.verification_status !== 'verified') continue
-      if (translation.content_kind !== 'meaning') continue
-
-      const matches =
-        verifiedMatchesByItem.get(translation.vocabulary_item_id) ?? []
-
-      matches.push(translation)
-      verifiedMatchesByItem.set(translation.vocabulary_item_id, matches)
-    }
+    }>
 
     const detailsById = new Map(detailRows.map(row => [row.id, row]))
+    const matchedById = new Map<string, Translation[]>()
+
+    for (const translation of translationMatches) {
+      const matches = matchedById.get(translation.vocabulary_item_id) ?? []
+      matches.push(translation)
+      matchedById.set(translation.vocabulary_item_id, matches)
+    }
+
     const results: VocabularySearchResult[] = []
-
-    for (const id of selectedIds) {
+    for (const id of itemIds) {
       const row = detailsById.get(id)
+      if (!row) continue
 
-      if (!row) return failed([], INCOMPLETE_PAGE_ERROR)
-
-      const { translations, ...item } = row
-
-      const verifiedNestedTranslations = (translations ?? []).filter(
+      const verifiedReadings = (row.vocabulary_readings ?? []).filter(
+        reading => reading.verification_status !== 'rejected',
+      )
+      const verifiedTranslations = (row.translations ?? []).filter(
         translation =>
-          translation.verification_status === 'verified' &&
-          translation.content_kind === 'meaning' &&
-          (!options.locale || translation.locale === options.locale),
+          translation.verification_status !== 'rejected' &&
+          translation.content_kind === 'meaning',
       )
 
       results.push({
-        ...item,
-        vocabulary_readings: (row.vocabulary_readings ?? []).filter(
-          reading => reading.verification_status === 'verified',
-        ),
-        translations: verifiedNestedTranslations,
-        matched_translations: verifiedMatchesByItem.get(id) ?? [],
+        ...row,
+        vocabulary_readings: verifiedReadings,
+        translations: verifiedTranslations,
+        matched_translations: matchedById.get(id) ?? [],
       } as VocabularySearchResult)
     }
 
-    return { data: results, error: null }
+    // Prefer direct character matches, then pinyin, then translated meanings.
+    const itemIdsSet = new Set(itemMatches.map(item => item.id))
+    const readingIdsSet = new Set(readingMatches.map(item => item.vocabulary_item_id))
+    results.sort((a, b) =>
+      Number(itemIdsSet.has(b.id)) - Number(itemIdsSet.has(a.id)) ||
+      Number(readingIdsSet.has(b.id)) - Number(readingIdsSet.has(a.id)),
+    )
+
+    return { data: results.slice(0, resultLimit), error: null }
   } catch (error) {
     return failed([], error)
   }
