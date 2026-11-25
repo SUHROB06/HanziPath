@@ -173,7 +173,7 @@ export async function searchVocabulary(
   try {
     const pattern = `%${escapeLike(term)}%`
     const normalizedTerm = normalizePinyin(term)
-    const pinyinPattern = `%${escapeLike(normalizedTerm)}%`
+    // Tone marks are stored in the pinyin field (e.g. wán), while students often type wan.\n    // Replace vowels with single-character wildcards, then rank/filter candidates in JS.\n    const pinyinPattern = `%${escapeLike(normalizedTerm.replace(/[aeiou]/g, '_'))}%`
 
     // Search only matching rows. Downloading every reading and translation
     // before filtering made each keystroke slow as the catalog grew.
@@ -185,14 +185,14 @@ export async function searchVocabulary(
 
       client.from('vocabulary_readings')
         .select('*')
-        .eq('verification_status', 'verified')
-        .or(`pinyin.ilike.${pattern},pinyin_numeric.ilike.${pinyinPattern}`)
+        .neq('verification_status', 'rejected')
+        .or(`pinyin.ilike.${pinyinPattern},pinyin_numeric.ilike.${pattern}`)
         .limit(resultLimit * 4),
 
       (() => {
         let query = client.from('translations')
           .select('*')
-          .eq('verification_status', 'verified')
+          .neq('verification_status', 'rejected')
           .eq('content_kind', 'meaning')
           .ilike('text', pattern)
 
@@ -205,7 +205,7 @@ export async function searchVocabulary(
     if (queryError) return failed([], queryError)
 
     const itemMatches = (itemResponse.data ?? []) as VocabularyItem[]
-    const readingMatches = (readingResponse.data ?? []) as VocabularyReading[]
+    const readingMatches = ((readingResponse.data ?? []) as VocabularyReading[]).filter(\n      reading => normalizePinyin(reading.pinyin).includes(normalizedTerm),\n    )
     const translationMatches = (translationResponse.data ?? []) as Translation[]
 
     const candidateIds = new Set<string>([
