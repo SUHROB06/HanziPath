@@ -1,8 +1,6 @@
-export type LessonCardWord = { hanzi: string; pinyin: string }
+import { normalizeDictionaryPinyin } from './dictionaryQuality'
 
-function canonicalPinyin(value: string): string {
-  return value.normalize('NFKC').toLocaleLowerCase().replace(/[\s'’·]/g, '')
-}
+export type LessonCardWord = { hanzi: string; pinyin: string }
 
 /**
  * Preserve every distinct Chinese headword/pronunciation pair while collapsing
@@ -13,7 +11,7 @@ export function uniqueLessonCards<T extends LessonCardWord>(words: T[]): T[] {
   const result: T[] = []
   for (const word of words) {
     const hanzi = word.hanzi.trim().normalize('NFKC')
-    const pinyin = canonicalPinyin(word.pinyin)
+    const pinyin = normalizeDictionaryPinyin(word.pinyin)
     if (!hanzi || !pinyin) continue
     const key = hanzi + '|' + pinyin
     if (seen.has(key)) continue
