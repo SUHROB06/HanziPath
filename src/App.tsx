@@ -626,20 +626,52 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     if (index < writingEnd) {
       const writingIndex = index - format.listening - format.reading
       const lesson = lessons[writingLessonIndex++]
-      if (level === 3 && writingIndex < Math.min(5, format.writing)) {
-        const word = safeWords[writingWordIndex++ % safeWords.length]
-        const meaning = meaningOf(word)
+      const characterWriting = system === '3.0'
+        ? level === 2 || (level === 3 && writingIndex < 5)
+        : level === 3 && writingIndex < 5
+      if (characterWriting) {
+        const word = safeWords[writingWordIndex++]
+        if (word) {
+          const meaning = meaningOf(word)
+          questions.push({
+            section: 'writing',
+            part: partNumber(writingIndex, format.writingParts),
+            prompt: locale === 'ru' ? 'Запиши иероглифами слово: ' + word.pinyin + ' (' + meaning + ')' : locale === 'uz' ? word.pinyin + ' (' + meaning + ') so‘zini ierogliflar bilan yozing.' : 'Write the Chinese characters for ' + word.pinyin + ' (' + meaning + ').',
+            options: [], answer: word.hanzi, explanation: word.hanzi + ' · ' + word.pinyin + ' · ' + meaning,
+          })
+        }
+        continue
+      }
+      if (system === '3.0' && level === 4) {
+        const word = writingIndex < 5 ? safeWords[writingWordIndex++] : undefined
+        const cue = word ? word.hanzi + ' (' + word.pinyin + ') · ' + meaningOf(word) : lesson.grammar.example
+        const prompt = writingIndex < 5
+          ? (locale === 'ru' ? 'Составь естественное предложение, используя слово: ' + cue : locale === 'uz' ? 'Quyidagi so‘zdan foydalanib tabiiy gap tuzing: ' + cue : 'Write a natural Chinese sentence using: ' + cue)
+          : (locale === 'ru' ? 'Напиши связный текст не менее чем из 80 китайских иероглифов на тему «' + lesson.title + '».' : locale === 'uz' ? '«' + lesson.title + '» mavzusida kamida 80 ta xitoy ieroglifidan iborat matn yozing.' : 'Write a coherent text of at least 80 Chinese characters about “' + lesson.title + '”.')
         questions.push({
-          section: 'writing',
-          part: partNumber(writingIndex, format.writingParts),
-          prompt: locale === 'ru' ? 'Запиши иероглифами слово: ' + word.pinyin + ' (' + meaning + ')' : locale === 'uz' ? word.pinyin + ' (' + meaning + ') so‘zini ierogliflar bilan yozing.' : 'Write the Chinese characters for ' + word.pinyin + ' (' + meaning + ').',
-          options: [],
-          answer: word.hanzi,
-          explanation: `${word.hanzi} · ${word.pinyin} · ${meaning}`,
+          section: 'writing', part: partNumber(writingIndex, format.writingParts), prompt, options: [], answer: '',
+          explanation: locale === 'ru' ? 'Самопроверка: раскрой тему, соблюдай порядок слов, грамматику и связность.' : locale === 'uz' ? 'O‘zini tekshirish: mavzuni yoritish, so‘z tartibi va grammatikaga e’tibor bering.' : 'Self-check: develop the topic, use natural word order, and check grammar and coherence.',
+          manualReview: true,
         })
         continue
       }
-      if (level >= 5 || (system === '3.0' && level === 4 && writingIndex >= format.writing - 2)) {
+      if (system === '3.0' && level >= 5 && level <= 6) {
+        const sourceText = [lesson.grammar.example, ...(lesson.grammar.extraExamples ?? []).map(example => example.hanzi)].join(' ')
+        const prompt = level === 5 && writingIndex === 0
+          ? (locale === 'ru' ? 'Напиши связный рассказ по последовательности событий на тему «' + lesson.title + '». Используй фразу: ' + lesson.grammar.example : locale === 'uz' ? '«' + lesson.title + '» mavzusida voqealar ketma-ketligi asosida hikoya yozing. ' + lesson.grammar.example : 'Write a coherent story about “' + lesson.title + '”, using this detail: ' + lesson.grammar.example)
+          : level === 5
+            ? (locale === 'ru' ? 'Напиши эссе не менее 200 китайских иероглифов на тему «' + lesson.title + '».' : locale === 'uz' ? '«' + lesson.title + '» mavzusida kamida 200 ta xitoy ieroglifidan iborat esse yozing.' : 'Write an essay of at least 200 Chinese characters about “' + lesson.title + '”.')
+            : writingIndex === 0
+              ? (locale === 'ru' ? 'Кратко изложи основную мысль текста своими словами: «' + sourceText + '»' : locale === 'uz' ? 'Matnning asosiy mazmunini qisqacha bayon qiling: «' + sourceText + '»' : 'Summarize the main idea in your own words: “' + sourceText + '”')
+              : (locale === 'ru' ? 'Напиши аргументированное эссе на тему «' + lesson.title + '», приведи доводы и пример.' : locale === 'uz' ? '«' + lesson.title + '» mavzusida dalillar va misol bilan esse yozing.' : 'Write an argumentative essay about “' + lesson.title + '”, with reasons and an example.')
+        questions.push({
+          section: 'writing', part: partNumber(writingIndex, format.writingParts), prompt, options: [], answer: '',
+          explanation: locale === 'ru' ? 'Самопроверка: структура, связность, точность языка, раскрытие темы и требуемый объём.' : locale === 'uz' ? 'O‘zini tekshirish: tuzilma, izchillik, til aniqligi va mavzuning yoritilishi.' : 'Self-check: structure, coherence, language accuracy, topic development, and required length.',
+          manualReview: true,
+        })
+        continue
+      }
+      if (level >= 5) {
         questions.push({
           section: 'writing',
           part: partNumber(writingIndex, format.writingParts),
