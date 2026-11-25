@@ -2746,9 +2746,13 @@ export default function App() {
               ? (lang === 'ru' ? 'Формат соответствует пяти разделам HSK 7–9. Автоматически оцениваются только объективные задания; письмо, перевод и устная речь требуют самостоятельной или преподавательской проверки. Официальный экзамен использует отдельные баллы по пяти навыкам и модель IRT.'
                 : lang === 'uz' ? 'Format HSK 7–9 ning besh bo‘limiga mos. Faqat test savollari avtomatik baholanadi; yozish, tarjima va nutq mustaqil yoki o‘qituvchi tomonidan tekshiriladi. Rasmiy imtihon besh ko‘nikma bo‘yicha alohida IRT ballarini beradi.'
                   : 'The format follows the five HSK 7–9 sections. Only objective questions are auto-graded; writing, translation and speaking need self- or teacher review. The official test reports five skill scores using IRT.')
-              : (lang === 'ru' ? 'Это тренировочная симуляция по структуре экзамена, а не официальный вариант прошлых лет. Открытые письменные задания могут требовать ручной проверки.'
-                : lang === 'uz' ? 'Bu imtihon tuzilishiga asoslangan mashq simulyatsiyasi, rasmiy oldingi imtihon varianti emas. Ochiq yozma topshiriqlar qo‘lda tekshirilishi mumkin.'
-                  : 'This is a practice simulation aligned to the test structure, not an official past paper. Open-ended writing tasks may require manual review.')}
+              : examSystem === '3.0'
+                ? (lang === 'ru' ? 'Количество заданий и разделы HSK 3.0 уровней 1–6 сверены с опубликованными CTI образцами 2026 года. Задания HanziPath созданы для тренировки и не являются официальными экзаменационными материалами.'
+                  : lang === 'uz' ? 'HSK 3.0 1–6 darajalari bo‘yicha savollar soni va bo‘limlar CTI tomonidan e’lon qilingan 2026-yil namunalariga moslashtirilgan. HanziPath topshiriqlari mashq uchun yaratilgan, rasmiy imtihon materiallari emas.'
+                    : 'Question counts and sections for HSK 3.0 levels 1–6 follow CTI’s published 2026 sample structure. HanziPath questions are original practice material, not official exam papers.')
+                : (lang === 'ru' ? 'Это тренировочная симуляция по структуре экзамена, а не официальный вариант прошлых лет. Открытые письменные задания могут требовать ручной проверки.'
+                  : lang === 'uz' ? 'Bu imtihon tuzilishiga asoslangan mashq simulyatsiyasi, rasmiy oldingi imtihon varianti emas. Ochiq yozma topshiriqlar qo‘lda tekshirilishi mumkin.'
+                    : 'This is a practice simulation aligned to the test structure, not an official past paper. Open-ended writing tasks may require manual review.')}
             {' · '}<a href="https://www.chinesetest.cn/HSK" target="_blank" rel="noreferrer">{lang === 'ru' ? 'Официальная структура HSK' : lang === 'uz' ? 'HSK rasmiy tuzilishi' : 'Official HSK structure'}</a>
           </p>
           {examHistory.length > 0 && <section className="exam-history">
