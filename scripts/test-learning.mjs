@@ -67,6 +67,12 @@ assert.equal(lessonCards.uniqueLessonCards([
   { hanzi: '西安', pinyin: 'xī' + String.fromCharCode(39) + 'ān' },
 ]).length, 2, 'syllable boundaries must not be collapsed')
 
+const personalQueue = await loadTypeScriptModule('../src/data/personalFlashcardQueue.ts')
+const queueCards = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+assert.deepEqual(personalQueue.buildPersonalFlashcardQueue(queueCards, [], []).map(card => card.id), ['a', 'b', 'c'])
+assert.deepEqual(personalQueue.buildPersonalFlashcardQueue(queueCards, [], ['a']).map(card => card.id), ['b', 'c', 'a'])
+assert.deepEqual(personalQueue.buildPersonalFlashcardQueue(queueCards, ['b'], ['a', 'a']).map(card => card.id), ['c', 'a'])
+assert.deepEqual(personalQueue.buildPersonalFlashcardQueue(queueCards, ['a', 'b', 'c'], []).map(card => card.id), [])
 
 const examFormats = await loadTypeScriptModule('../src/data/examFormats.ts')
 const legacy1 = examFormats.examFormat('2.0', 1)
