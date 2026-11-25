@@ -62,6 +62,11 @@ assert.equal(lessonCards.uniqueLessonCards([
   { hanzi: '行', pinyin: 'háng' },
 ]).length, 2, 'different pronunciations must remain distinct')
 assert.equal(lessonCards.uniqueLessonCards(lessonWords).length, 24)
+assert.equal(lessonCards.uniqueLessonCards([
+  { hanzi: '西安', pinyin: 'xī ān' },
+  { hanzi: '西安', pinyin: 'xī' + String.fromCharCode(39) + 'ān' },
+]).length, 2, 'syllable boundaries must not be collapsed')
+
 
 const examFormats = await loadTypeScriptModule('../src/data/examFormats.ts')
 const legacy1 = examFormats.examFormat('2.0', 1)
