@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Check, Pencil, Plus, RotateCcw, Save, Trash2, X } from 'lucide-react'
 import { supabase } from '../supabase'
 import type { Locale } from '../i18n'
+import { buildPersonalFlashcardQueue } from '../data/personalFlashcardQueue'
 
 type CustomCard = {
   id: string
@@ -40,7 +41,7 @@ const copy = {
     hanzi: 'Иероглиф или слово', pinyin: 'Pinyin', translation: 'Перевод',
     example: 'Пример предложения', notes: 'Заметки', add: 'Добавить карточку',
     save: 'Сохранить изменения', cancel: 'Отмена', edit: 'Изменить', remove: 'Удалить',
-    all: 'Все наборы', noCards: 'В этом наборе пока нет карточек. Добавь первую!',
+    all: 'Все наборы', noCards: 'В этом наборе пока нет карточек. Добавь первую!', sessionDone: 'Все карточки этой сессии просмотрены.', restart: 'Начать заново',
     front: 'Показать ответ', again: 'Повторить', known: 'Знаю', previous: 'Назад', next: 'Далее',
     count: 'карточек', error: 'Не удалось загрузить карточки. Попробуй ещё раз.',
     required: 'Заполни иероглиф, произношение и перевод.', saved: 'Карточка сохранена.',
@@ -53,7 +54,7 @@ const copy = {
     hanzi: 'Chinese word or characters', pinyin: 'Pinyin', translation: 'Translation',
     example: 'Example sentence', notes: 'Notes', add: 'Add card',
     save: 'Save changes', cancel: 'Cancel', edit: 'Edit', remove: 'Delete',
-    all: 'All decks', noCards: 'No cards in this deck yet. Add your first one!',
+    all: 'All decks', noCards: 'No cards in this deck yet. Add your first one!', sessionDone: 'You have reviewed every card in this session.', restart: 'Start again',
     front: 'Show answer', again: 'Review again', known: 'I know it', previous: 'Previous', next: 'Next',
     count: 'cards', error: 'Could not load cards. Please try again.',
     required: 'Enter the Chinese word, pronunciation and translation.', saved: 'Card saved.',
@@ -66,7 +67,7 @@ const copy = {
     hanzi: 'Xitoycha so‘z yoki ieroglif', pinyin: 'Pinyin', translation: 'Tarjima',
     example: 'Gap namunasi', notes: 'Eslatmalar', add: 'Kartochka qo‘shish',
     save: 'O‘zgarishlarni saqlash', cancel: 'Bekor qilish', edit: 'Tahrirlash', remove: 'O‘chirish',
-    all: 'Barcha to‘plamlar', noCards: 'Bu to‘plamda hali kartochkalar yo‘q. Birinchisini qo‘shing!',
+    all: 'Barcha to‘plamlar', noCards: 'Bu to‘plamda hali kartochkalar yo‘q. Birinchisini qo‘shing!', sessionDone: 'Ushbu mashg‘ulotdagi barcha kartochkalar ko‘rib chiqildi.', restart: 'Qaytadan boshlash',
     front: 'Javobni ko‘rsatish', again: 'Qayta takrorlash', known: 'Bilaman', previous: 'Orqaga', next: 'Keyingi',
     count: 'ta kartochka', error: 'Kartochkalarni yuklab bo‘lmadi. Qayta urinib ko‘ring.',
     required: 'Xitoycha so‘z, talaffuz va tarjimani kiriting.', saved: 'Kartochka saqlandi.',
@@ -84,6 +85,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [activeIndex, setActiveIndex] = useState(0)
   const [againQueue, setAgainQueue] = useState<string[]>([])
+  const [completedIds, setCompletedIds] = useState<string[]>([])
   const [showAnswer, setShowAnswer] = useState(false)
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
@@ -133,8 +135,8 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
     [cards, deck],
   )
   const studyQueue = useMemo(
-    () => [...visibleCards, ...againQueue.map(id => visibleCards.find(card => card.id === id)).filter((card): card is CustomCard => Boolean(card))],
-    [visibleCards, againQueue],
+    () => buildPersonalFlashcardQueue(visibleCards, completedIds, againQueue),
+    [visibleCards, completedIds, againQueue],
   )
   const activeCard = studyQueue.length ? studyQueue[activeIndex % studyQueue.length] : null
 
@@ -175,7 +177,9 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
         : [result.data as CustomCard, ...current])
       setDeck(payload.deck_name)
       setAgainQueue([])
+      setCompletedIds([])
       setActiveIndex(0)
+      setShowAnswer(false)
       setNotice(t.saved)
       resetDraft(payload.deck_name)
     }
@@ -202,6 +206,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
     else {
       setCards(current => current.filter(item => item.id !== card.id))
       setAgainQueue(queue => queue.filter(id => id !== card.id))
+      setCompletedIds(items => items.filter(id => id !== card.id))
       setActiveIndex(0)
       setShowAnswer(false)
       if (editingId === card.id) resetDraft()
@@ -216,15 +221,17 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
 
   const markKnown = () => {
     if (!activeCard) return
+    setCompletedIds(items => items.includes(activeCard.id) ? items : [...items, activeCard.id])
     setAgainQueue(queue => queue.filter(id => id !== activeCard.id))
-    setActiveIndex(index => index + 1)
+    setActiveIndex(0)
     setShowAnswer(false)
   }
 
   const reviewAgain = () => {
     if (!activeCard) return
-    setAgainQueue(queue => [...queue, activeCard.id])
-    setActiveIndex(index => index + 1)
+    // Move this card to the back once; never leave it in both queues.
+    setAgainQueue(queue => [...queue.filter(id => id !== activeCard.id), activeCard.id])
+    setActiveIndex(0)
     setShowAnswer(false)
   }
 
@@ -254,7 +261,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
         </form>
         <div className="personal-flashcards-study">
           <div className="filters">
-            <label>{t.deck}<select value={deck} onChange={event => { setDeck(event.target.value); setAgainQueue([]); setActiveIndex(0); setShowAnswer(false) }}>
+            <label>{t.deck}<select value={deck} onChange={event => { setDeck(event.target.value); setAgainQueue([]); setCompletedIds([]); setActiveIndex(0); setShowAnswer(false) }}>
               <option value="">{t.all}</option>
               {decks.map(name => <option key={name} value={name}>{name}</option>)}
             </select></label>
@@ -282,7 +289,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
                 <button className="outline" type="button" aria-label={t.remove} onClick={() => void deleteCard(card)}><Trash2 size={14}/></button>
               </div>)}
             </div>
-          </> : <div className="empty">{t.noCards}</div>}
+          </> : <div className="empty">{visibleCards.length ? <>{t.sessionDone}<button className="outline" type="button" onClick={() => { setCompletedIds([]); setAgainQueue([]); setActiveIndex(0); setShowAnswer(false) }}>{t.restart}</button></> : t.noCards}</div>}
         </div>
       </div>
     </div>
