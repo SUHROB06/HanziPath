@@ -39,7 +39,7 @@ const copy: Record<Locale, Record<string, string>> = {
     title: 'Personal Flash Cards', subtitle: 'Создавай собственные карточки и повторяй их в удобном темпе.',
     signIn: 'Войди в аккаунт HanziPath, чтобы сохранять личные карточки и синхронизировать их между устройствами.',
     loading: 'Загружаем твои карточки…', deck: 'Набор карточек', newDeck: 'Название набора',
-    hanzi: 'Иероглиф или слово', pinyin: 'Pinyin', translation: 'Перевод',
+    hanzi: 'Поиск: перевод, пиньинь или иероглиф', pinyin: 'Pinyin', translation: 'Перевод',
     example: 'Пример предложения', notes: 'Заметки', add: 'Добавить карточку',
     save: 'Сохранить изменения', cancel: 'Отмена', edit: 'Изменить', remove: 'Удалить',
     all: 'Все наборы', noCards: 'В этом наборе пока нет карточек. Добавь первую!', sessionDone: 'Все карточки этой сессии просмотрены.', restart: 'Начать заново',
@@ -52,7 +52,7 @@ const copy: Record<Locale, Record<string, string>> = {
     title: 'Personal Flash Cards', subtitle: 'Create your own cards and review them at your pace.',
     signIn: 'Sign in to HanziPath to save your personal cards and sync them across devices.',
     loading: 'Loading your cards…', deck: 'Deck', newDeck: 'Deck name',
-    hanzi: 'Chinese word or characters', pinyin: 'Pinyin', translation: 'Translation',
+    hanzi: 'Search: translation, pinyin or Chinese characters', pinyin: 'Pinyin', translation: 'Translation',
     example: 'Example sentence', notes: 'Notes', add: 'Add card',
     save: 'Save changes', cancel: 'Cancel', edit: 'Edit', remove: 'Delete',
     all: 'All decks', noCards: 'No cards in this deck yet. Add your first one!', sessionDone: 'You have reviewed every card in this session.', restart: 'Start again',
@@ -65,7 +65,7 @@ const copy: Record<Locale, Record<string, string>> = {
     title: 'Personal Flash Cards', subtitle: 'O‘z kartochkalaringizni yarating va qulay vaqtda takrorlang.',
     signIn: 'Shaxsiy kartochkalarni saqlash va qurilmalar orasida sinxronlash uchun HanziPath hisobiga kiring.',
     loading: 'Kartochkalaringiz yuklanmoqda…', deck: 'To‘plam', newDeck: 'To‘plam nomi',
-    hanzi: 'Xitoycha so‘z yoki ieroglif', pinyin: 'Pinyin', translation: 'Tarjima',
+    hanzi: 'Qidiruv: tarjima, pinyin yoki xitoycha ieroglif', pinyin: 'Pinyin', translation: 'Tarjima',
     example: 'Gap namunasi', notes: 'Eslatmalar', add: 'Kartochka qo‘shish',
     save: 'O‘zgarishlarni saqlash', cancel: 'Bekor qilish', edit: 'Tahrirlash', remove: 'O‘chirish',
     all: 'Barcha to‘plamlar', noCards: 'Bu to‘plamda hali kartochkalar yo‘q. Birinchisini qo‘shing!', sessionDone: 'Ushbu mashg‘ulotdagi barcha kartochkalar ko‘rib chiqildi.', restart: 'Qaytadan boshlash',
@@ -92,7 +92,6 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
   const [busy, setBusy] = useState(false)
   const [suggestions, setSuggestions] = useState<Array<{ hanzi: string; pinyin: string; translation: string; example: string }>>([])
   const [suggestionsLoading, setSuggestionsLoading] = useState(false)
-  const [dismissedSuggestionFor, setDismissedSuggestionFor] = useState('')
   const [searchText, setSearchText] = useState('')
 
   useEffect(() => {
@@ -386,7 +385,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
           <label>{t.notes}<textarea value={draft.notes} onChange={event => setDraft(value => ({ ...value, notes: event.target.value }))} rows={2} maxLength={500}/></label>
           </>}
           <div className="personal-flashcards-form-actions">
-            <button className="primary" type="submit" disabled={busy}>{editingId ? <Save size={15}/> : <Plus size={15}/>} {editingId ? t.save : t.add}</button>
+            {editingId && <button className="primary" type="submit" disabled={busy}><Save size={15}/>{t.save}</button>}
             {editingId && <button className="outline" type="button" onClick={() => resetDraft()}><X size={15}/>{t.cancel}</button>}
           </div>
         </form>
