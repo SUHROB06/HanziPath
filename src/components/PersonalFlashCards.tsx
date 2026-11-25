@@ -33,7 +33,7 @@ const emptyDraft = (): Draft => ({
   notes: '',
 })
 
-const copy = {
+const copy: Record<Locale, Record<string, string>> = {
   ru: {
     title: 'Personal Flash Cards', subtitle: 'Создавай собственные карточки и повторяй их в удобном темпе.',
     signIn: 'Войди в аккаунт HanziPath, чтобы сохранять личные карточки и синхронизировать их между устройствами.',
@@ -45,7 +45,7 @@ const copy = {
     front: 'Показать ответ', again: 'Повторить', known: 'Знаю', previous: 'Назад', next: 'Далее',
     count: 'карточек', error: 'Не удалось загрузить карточки. Попробуй ещё раз.',
     required: 'Заполни иероглиф, произношение и перевод.', saved: 'Карточка сохранена.',
-    deleteConfirm: 'Удалить эту карточку?', emptyDeck: 'Мой набор',
+    deleteConfirm: 'Удалить эту карточку?', emptyDeck: 'Мой набор', suggestions: 'Подходящие слова', suggestionsLoading: 'Ищем слова…', noSuggestions: 'Подходящих слов не найдено.',
   },
   en: {
     title: 'Personal Flash Cards', subtitle: 'Create your own cards and review them at your pace.',
@@ -138,7 +138,8 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
 
   useEffect(() => {
     const term = draft.hanzi.trim()
-    if (!supabase || !term || term === dismissedSuggestionFor) {
+    const client = supabase
+    if (!client || !term || term === dismissedSuggestionFor) {
       setSuggestions([])
       setSuggestionsLoading(false)
       return
@@ -147,7 +148,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
     let cancelled = false
     const timer = window.setTimeout(async () => {
       setSuggestionsLoading(true)
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('vocabulary_items')
         .select('id,simplified,vocabulary_readings(pinyin,verification_status),examples(id,sentence_hanzi,verification_status),translations(locale,content_kind,text,example_id,verification_status)')
         .ilike('simplified', `%${term}%`)
@@ -177,6 +178,8 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
         )
         if (!reading || !meaning || !example) return []
         const exampleMeaning = translations.find(
+          (item: any) => item.content_kind === 'example_translation' && item.example_id === example.id && item.locale === locale,
+        ) ?? translations.find(
           (item: any) => item.content_kind === 'example_translation' && item.example_id === example.id,
         )
         return [{
