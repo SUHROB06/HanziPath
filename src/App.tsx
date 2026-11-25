@@ -29,6 +29,7 @@ import type { StandardLevel } from './types/vocabulary'
 import { mergeLearningProgress, type LearningProgressSnapshot } from './data/learningProgress'
 import { adaptiveDifficulty, dueReviewIds, scheduleReview, type ReviewQuality, type ReviewState } from './data/spacedRepetition'
 import { mergeDictionaryEntries, normalizeDictionaryPinyin } from './data/dictionaryQuality'
+import PersonalFlashCards from './components/PersonalFlashCards'
 
 type System = '2.0' | '3.0'
 
@@ -867,6 +868,7 @@ export default function App() {
     const saved = readStored<{ date: string; count: number }>(DAILY_REVIEW_COUNT_KEY, { date: '', count: 0 })
     return saved.date === localDateKey() ? saved : { date: localDateKey(), count: 0 }
   })
+  const [cardsMode, setCardsMode] = useState<'lesson' | 'personal'>('lesson')
   const [cardsSystem, setCardsSystem] = useState<CourseSystem>(() => readStored<CourseSystem>('hanzipath.cards.system', '2.0'))
   const [cardsLevel, setCardsLevel] = useState<CourseLevel>(() => readStored<CourseLevel>('hanzipath.cards.level', 1))
   const [cardsLessonId, setCardsLessonId] = useState<string>(() => readStored<string>('hanzipath.cards.lesson', ''))
@@ -2581,6 +2583,11 @@ export default function App() {
             <span className="demo-tag">HSK {cardsSystem} · {cardsLevel} · {selectedCardsLesson?.title ?? ''}</span>
           </div>
           <p className="notice-text">{t('flashcards.notice')}</p>
+          <div className="standard-switch personal-flashcards-tabs" role="tablist" aria-label={lang === 'ru' ? 'Режим карточек' : lang === 'uz' ? 'Kartochka rejimi' : 'Flashcard mode'}>
+            <button type="button" role="tab" aria-selected={cardsMode === 'lesson'} className={cardsMode === 'lesson' ? 'selected' : ''} onClick={() => setCardsMode('lesson')}>{lang === 'ru' ? 'Карточки уроков' : lang === 'uz' ? 'Dars kartochkalari' : 'Lesson cards'}</button>
+            <button type="button" role="tab" aria-selected={cardsMode === 'personal'} className={cardsMode === 'personal' ? 'selected' : ''} onClick={() => setCardsMode('personal')}>Personal Flash Cards</button>
+          </div>
+          {cardsMode === 'personal' ? <PersonalFlashCards locale={lang}/> : <>
           <div className="filters study-filters">
             <label>{lang === 'ru' ? 'Стандарт' : lang === 'uz' ? 'Standart' : 'Standard'}
               <select value={cardsSystem} onChange={event => { setCardsSystem(event.target.value as CourseSystem); setCardsLevel(1); setCardsLessonId(''); setCardIndex(0); setShowAnswer(false) }}>
@@ -2619,6 +2626,7 @@ export default function App() {
               <button className="outline" aria-label={t('flashcards.next')} onClick={() => { setShowAnswer(false); setCardIndex(i => (i + 1) % cardStudyWords.length) }}>›</button>
             </div>
           </> : <div className="empty">{t('course.noWords')}</div>}
+          </>}
         </section>
       )}
       {section === 4 && (
