@@ -642,11 +642,23 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
         })
         continue
       }
-      if (level >= 5) {
+      if (system === '2.0' && level === 4 && writingIndex >= 10) {
+        const word = safeWords[writingWordIndex++]
+        const cue = word ? word.hanzi + ' (' + word.pinyin + ')' : lesson.grammar.example
+        questions.push({
+          section: 'writing', part: partNumber(writingIndex, format.writingParts),
+          prompt: locale === 'ru' ? 'Составь грамматически правильное предложение со словом: ' + cue : locale === 'uz' ? 'Quyidagi so‘z bilan grammatik jihatdan to‘g‘ri gap tuzing: ' + cue : 'Write a grammatically correct Chinese sentence using: ' + cue,
+          options: [], answer: '',
+          explanation: locale === 'ru' ? 'Самопроверка: значение слова, порядок слов и грамматическая конструкция использованы правильно.' : locale === 'uz' ? 'O‘zini tekshirish: so‘z ma’nosi, tartib va grammatika to‘g‘ri ishlatilgan.' : 'Self-check: use the word accurately and check word order and grammar.',
+          manualReview: true,
+        })
+        continue
+      }
+      if (level >= 5 && !(system === '2.0' && level === 5 && writingIndex < 8)) {
         questions.push({
           section: 'writing',
           part: partNumber(writingIndex, format.writingParts),
-          prompt: locale === 'ru' ? 'Напиши короткий связный текст по теме «' + lesson.title + '». Используй фразу ' + lesson.grammar.example + ' как опору.' : locale === 'uz' ? '«' + lesson.title + '» mavzusida qisqa matn yozing. ' + lesson.grammar.example + ' gapidan foydalaning.' : 'Write a short text about “' + lesson.title + '”. Use ' + lesson.grammar.example + ' as a starting point.',
+          prompt: system === '2.0' && level === 5 ? (locale === 'ru' ? 'Напиши связный текст примерно из 80 иероглифов на тему «' + lesson.title + '». Используй фразу ' + lesson.grammar.example + ' как опору.' : locale === 'uz' ? '«' + lesson.title + '» mavzusida taxminan 80 ta ieroglifdan iborat matn yozing. ' + lesson.grammar.example + ' gapidan foydalaning.' : 'Write a coherent composition of about 80 Chinese characters on “' + lesson.title + '”. Use ' + lesson.grammar.example + ' as a starting point.') : locale === 'ru' ? 'Напиши короткий связный текст по теме «' + lesson.title + '». Используй фразу ' + lesson.grammar.example + ' как опору.' : locale === 'uz' ? '«' + lesson.title + '» mavzusida qisqa matn yozing. ' + lesson.grammar.example + ' gapidan foydalaning.' : 'Write a short text about “' + lesson.title + '”. Use ' + lesson.grammar.example + ' as a starting point.',
           options: [],
           answer: '',
           explanation: locale === 'ru' ? 'Самопроверка: тема раскрыта, структура связная, грамматика и целевая конструкция использованы правильно.' : locale === 'uz' ? 'O‘zini tekshirish: mavzu yoritilgan, matn izchil, grammatika va kerakli tuzilma to‘g‘ri ishlatilgan.' : 'Self-check: address the topic, keep a clear structure, and use the target grammar accurately.',
