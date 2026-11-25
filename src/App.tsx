@@ -531,6 +531,13 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     .filter(lesson => lesson.grammar.example && lesson.grammar.meaning)
     .map(lesson => [lesson.grammar.example + '|' + lesson.grammar.meaning, lesson] as const)).values()]
   const lessons = shuffleWithSeed(uniqueLessons, attemptSeed + 71)
+  const listeningItems = shuffleWithSeed([...new Map(lessons.flatMap(lesson => [
+    { text: lesson.grammar.example, pinyin: lesson.grammar.pinyin, meaning: lesson.grammar.meaning },
+    ...(lesson.grammar.extraExamples ?? []).map(example => ({
+      text: example.hanzi, pinyin: example.pinyin, meaning: example.meaning,
+    })),
+  ]).filter(item => item.text?.trim() && item.pinyin?.trim() && item.meaning?.trim())
+    .map(item => [item.text.trim() + '|' + item.pinyin.trim().toLocaleLowerCase(), item] as const)).values()], attemptSeed + 17)
   const questions: ExamQuestion[] = []
   if (!lessons.length || !safeWords.length) return questions
   const writingEnd = format.listening + format.reading + format.writing
@@ -540,6 +547,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
   const makeOptions = (answer: string, distractors: string[], seed: number) =>
     shuffleWithSeed([answer, ...[...new Set(distractors.filter(value => value && value !== answer))].slice(0, 3)], seed)
   let listeningIndex = 0
+  let listeningWordIndex = 0
   let readingWordIndex = 0
   let readingLessonIndex = 0
   let writingWordIndex = 0
@@ -550,40 +558,46 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
   for (let index = 0; index < total; index += 1) {
     const seed = (attemptSeed + (level + 1) * 1009 + index * 97) >>> 0
     if (index < format.listening) {
-      const lesson = lessons[listeningIndex]
-      if (lesson) {
+      const item = listeningItems[listeningIndex]
+      if (item) {
         listeningIndex += 1
-        const answer = lesson.grammar.meaning
+        const answer = item.meaning
+        const distractors = [
+          ...listeningItems.filter(candidate => candidate.text !== item.text).map(candidate => candidate.meaning),
+          ...safeWords.map(meaningOf),
+        ]
         questions.push({
           section: 'listening',
           part: partNumber(index, format.listeningParts),
           prompt: locale === 'ru' ? 'Прослушай фразу и выбери её значение.' : locale === 'uz' ? 'Gapni tinglang va uning ma’nosini tanlang.' : 'Listen to the sentence and choose its meaning.',
-          options: makeOptions(answer, lessons.filter(item => item.id !== lesson.id).map(item => item.grammar.meaning), seed),
+          options: makeOptions(answer, distractors, seed),
           answer,
-          audio: lesson.grammar.example,
-          pinyin: lesson.grammar.pinyin,
-          explanation: `${lesson.grammar.example} · ${lesson.grammar.pinyin} · ${lesson.grammar.meaning}`,
+          audio: item.text,
+          pinyin: item.pinyin,
+          explanation: `${item.text} · ${item.pinyin} · ${item.meaning}`,
         })
       } else {
-        const word = safeWords[(index - lessons.length) % safeWords.length]
-        const answer = meaningOf(word)
-        questions.push({
-          section: 'listening',
-          part: partNumber(index, format.listeningParts),
-          prompt: locale === 'ru' ? 'Прослушай слово и выбери его перевод.' : locale === 'uz' ? 'So‘zni tinglang va tarjimasini tanlang.' : 'Listen to the word and choose its meaning.',
-          options: makeOptions(answer, safeWords.filter(item => wordId(item) !== wordId(word)).map(meaningOf), seed),
-          answer,
-          audio: word.hanzi,
-          pinyin: word.pinyin,
-          explanation: `${word.hanzi} · ${word.pinyin} · ${meaningOf(word)}`,
-        })
+        const word = safeWords[listeningWordIndex++]
+        if (word) {
+          const answer = meaningOf(word)
+          questions.push({
+            section: 'listening',
+            part: partNumber(index, format.listeningParts),
+            prompt: locale === 'ru' ? 'Прослушай слово и выбери его перевод.' : locale === 'uz' ? 'So‘zni tinglang va tarjimasini tanlang.' : 'Listen to the word and choose its meaning.',
+            options: makeOptions(answer, safeWords.filter(item => wordId(item) !== wordId(word)).map(meaningOf), seed),
+            answer,
+            audio: word.hanzi,
+            pinyin: word.pinyin,
+            explanation: `${word.hanzi} · ${word.pinyin} · ${meaningOf(word)}`,
+          })
+        }
       }
       continue
     }
     if (index < format.listening + format.reading) {
       const offset = index - format.listening
       if (offset % 2 === 0 || readingLessonIndex >= lessons.length) {
-        const word = safeWords[readingWordIndex % safeWords.length]
+        const word = safeWords[readingWordIndex]
         readingWordIndex += 1
         const answer = meaningOf(word)
         questions.push({
@@ -611,7 +625,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     }
     if (index < writingEnd) {
       const writingIndex = index - format.listening - format.reading
-      const lesson = lessons[writingLessonIndex++ % lessons.length]
+      const lesson = lessons[writingLessonIndex++]
       if (level === 3 && writingIndex < Math.min(5, format.writing)) {
         const word = safeWords[writingWordIndex++ % safeWords.length]
         const meaning = meaningOf(word)
@@ -651,7 +665,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       continue
     }
     if (index < translationEnd) {
-      const lesson = lessons[translationIndex++ % lessons.length]
+      const lesson = lessons[translationIndex++]
       const translateToChinese = (translationIndex - 1) % 2 === 1
       questions.push({
         section: 'translation',
@@ -668,7 +682,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       })
       continue
     }
-    const lesson = lessons[speakingIndex++ % lessons.length]
+    const lesson = lessons[speakingIndex++]
     questions.push({
       section: 'speaking',
       part: partNumber(index - translationEnd, format.speakingParts),
