@@ -87,6 +87,17 @@ const newHsk79 = examFormats.examFormat('3.0', 7)
 assert.equal(examFormats.examQuestionCount(newHsk79), 91)
 assert.equal(newHsk79.minutes, 200)
 
+const listeningBank = await loadTypeScriptModule('../src/data/examListeningBank.ts')
+assert.equal(new Set(listeningBank.examListeningBank.map(item => item.audio)).size, listeningBank.examListeningBank.length)
+for (const item of listeningBank.examListeningBank) {
+  assert.ok(item.options.includes(item.answer), 'each listening question must include its answer')
+  assert.equal(new Set(item.options).size, item.options.length, 'listening distractors must be unique')
+  assert.ok(item.audio.length > 12, 'dialogue and monologue audio should contain context')
+}
+for (let level = 1; level <= 6; level += 1) {
+  assert.ok(listeningBank.examListeningBank.filter(item => item.level === level).length >= 3)
+}
+
 const progress = await loadTypeScriptModule('../src/data/learningProgress.ts')
 const today = '2026-11-17'
 const local = progress.emptyLearningProgress(today)
@@ -151,7 +162,7 @@ const missing = Object.fromEntries(['hanzi', 'pinyin', 'ru', 'en', 'uz'].map(key
 ]))
 const unverified = entries.filter(entry => entry.membershipStatus !== 'verified').length
 
-console.log('Learning logic, lesson-card uniqueness and dictionary deduplication tests passed.')
+console.log('Learning logic, lesson-card uniqueness, HSK formats, listening bank and dictionary tests passed.')
 console.log(JSON.stringify({
   dictionaryAudit: audit,
   missingCoreFields: missing,
