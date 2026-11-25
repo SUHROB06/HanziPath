@@ -2405,3 +2405,51 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline-color:#b34
   .personal-flashcards-grid { grid-template-columns:1fr; }
   .personal-flashcards-heading { flex-direction:column; }
 }
+
+
+/* Personal Flash Cards: dictionary suggestions below the character input. */
+.personal-flashcard-suggestions {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+  border-radius: 14px;
+  background: var(--surface-soft, rgba(128, 128, 128, 0.06));
+}
+.personal-flashcard-suggestions > strong {
+  font-size: 0.82rem;
+  color: var(--text-secondary, inherit);
+}
+.personal-flashcard-suggestions > small {
+  color: var(--text-secondary, inherit);
+}
+.personal-flashcard-suggestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.2));
+  border-radius: 10px;
+  background: var(--surface, transparent);
+  color: inherit;
+  cursor: pointer;
+}
+.personal-flashcard-suggestion:hover {
+  border-color: var(--accent, currentColor);
+}
+.personal-flashcard-suggestion > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.personal-flashcard-suggestion b {
+  font-size: 1.05rem;
+}
+.personal-flashcard-suggestion small {
+  overflow-wrap: anywhere;
+  color: var(--text-secondary, inherit);
+  font-size: 0.78rem;
+}
