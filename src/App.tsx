@@ -609,8 +609,20 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       const writingIndex = index - format.listening - format.reading
       const lesson = lessons[writingLessonIndex++]
       if (!lesson) return []
+      if (system === '3.0' && level === 2 && writingIndex < 5) {
+        const word = safeWords[writingWordIndex++]
+        if (!word) return []
+        questions.push({
+          section: 'writing', part: partNumber(writingIndex, format.writingParts),
+          prompt: locale === 'ru' ? 'Выбери правильный иероглиф для pinyin: ' + word.pinyin + ' (' + meaningOf(word) + ')' : locale === 'uz' ? 'Quyidagi pinyin uchun to‘g‘ri ieroglifni tanlang: ' + word.pinyin + ' (' + meaningOf(word) + ')' : 'Choose the correct Chinese character for: ' + word.pinyin + ' (' + meaningOf(word) + ')',
+          options: makeOptions(word.hanzi, safeWords.filter(item => wordId(item) !== wordId(word)).map(item => item.hanzi), seed),
+          answer: word.hanzi,
+          explanation: word.hanzi + ' · ' + word.pinyin + ' · ' + meaningOf(word),
+        })
+        continue
+      }
       const characterWriting = system === '3.0'
-        ? level === 2 || (level === 3 && writingIndex < 5)
+        ? (level === 2 && writingIndex >= 5) || (level === 3 && writingIndex < 5)
         : level === 3 && writingIndex < 5
       if (characterWriting) {
         const word = safeWords[writingWordIndex++]
@@ -624,6 +636,18 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
             options: [], answer: word.hanzi, explanation: word.hanzi + ' · ' + word.pinyin + ' · ' + meaning,
           })
         }
+        continue
+      }
+      if (system === '3.0' && level === 3) {
+        const word = safeWords[writingWordIndex++]
+        const cue = word ? word.hanzi + ' (' + word.pinyin + ')' : lesson.grammar.example
+        questions.push({
+          section: 'writing', part: partNumber(writingIndex, format.writingParts),
+          prompt: locale === 'ru' ? 'Составь полное предложение, используя слово: ' + cue : locale === 'uz' ? 'Quyidagi so‘zdan foydalanib to‘liq gap tuzing: ' + cue : 'Write a complete Chinese sentence using: ' + cue,
+          options: [], answer: '',
+          explanation: locale === 'ru' ? 'Самопроверка: предложение раскрывает смысл слова и грамматически завершено.' : locale === 'uz' ? 'O‘zini tekshirish: gap so‘z ma’nosini ochib beradi va grammatik jihatdan to‘liq.' : 'Self-check: the sentence uses the word meaningfully and is grammatically complete.',
+          manualReview: true,
+        })
         continue
       }
       if (system === '3.0' && level === 4) {
