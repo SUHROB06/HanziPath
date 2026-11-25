@@ -31,6 +31,7 @@ import { adaptiveDifficulty, dueReviewIds, scheduleReview, type ReviewQuality, t
 import { mergeDictionaryEntries, normalizeDictionaryPinyin } from './data/dictionaryQuality'
 import { uniqueLessonCards } from './data/lessonCards'
 import { examFormat, type ExamFormat } from './data/examFormats'
+import { examListeningBank } from './data/examListeningBank'
 import PersonalFlashCards from './components/PersonalFlashCards'
 
 type System = '2.0' | '3.0'
@@ -502,13 +503,21 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     .filter(lesson => lesson.grammar.example && lesson.grammar.meaning)
     .map(lesson => [lesson.grammar.example + '|' + lesson.grammar.meaning, lesson] as const)).values()]
   const lessons = shuffleWithSeed(uniqueLessons, attemptSeed + 71)
-  const listeningItems = shuffleWithSeed([...new Map(lessons.flatMap(lesson => [
-    { text: lesson.grammar.example, pinyin: lesson.grammar.pinyin, meaning: lesson.grammar.meaning },
+  const dialogueItems = examListeningBank
+    .filter(item => system === '3.0' && level >= 7 ? true : item.level <= level)
+    .map(item => ({
+      text: item.audio, pinyin: item.pinyin, meaning: item.answer,
+      prompt: item.prompt[locale], options: item.options, explanation: item.explanation[locale],
+    }))
+  const sentenceItems = [...new Map(lessons.flatMap(lesson => [
+    { text: lesson.grammar.example, pinyin: lesson.grammar.pinyin, meaning: lesson.grammar.meaning, prompt: undefined as string | undefined, options: undefined as string[] | undefined, explanation: undefined as string | undefined },
     ...(lesson.grammar.extraExamples ?? []).map(example => ({
       text: example.hanzi, pinyin: example.pinyin, meaning: example.meaning,
+      prompt: undefined as string | undefined, options: undefined as string[] | undefined, explanation: undefined as string | undefined,
     })),
   ]).filter(item => item.text?.trim() && item.pinyin?.trim() && item.meaning?.trim())
-    .map(item => [item.text.trim() + '|' + item.pinyin.trim().toLocaleLowerCase(), item] as const)).values()], attemptSeed + 17)
+    .map(item => [item.text.trim() + '|' + item.pinyin.trim().toLocaleLowerCase(), item] as const)).values()]
+  const listeningItems = shuffleWithSeed([...dialogueItems, ...sentenceItems], attemptSeed + 17)
   const questions: ExamQuestion[] = []
   if (!lessons.length || !safeWords.length) return questions
   const writingEnd = format.listening + format.reading + format.writing
@@ -540,12 +549,12 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
         questions.push({
           section: 'listening',
           part: partNumber(index, format.listeningParts),
-          prompt: locale === 'ru' ? 'Прослушай фразу и выбери её значение.' : locale === 'uz' ? 'Gapni tinglang va uning ma’nosini tanlang.' : 'Listen to the sentence and choose its meaning.',
-          options: makeOptions(answer, distractors, seed),
+          prompt: item.prompt ?? (locale === 'ru' ? 'Прослушай фразу и выбери её значение.' : locale === 'uz' ? 'Gapni tinglang va uning ma’nosini tanlang.' : 'Listen to the sentence and choose its meaning.'),
+          options: item.options ?? makeOptions(answer, distractors, seed),
           answer,
           audio: item.text,
           pinyin: item.pinyin,
-          explanation: `${item.text} · ${item.pinyin} · ${item.meaning}`,
+          explanation: item.explanation ?? `${item.text} · ${item.pinyin} · ${item.meaning}`,
         })
       } else {
         const word = safeWords[listeningWordIndex++]
