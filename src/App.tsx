@@ -29,6 +29,7 @@ import type { StandardLevel } from './types/vocabulary'
 import { mergeLearningProgress, type LearningProgressSnapshot } from './data/learningProgress'
 import { adaptiveDifficulty, dueReviewIds, scheduleReview, type ReviewQuality, type ReviewState } from './data/spacedRepetition'
 import { mergeDictionaryEntries, normalizeDictionaryPinyin } from './data/dictionaryQuality'
+import { uniqueLessonCards } from './data/lessonCards'
 import PersonalFlashCards from './components/PersonalFlashCards'
 
 type System = '2.0' | '3.0'
@@ -1627,7 +1628,10 @@ export default function App() {
   const cardsLessons = expandedLessonData.lessons.filter(lesson => lesson.system === cardsSystem && lesson.level === cardsLevel)
   const selectedCardsLesson = cardsLessons.find(lesson => lesson.id === cardsLessonId) ?? cardsLessons[0]
   const cardStudyWords = useMemo(() => {
-    const base = selectedCardsLesson ? expandedLessonData.assignments[selectedCardsLesson.id] ?? [] : []
+    const assigned = selectedCardsLesson ? expandedLessonData.assignments[selectedCardsLesson.id] ?? [] : []
+    // Source IDs can differ for duplicate vocabulary rows; compare the actual
+    // headword + pronunciation so one lesson never repeats the same card.
+    const base = uniqueLessonCards(assigned)
     const dueIds = new Set(dueReviewIds(reviewSchedule))
     return [...base].sort((a, b) => {
       const aId = wordId(a)
