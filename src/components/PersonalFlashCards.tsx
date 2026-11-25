@@ -58,7 +58,7 @@ const copy = {
     front: 'Show answer', again: 'Review again', known: 'I know it', previous: 'Previous', next: 'Next',
     count: 'cards', error: 'Could not load cards. Please try again.',
     required: 'Enter the Chinese word, pronunciation and translation.', saved: 'Card saved.',
-    deleteConfirm: 'Delete this card?', emptyDeck: 'My deck',
+    deleteConfirm: 'Delete this card?', emptyDeck: 'My deck', suggestions: 'Suggested words', suggestionsLoading: 'Finding words…', noSuggestions: 'No matching words found.',
   },
   uz: {
     title: 'Personal Flash Cards', subtitle: 'O‘z kartochkalaringizni yarating va qulay vaqtda takrorlang.',
@@ -71,7 +71,7 @@ const copy = {
     front: 'Javobni ko‘rsatish', again: 'Qayta takrorlash', known: 'Bilaman', previous: 'Orqaga', next: 'Keyingi',
     count: 'ta kartochka', error: 'Kartochkalarni yuklab bo‘lmadi. Qayta urinib ko‘ring.',
     required: 'Xitoycha so‘z, talaffuz va tarjimani kiriting.', saved: 'Kartochka saqlandi.',
-    deleteConfirm: 'Bu kartochka o‘chirilsinmi?', emptyDeck: 'Mening to‘plamim',
+    deleteConfirm: 'Bu kartochka o‘chirilsinmi?', emptyDeck: 'Mening to‘plamim', suggestions: 'Mos so‘zlar', suggestionsLoading: 'So‘zlar qidirilmoqda…', noSuggestions: 'Mos so‘zlar topilmadi.',
   },
 } satisfies Record<Locale, Record<string, string>>
 
@@ -89,6 +89,9 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
   const [showAnswer, setShowAnswer] = useState(false)
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  const [suggestions, setSuggestions] = useState<Array<{ hanzi: string; pinyin: string; translation: string; example: string }>>([])
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false)
+  const [dismissedSuggestionFor, setDismissedSuggestionFor] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -132,6 +135,69 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
       authListener.subscription.unsubscribe()
     }
   }, [t.error])
+
+  useEffect(() => {
+    const term = draft.hanzi.trim()
+    if (!supabase || !term || term === dismissedSuggestionFor) {
+      setSuggestions([])
+      setSuggestionsLoading(false)
+      return
+    }
+
+    let cancelled = false
+    const timer = window.setTimeout(async () => {
+      setSuggestionsLoading(true)
+      const { data, error } = await supabase
+        .from('vocabulary_items')
+        .select('id,simplified,vocabulary_readings(pinyin,verification_status),examples(id,sentence_hanzi,verification_status),translations(locale,content_kind,text,example_id,verification_status)')
+        .ilike('simplified', `%${term}%`)
+        .limit(40)
+
+      if (cancelled) return
+      if (error || !data) {
+        setSuggestions([])
+        setSuggestionsLoading(false)
+        return
+      }
+
+      const ranked = data.flatMap((row: any) => {
+        const hanzi = String(row.simplified ?? '')
+        if (!hanzi || hanzi === term) return []
+        const reading = (row.vocabulary_readings ?? []).find(
+          (item: any) => item.verification_status === 'verified' && item.pinyin,
+        )
+        const translations = (row.translations ?? []).filter(
+          (item: any) => item.verification_status === 'verified',
+        )
+        const meaning = translations.find(
+          (item: any) => item.content_kind === 'meaning' && item.locale === locale,
+        ) ?? translations.find((item: any) => item.content_kind === 'meaning')
+        const example = (row.examples ?? []).find(
+          (item: any) => item.verification_status === 'verified' && item.sentence_hanzi,
+        )
+        if (!reading || !meaning || !example) return []
+        const exampleMeaning = translations.find(
+          (item: any) => item.content_kind === 'example_translation' && item.example_id === example.id,
+        )
+        return [{
+          hanzi,
+          pinyin: String(reading.pinyin),
+          translation: String(meaning.text),
+          example: exampleMeaning
+            ? `${example.sentence_hanzi} — ${exampleMeaning.text}`
+            : String(example.sentence_hanzi),
+        }]
+      }).sort((a: { hanzi: string }, b: { hanzi: string }) => a.hanzi.length - b.hanzi.length)
+
+      setSuggestions(ranked.slice(0, 8))
+      setSuggestionsLoading(false)
+    }, 280)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [draft.hanzi, dismissedSuggestionFor, locale])
 
   const decks = useMemo(() => [...new Set(cards.map(card => card.deck_name))].sort(), [cards])
   const visibleCards = useMemo(
@@ -253,7 +319,19 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
         <form className="personal-flashcards-form" onSubmit={submit}>
           <h4>{editingId ? t.edit : t.add}</h4>
           <label>{t.newDeck}<input value={draft.deck_name} onChange={event => setDraft(value => ({ ...value, deck_name: event.target.value }))} maxLength={80}/></label>
-          <label>{t.hanzi}<input value={draft.hanzi} onChange={event => setDraft(value => ({ ...value, hanzi: event.target.value }))} required maxLength={120}/></label>
+          <label>{t.hanzi}<input value={draft.hanzi} onChange={event => { setDismissedSuggestionFor(''); setDraft(value => ({ ...value, hanzi: event.target.value })) }} required maxLength={120}/></label>
+          {(suggestionsLoading || suggestions.length > 0) && <div className="personal-flashcard-suggestions" role="list" aria-label={t.suggestions}>
+            <strong>{t.suggestions}</strong>
+            {suggestionsLoading && <small>{t.suggestionsLoading}</small>}
+            {suggestions.map(item => <button className="personal-flashcard-suggestion" type="button" key={item.hanzi + item.pinyin} onClick={() => {
+              setDraft(value => ({ ...value, hanzi: item.hanzi, pinyin: item.pinyin, translation: item.translation, example: item.example }))
+              setSuggestions([])
+              setDismissedSuggestionFor(item.hanzi)
+            }}>
+              <span><b>{item.hanzi}</b><small>{item.pinyin} · {item.translation}</small><small>{item.example}</small></span>
+              <Plus size={15}/>
+            </button>)}
+          </div>}
           <label>{t.pinyin}<input value={draft.pinyin} onChange={event => setDraft(value => ({ ...value, pinyin: event.target.value }))} required maxLength={160}/></label>
           <label>{t.translation}<input value={draft.translation} onChange={event => setDraft(value => ({ ...value, translation: event.target.value }))} required maxLength={240}/></label>
           <label>{t.example}<textarea value={draft.example} onChange={event => setDraft(value => ({ ...value, example: event.target.value }))} rows={2} maxLength={500}/></label>
