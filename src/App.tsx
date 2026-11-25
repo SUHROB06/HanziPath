@@ -549,6 +549,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
         })
       } else {
         const word = safeWords[listeningWordIndex++]
+        if (!word) return []
         if (word) {
           const answer = meaningOf(word)
           questions.push({
@@ -570,6 +571,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       if (offset % 2 === 0 || readingLessonIndex >= lessons.length) {
         const word = safeWords[readingWordIndex]
         readingWordIndex += 1
+        if (!word) return []
         const answer = meaningOf(word)
         questions.push({
           section: 'reading',
@@ -597,11 +599,13 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     if (index < writingEnd) {
       const writingIndex = index - format.listening - format.reading
       const lesson = lessons[writingLessonIndex++]
+      if (!lesson) return []
       const characterWriting = system === '3.0'
         ? level === 2 || (level === 3 && writingIndex < 5)
         : level === 3 && writingIndex < 5
       if (characterWriting) {
         const word = safeWords[writingWordIndex++]
+        if (!word) return []
         if (word) {
           const meaning = meaningOf(word)
           questions.push({
@@ -681,6 +685,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
     }
     if (index < translationEnd) {
       const lesson = lessons[translationIndex++]
+      if (!lesson) return []
       const translateToChinese = (translationIndex - 1) % 2 === 1
       questions.push({
         section: 'translation',
@@ -698,6 +703,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       continue
     }
     const lesson = lessons[speakingIndex++]
+    if (!lesson) return []
     questions.push({
       section: 'speaking',
       part: partNumber(index - translationEnd, format.speakingParts),
@@ -708,7 +714,7 @@ function examQuestions(system: CourseSystem, level: CourseLevel, words: Word[], 
       manualReview: true,
     })
   }
-  return questions
+  return questions.length === total ? questions : []
 }
 function normalizeWrittenAnswer(value: string): string {
   return value.replace(/[\s，。！？、,.!?;；:：]/g, '').toLocaleLowerCase()
