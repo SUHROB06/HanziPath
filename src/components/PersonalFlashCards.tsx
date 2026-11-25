@@ -113,6 +113,10 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
       else {
         setCards([])
         setDeck('')
+        setAgainQueue([])
+        setCompletedIds([])
+        setActiveIndex(0)
+        setShowAnswer(false)
         setLoading(false)
       }
     })
