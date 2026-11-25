@@ -207,7 +207,7 @@ export async function searchVocabulary(
     const queryError = itemResponse.error ?? readingResponse.error ?? translationResponse.error
     if (queryError) return failed([], queryError)
 
-    const itemMatches = (itemResponse.data ?? []) as VocabularyItem[]
+    const itemMatches = (itemResponse.data ?? []) as Array<{ id: string }>
     const readingMatches = (readingResponse.data ?? []) as VocabularyReading[]
     const translationMatches = (translationResponse.data ?? []) as Translation[]
 
