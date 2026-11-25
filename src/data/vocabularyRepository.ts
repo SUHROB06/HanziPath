@@ -173,27 +173,28 @@ export async function searchVocabulary(
   try {
     const pattern = `%${escapeLike(term)}%`
     const normalizedTerm = normalizePinyin(term)
-    // Tone marks are stored in the pinyin field (e.g. wán), while students often type wan.
-    // Replace vowels with single-character wildcards, then rank/filter candidates in JS.
-    const pinyinPattern = `%${escapeLike(normalizedTerm.replace(/[aeiou]/g, '_'))}%`
+    const pinyinPattern = `%${escapeLike(normalizedTerm)}%`
 
-    // Search only matching rows. Downloading every reading and translation
-    // before filtering made each keystroke slow as the catalog grew.
+    // Indexed substring queries cover every HSK catalog membership, including
+    // the combined HSK 3.0 advanced 7-9 band. Pinyin is normalized in SQL so
+    // students can search "wan" and still find "wán".
     const [itemResponse, readingResponse, translationResponse] = await Promise.all([
       client.from('vocabulary_items')
-        .select('*')
+        .select('id,simplified,traditional,source_id,verification_status')
         .or(`simplified.ilike.${pattern},traditional.ilike.${pattern}`)
         .limit(resultLimit * 4),
 
-      client.from('vocabulary_readings')
-        .select('*')
-        .neq('verification_status', 'rejected')
-        .or(`pinyin.ilike.${pinyinPattern},pinyin_numeric.ilike.${pattern}`)
-        .limit(500),
+      normalizedTerm.length >= 2
+        ? client.from('vocabulary_readings')
+            .select('id,vocabulary_item_id,pinyin,verification_status')
+            .neq('verification_status', 'rejected')
+            .ilike('pinyin_search', pinyinPattern)
+            .limit(resultLimit * 4)
+        : Promise.resolve({ data: [], error: null }),
 
       (() => {
         let query = client.from('translations')
-          .select('*')
+          .select('id,vocabulary_item_id,locale,text,content_kind,example_id,reading_id,verification_status')
           .neq('verification_status', 'rejected')
           .eq('content_kind', 'meaning')
           .ilike('text', pattern)
@@ -207,20 +208,22 @@ export async function searchVocabulary(
     if (queryError) return failed([], queryError)
 
     const itemMatches = (itemResponse.data ?? []) as VocabularyItem[]
-    const readingMatches = ((readingResponse.data ?? []) as VocabularyReading[]).filter(
-      reading => normalizePinyin(reading.pinyin).includes(normalizedTerm),
-    )
+    const readingMatches = (readingResponse.data ?? []) as VocabularyReading[]
     const translationMatches = (translationResponse.data ?? []) as Translation[]
 
-    const candidateIds = new Set<string>([
-      ...itemMatches.map(item => item.id),
-      ...readingMatches.map(reading => reading.vocabulary_item_id),
-      ...translationMatches.map(translation => translation.vocabulary_item_id),
-    ])
+    // Keep the most relevant groups first instead of truncating an unordered
+    // mixed set before relevance sorting.
+    const candidateIds = [
+      ...new Set([
+        ...itemMatches.map(item => item.id),
+        ...readingMatches.map(reading => reading.vocabulary_item_id),
+        ...translationMatches.map(translation => translation.vocabulary_item_id),
+      ]),
+    ].slice(0, resultLimit)
 
-    if (candidateIds.size === 0) return { data: [], error: null }
+    if (candidateIds.length === 0) return { data: [], error: null }
 
-    const itemIds = [...candidateIds].slice(0, resultLimit)
+    const itemIds = candidateIds
     const { data: detailData, error: detailError } = await client.from('vocabulary_items')
       .select('*, vocabulary_readings(*), translations(*)')
       .in('id', itemIds)
@@ -231,6 +234,7 @@ export async function searchVocabulary(
       vocabulary_readings?: VocabularyReading[] | null
       translations?: Translation[] | null
     }>
+
     const detailsById = new Map(detailRows.map(row => [row.id, row]))
     const matchedById = new Map<string, Translation[]>()
 
