@@ -208,7 +208,7 @@ export default function PersonalFlashCards({ locale }: { locale: Locale }) {
           <label>{t.notes}<textarea value={draft.notes} onChange={event => setDraft(value => ({ ...value, notes: event.target.value }))} rows={2} maxLength={500}/></label>
           <div className="personal-flashcards-form-actions">
             <button className="primary" type="submit" disabled={busy}>{editingId ? <Save size={15}/> : <Plus size={15}/>} {editingId ? t.save : t.add}</button>
-            {editingId && <button className="outline" type="button" onClick={resetDraft}><X size={15}/>{t.cancel}</button>}
+            {editingId && <button className="outline" type="button" onClick={() => resetDraft()}><X size={15}/>{t.cancel}</button>}
           </div>
         </form>
         <div className="personal-flashcards-study">
