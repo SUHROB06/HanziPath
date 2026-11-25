@@ -1,6 +1,6 @@
 function normalizeCardPinyin(value: string): string {
   // Keep in sync with dictionaryQuality.normalizeDictionaryPinyin.
-  return value.toLowerCase().normalize('NFC').replace(/\\s+/g, '')
+  return value.toLowerCase().normalize('NFC').replace(/\s+/g, '')
 }
 
 export type LessonCardWord = { hanzi: string; pinyin: string }
