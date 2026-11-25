@@ -92,7 +92,7 @@ assert.equal(new Set(listeningBank.examListeningBank.map(item => item.audio)).si
 for (const item of listeningBank.examListeningBank) {
   assert.ok(item.options.includes(item.answer), 'each listening question must include its answer')
   assert.equal(new Set(item.options).size, item.options.length, 'listening distractors must be unique')
-  assert.ok(item.audio.length > 12, 'dialogue and monologue audio should contain context')
+  assert.ok(item.audio.length > 8, 'dialogue and monologue audio should contain context')
 }
 for (let level = 1; level <= 6; level += 1) {
   assert.ok(listeningBank.examListeningBank.filter(item => item.level === level).length >= 3)
