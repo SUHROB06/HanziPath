@@ -309,12 +309,12 @@ type ExamFormat = {
 }
 
 const examFormats: Record<string, ExamFormat> = {
-  '2.0:1': { listening: 20, listeningParts: [5, 5, 5, 5], reading: 20, readingParts: [5, 5, 5, 5], writing: 0, writingParts: [], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 35 },
-  '2.0:2': { listening: 35, listeningParts: [10, 10, 10, 5], reading: 25, readingParts: [5, 5, 5, 10], writing: 0, writingParts: [], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 50 },
-  '2.0:3': { listening: 40, listeningParts: [10, 10, 10, 10], reading: 30, readingParts: [10, 10, 10], writing: 10, writingParts: [5, 5], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 85 },
-  '2.0:4': { listening: 45, listeningParts: [10, 15, 20], reading: 40, readingParts: [10, 10, 20], writing: 15, writingParts: [10, 5], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 100 },
-  '2.0:5': { listening: 45, listeningParts: [20, 25], reading: 45, readingParts: [15, 10, 20], writing: 10, writingParts: [8, 2], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 120 },
-  '2.0:6': { listening: 50, listeningParts: [15, 15, 20], reading: 50, readingParts: [10, 10, 10, 20], writing: 1, writingParts: [1], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 135 },
+  '2.0:1': { listening: 20, listeningParts: [5, 5, 5, 5], reading: 20, readingParts: [5, 5, 5, 5], writing: 0, writingParts: [], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 40 },
+  '2.0:2': { listening: 35, listeningParts: [10, 10, 10, 5], reading: 25, readingParts: [5, 5, 5, 10], writing: 0, writingParts: [], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 55 },
+  '2.0:3': { listening: 40, listeningParts: [10, 10, 10, 10], reading: 30, readingParts: [10, 10, 10], writing: 10, writingParts: [5, 5], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 90 },
+  '2.0:4': { listening: 45, listeningParts: [10, 15, 20], reading: 40, readingParts: [10, 10, 20], writing: 15, writingParts: [10, 5], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 105 },
+  '2.0:5': { listening: 45, listeningParts: [20, 25], reading: 45, readingParts: [15, 10, 20], writing: 10, writingParts: [8, 2], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 125 },
+  '2.0:6': { listening: 50, listeningParts: [15, 15, 20], reading: 50, readingParts: [10, 10, 10, 20], writing: 1, writingParts: [1], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 140 },
   '3.0:1': { listening: 20, listeningParts: [5, 5, 5, 5], reading: 20, readingParts: [5, 5, 5, 5], writing: 0, writingParts: [], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 40 },
   '3.0:2': { listening: 25, listeningParts: [5, 10, 10], reading: 25, readingParts: [5, 5, 10, 5], writing: 10, writingParts: [5, 5], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 60 },
   '3.0:3': { listening: 30, listeningParts: [10, 10, 10], reading: 30, readingParts: [10, 10, 10], writing: 10, writingParts: [5, 5], translation: 0, translationParts: [], speaking: 0, speakingParts: [], minutes: 83 },
